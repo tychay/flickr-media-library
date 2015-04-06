@@ -35,9 +35,9 @@ media_upload_header();
             </div>
         </div>
         <!--<div class="media-sidebar">INFO CONTENT HERE</div>-->
-        <div id="<?php echo FML::SLUG ?>-ajax-error" class="error"> ERROR GOES HERE</div>
+        <div id="<?php echo FML::SLUG ?>-ajax-error" class="error"></div>
         <ul tabindex="-1" class="attachments ui-sortable ui-sortable-disabled" id="<?php echo FML::SLUG ?>-photo-list">
-        <!--
+<!--
             <li tabindex=0" role="checkbox" aria-label="LABEL" aria-checked="false" data-id="ID HERE" class="attachment save-ready">
                 <div class="attachment-preview js--select-attachment type-image subtype-jpeg landscape">
                     <div class="thumbnail">

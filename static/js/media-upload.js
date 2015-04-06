@@ -56,6 +56,7 @@
       if ( size ) { size = '_'+size; }
       return 'http://farm'+photoObj.farm+'.staticflickr.com/'+photoObj.server+'/'+photoObj.id+'_'+photoObj.secret+size+'.jpg';
     };
+
     /**
      * Generates web page url to a given photo on Flickr
      *
@@ -65,11 +66,12 @@
      */
     this.webUrl = function(photoObj) {
       return 'http://www.flickr.com/photos'+photoObj.owner+'/'+photoObj.id;
-    }
+    };
+
     // SEARCH QUERY API
     /**
      * Search even triggers search for photos using Flickr API.
-     * @param  {int} paging what page we are displaying.
+     * @param  {int} 0 if starting a new search, 1 if display next page
      * @return {boolean} false
      */
     this.searchPhoto = function(paging) {
@@ -92,7 +94,7 @@
         self.query = self.$search_query.val();
         //self.sort_by = $('#sort_by').val(); TODO
         self.clearItems(true);
-      }else{
+      } else {
         self.page += paging;
       }
 
@@ -124,7 +126,7 @@
      * + parse and show any photodata callback
      * @param  {object} data the json data returned by flickr (probably "photos" or "photoset")
      */
-    self.callbackSearchPhotos = function(data) {
+    this.callbackSearchPhotos = function(data) {
       if( !data ) return self.error(data); 
       if( !data.photos && !data.photoset ) return self.error(data);
       var photos = data.photos;
@@ -172,10 +174,62 @@
       return self.renderPhotoList();
     };
 
-    self.loadMore = function() {
+    /**
+     * handle "Load More" button press by downloading another page of Flickr data
+     * @return {boolean} false to override default behaviuor
+     */
+    this.loadMore = function() {
       $('#pagination').prop('disabled',true).val(constants.msg_loading); //dont allow to keep clicking on it
       self.searchPhoto(1); // get next page
       return false;
+    };
+
+    /**
+     * + Handle change in main select box filter
+     *
+     * this = $select_main
+     */
+    this.changeSearchType = function() {
+      switch ( this.val() ) {
+        case 'self':
+          self.renderFilterMenu('self');
+          self.searchPhoto(0);
+          break;
+        case 'sets':
+          self.clearItems(true);
+          self.renderFilterMenu('sets');
+          break;
+        case 'all':
+          self.searchPhoto(0);
+          self.renderFilterMenu('all');
+          break;
+      }
+    };
+
+    /**
+     * Create secondary filter select box
+     * 
+     */
+    this.renderFilterMenu = function(searchType) {
+      //TODO:
+      /*
+      switch ( searchType) {
+
+      }
+      */
+    }
+
+    /**
+     * + Handle defocus of search field (if edited)
+     *
+     * this = $search_query
+     */
+    this.blurSearchField = function() {
+      // dont' force a refresh if query is unchanged
+      if ( self.query == this.val() ) {
+        return;
+      }
+      self.searchPhoto(0);
     }
     // FLICKR API
     /**
@@ -353,7 +407,7 @@
       self.$photo_list.append($li.append($input));
     };
 
-    // on ready for object
+    // onready for object
     $( function() {
       // initialize document element properties
       self.$select_main  = $('#'+constants.slug+'-select-main');
@@ -363,6 +417,9 @@
       self.$spinner      = $('.spinner');
       self.nonce         = $('#'+constants.slug+'-search-nonce').val();
 
+      // bind behaviors
+      self.$select_main.on('change',self.changeSearchType);
+      self.$search_query.on('blur',self.blurSearchField);
       //$('div#alignments').on('change', ':radio', wpFlickrEmbed.changeAlignment);
       //$('.sizes').on('change', ':radio', wpFlickrEmbed.changeSize);
       //$('input.searchTypes').on('change', wpFlickrEmbed.changeSearchType);
@@ -554,20 +611,6 @@ function WpFlickrEmbed() {
     $('#put_background').show();
   };
 
-  self.changeSearchType = function() {
-    if($('#flickr_search_0:checked').size()) {
-      $('#flickr_search_query').show();
-      $('#photoset').hide();
-    }else if($('#flickr_search_1:checked').size()) {
-      $('#flickr_search_query').hide();
-      wpFlickrEmbed.flickrGetPhotoSetsList(function() {
-        $('#photoset').show();
-      });
-    }else{
-      $('#flickr_search_query').show();
-      $('#photoset').hide();
-    }
-  };
 
   self.changeSortOrder = function() {
     wpFlickrEmbed.searchPhoto(0);
@@ -586,7 +629,6 @@ function WpFlickrEmbed() {
     });
   };
 
-
   self.callbackPhotoSetsList = function(data) {
     if(!data || !data.photosets || !data.photosets.photoset) {
       $('#photoset').css('display', 'none');
@@ -595,7 +637,6 @@ function WpFlickrEmbed() {
       $('#photoset').append(new Option(data.photosets.photoset[i].title._content, data.photosets.photoset[i].id));
     }
   };
-
 
   self.showInsertImageDialog = function(photo_id) {
     self.flickr_url = self.photos[photo_id].flickr_url;
@@ -609,9 +650,6 @@ function WpFlickrEmbed() {
 
     $('#photo_title').val(self.title_text);
   };
-
-
-
 
   self.insertImage = function() {
     var original_flickr_url = self.flickr_url,
@@ -670,8 +708,6 @@ function WpFlickrEmbed() {
 
     self.send_to_editor(p.html(), $('#continue_insert:checked').size() == 0);
   };
-
-
 
   self.cancelInsertImage = function() {
     $('#put_dialog').hide();
