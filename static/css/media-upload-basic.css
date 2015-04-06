@@ -1,0 +1,64 @@
+/* "overrides" */
+.media-iframe-content {
+    /* undo position from core */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 61px;
+    height: auto;
+    width: auto;
+    margin: 0;
+    overflow: auto;
+    background: #fff;
+    /*
+    border-top: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    */
+}
+.media-iframe-toolbar {
+    position: absolute;
+    padding: 0 16px;
+    left: 200px;
+    right: 0;
+    bottom: 0;
+    height: 60px;
+    z-index: 100;
+}
+.media-toolbar {
+    top: 10px;
+}
+.media-toolbar .spinner {
+    margin-top: 0;
+}
+.media-upload-form {
+    margin-top: 40px; /* for some reason the form output is too close to the media items */
+}
+li.attachment {
+    width: 100px; /* used fixed widths for flickr sq thumbnails */
+}
+#flickr-media-library-select-filtersort {
+    display:none; /* initially hide sorting */
+}
+#flickr-media-library-ajax-error {
+    display:none;
+    margin: 10px;
+}
+/* loader *
+#loader {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+}
+#loader span.helper {
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+#loader img {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+}
+*/
