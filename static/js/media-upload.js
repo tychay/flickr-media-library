@@ -29,6 +29,7 @@
     
     // flickr results
     this.photos = [];
+    this.photo_data = {};
     this.photosets = null;
     
     // form objects (initialized in onready)
@@ -36,6 +37,7 @@
     this.$search_query  = null;
     this.$search_filter = null;
     this.$photo_list    = null;
+    this.$media_sidebar = null;
     this.$error_box     = null;
     this.$spinner       = null;
     this.nonce          = null;
@@ -67,7 +69,9 @@
      * @return {string}          url to photo page on flickr
      */
     this.webUrl = function(photoObj) {
-      return 'http://www.flickr.com/photos'+photoObj.owner+'/'+photoObj.id;
+      //if (photoObj.urls && photoObj.urls.url && photoObj.urls.url.typ)
+      var ownername = (typeof photoObj.owner === 'string') ? photoObj.owner : photoObj.owner.username
+      return 'http://www.flickr.com/photos'+ownername+'/'+photoObj.id;
     };
 
     // SEARCH QUERY API
@@ -131,8 +135,7 @@
         query.method = 'flickr.photos.search';
       }
 
-      console.log(query);
-
+      //console.log(query);
       self.getFlickrData(query, self.callbackSearchPhotos);
       return false;
     };
@@ -164,24 +167,10 @@
       if ( !list ) return self.error(data);
       if ( !list.length ) return self.error(data);
 
-      //self.clearItems();
-      //self.photos = {};
-
       // save photos
       for (var i=0; i<list.length; ++i) {
         var photo = list[i];
 
-        photo.short_title = photo.title.replace(/^(.{17}).*$/, '$1…');
-
-        /*
-        photo.img_urls = {
-          's': convert_https_to_http(photo.url_s),
-          'q': convert_https_to_http(photo.url_q),
-          'm': convert_https_to_http(photo.url_m),
-          'z': convert_https_to_http(photo.url_z),
-        };
-        */
-        //var image_s_url = self.convertHTTPStoHTTP(photo.url_sq);
 
         photo.owner = (photo.owner) ? photo.owner : self.user_id;
 
@@ -196,10 +185,48 @@
         photo.url = 'http://www.flickr.com/photos/'+photo.owner+'/'+photot.id+'/';
         */
         var idx = (self.page-1)*self.perpage + i;
-        self.photos[idx] = photo;
+        self.photos[idx] = photo.id;
+        self.addPhotoData(photo.id,photo);
       }
 
       return self.renderPhotoList();
+    };
+
+    this.addPhotoData = function( id, photo ) {
+      // check to make sure ID is right
+      if ( photo.id && (id != photo.id) ) {
+        return;
+      }
+      // first time added info
+      if ( !self.photo_data[id] ) {
+        self.photo_data[id] = photo; 
+        return;
+      }
+      // everything else overwrites existing set
+      var photo_data = self.photo_data[id];
+      for( var idx in photo ) {
+        // handle title special case:
+        if ( idx === 'title' ) {
+          // title fro photoinfo is in XML content
+          if ( photo.title._content ) {
+            photo_data.title = photo.title._content;
+          }
+          // also generate short title
+          photo_data.short_title = photo_data.title.replace(/^(.{17}).*$/, '$1…');
+          continue;
+        }
+        photo_data[idx] = photo[idx];
+      }
+
+        /*
+        photo.img_urls = {
+          's': convert_https_to_http(photo.url_s),
+          'q': convert_https_to_http(photo.url_q),
+          'm': convert_https_to_http(photo.url_m),
+          'z': convert_https_to_http(photo.url_z),
+        };
+        */
+        //var image_s_url = self.convertHTTPStoHTTP(photo.url_sq);
     };
 
     /**
@@ -245,7 +272,7 @@
     /**
      * + Handle defocus of search field (if edited)
      *
-     * this = $search_query
+     * $this = $search_query
      */
     this.blurSearchField = function() {
       // dont' force a refresh if query is unchanged
@@ -257,18 +284,22 @@
 
     /**
      * API to call flickr and get user's photosets list
-     * @param  {Function} cb [description]
-     * @return {[type]}      [description]
+     * @param  {boolean} forceApi Whether to force an API call to refresh the photo list
      */
     self.getPhotoSetsList = function(forceApi) {
-      var params = {};
-
-      params.user_id = constants.flickr_user_id;
-      params.format = 'json';
-      params.method = 'flickr.photosets.getList';
+      var params = {
+        user_id: constants.flickr_user_id,
+        format: 'json',
+        method: 'flickr.photosets.getList'
+      };
 
       self.getFlickrData(params, function(data) {
-        self.callbackPhotoSetsList(data);
+        if ( !data || !data.photosets || !data.photosets.photoset ) {
+          self.photosets = null;
+          self.error(data);
+          return;
+        }
+        self.photosets = data.photosets;
         self.renderFilterMenu('sets');
         self.$spinner.hide();
         if ( forceApi ) {
@@ -277,12 +308,43 @@
       });
     };
 
-    self.callbackPhotoSetsList = function(data) {
-      if( !data || !data.photosets || !data.photosets.photoset ) {
-        self.photosets = null;
-      }
-      self.photosets = data.photosets;
+    self.getPhotoInfo = function(photoId) {
+      // no matter what, don't call it twice
+      self.photo_data[photoId].loaded = true;
+
+      var params = {
+        photo_id: photoId,
+        format: 'json',
+        method: 'flickr.photos.getInfo'
+      };
+
+      self.getFlickrData(params, function(data) {
+        if ( !data || !data.photo || !data.photo.id ) {
+          self.error(data);
+          return;
+        }
+        self.addPhotoData(data.photo.id, data.photo);
+        // make sure it's the same before rendering
+        if (photoId == $('.attachment-details').attr('data-id') ) {
+          // render udpated data
+          self.renderPhotoInfo(photoId);
+        }
+        self.$spinner.hide();
+      });
     };
+
+    /**
+     * + click event on image
+     *
+     * $this = li that triggered event
+     * 
+     * @param  {event} event event object of tirgger
+     */
+    this.showPhotoInfo = function(event) {
+      var id = $(this).attr('data-id');
+      self.renderPhotoInfo(id);
+    };
+
     // FLICKR API
     /**
      * Make a Flickr api call
@@ -411,7 +473,7 @@
       this.clearItems(false);
 
       for (var i=0; i<self.photos.length; ++i) {
-        photo = self.photos[i];
+        photo = self.photo_data[self.photos[i]];
         if ( typeof(photo) != 'object' ) { continue; } // should never happen, but let's handle sparse arrays just in case
         //var li = document.createElement('li');
         var $li = $('<li>').attr({
@@ -421,7 +483,7 @@
           'aria-checked': 'false',
           'data-id': photo.id,
           class: 'attachment save-ready'
-        });
+        }).click(self.showPhotoInfo);
 
         var $img = $('<img>').attr({
           src: self.imgUrl(photo,'s'),
@@ -435,7 +497,7 @@
       }
 
       if (self.page < self.num_pages) {
-          self.showPagination();
+          self.renderPagination();
       }
       self.$spinner.hide();
     };
@@ -443,7 +505,7 @@
     /**
      * Render pagination 
      */
-    this.showPagination = function() {
+    this.renderPagination = function() {
       //<li id="pagin"><input id="pagination" type="button" class="button" value="Load More" style="display: inline-block;"></li>
       var $li = $('<li>').attr({
         id:    'pagin'
@@ -496,6 +558,9 @@
       $select_filter.show();
     };
 
+    /**
+     * Render the photo sets select menu in the filters section
+     */
     this.renderSetsMenu = function() {
       var $select_filter = self.$select_filter;
 
@@ -511,13 +576,99 @@
       $select_filter.show();
     };
 
-    // onready for object
+    /**
+     * Render a photo ont the sidebar
+     * @param  {[type]} id [description]
+     * @return {[type]}    [description]
+     */
+    this.renderPhotoInfo = function(id) {
+      this.$media_sidebar.empty();
+
+      var photo_data = self.photo_data[id];
+      // if ( !photo_data ) { ???; } TODO
+      console.log(photo_data);
+      if ( !photo_data.loaded ) {
+        self.getPhotoInfo(id);
+      }
+
+      var info_box = $('<div>').attr({
+        tabindex: 0,
+        'data-id': id,
+        'class': 'attachment-details save-ready'
+      }).append(
+        $('<h3>').text(constants.msg_attachment_details)
+      );
+
+      var attachment_info = $('<div>').attr('class', 'attachment-info').append(
+        $('<div>').attr('class','thumbnail thumbnail-image')
+        .append(
+          $('<img>').attr({
+            src: self.imgUrl(photo_data,'m'),
+            srcset: self.imgUrl(photo_data,'m')+' 1x, '+self.imgUrl(photo_data,'z')+' 2x, '+self.imgUrl(photo_data,'c')+' 3x',
+            draggable: 'false',
+            alt: photo_data.title
+          })
+        )
+      );
+
+      var details = $('<div>').attr('class', 'details');
+      details.append($('<div>').attr('class', 'filename').text(photo_data.title));
+      if ( photo_data.dates && photo_data.dates.posted ) {
+        var date = new Date(parseInt(photo_data.dates.posted)*1000);
+        details.append($('<div>').attr('class', 'uploaded').text(date.toLocaleString()));
+      }
+      // file-size
+      // dimensions
+      // X edit attachment link
+      // X refresh attachment link
+      // X delete attachment link
+      // <div class="compat-meta"></div>
+      attachment_info.append(details);
+      info_box.append(attachment_info);
+      
+      info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data), false ));
+      info_box.append(self._makeLabelTag('title', constants.msg_title, photo_data.title, false ));
+      // label title
+      // label caption
+      // label alt text
+      if ( photo_data.description && photo_data.description._content ) {
+        info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description._content, true ));
+      }
+
+      this.$media_sidebar.append(info_box);
+    };
+
+    this._makeLabelTag = function (dataSetting, name, value, textArea)  {
+      var label = $('<label>').attr({
+          'class': 'setting',
+          'data-setting': dataSetting
+        }).append(
+          $('<span>').attr('class','name').text(name)
+        );
+      if ( textArea ) {
+        label.append(
+          $('<textarea>').attr('readonly', 'readonly').text(value)
+        );
+      } else {
+        label.append(
+          $('<input>').attr({
+            'type': 'text',
+            'value': value,
+            'readonly': 'readonly'
+          })
+        );
+      }
+      return label;
+    };
+
+    // ONREADY
     $( function() {
       // initialize document element properties
       self.$select_main   = $('#'+constants.slug+'-select-main');
       self.$select_filter = $('#'+constants.slug+'-select-filtersort');
       self.$search_query  = $('#'+constants.slug+'-search-input');
       self.$photo_list    = $('#'+constants.slug+'-photo-list');
+      self.$media_sidebar = $('#'+constants.slug+'-media-sidebar');
       self.$error_box     = $('#ajax_error_msg');
       self.$spinner       = $('.spinner');
       self.nonce          = $('#'+constants.slug+'-search-nonce').val();

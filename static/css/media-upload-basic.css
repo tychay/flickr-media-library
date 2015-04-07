@@ -37,6 +37,11 @@
 li.attachment {
     width: 100px; /* used fixed widths for flickr sq thumbnails */
 }
+.attachment-info .thumbnail, .attachment-info .thumbnail img {
+    max-width: 240px; /* default is 120px, but let's make it larger because we can */
+    max-height: 240px;
+}
+
 #flickr-media-library-select-filtersort {
     display:none; /* initially hide sorting */
 }

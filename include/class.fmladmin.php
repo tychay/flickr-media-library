@@ -417,6 +417,10 @@ class FMLAdmin
 			'msg_flickr_error_unknown '=> __('Flickr API returned an unknown error.', FML::SLUG),
 			'msg_pagination'     => __('Load More'),
 			'msg_loading'        => __('Loading…', FML::SLUG),
+			'msg_attachment_details' => __('Attachment Details'),
+			'msg_url'            => __('URL'),
+			'msg_title'          => __('Title'),
+			'msg_description'    => __('Description'),
 			'msgs_sort'			 => array(
 				'date-posted-desc'     => __('Date posted (desc)', FML::SLUG),
 				'date-posted-asc'      => __('Date posted (asc)', FML::SLUG),

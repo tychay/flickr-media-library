@@ -32,21 +32,9 @@ media_upload_header();
                 <input type="search" placeholder="<?php _e('Search'); ?>" id="<?php echo FML::SLUG; ?>-search-input" class="search" />
             </div>
         </div>
-        <!--<div class="media-sidebar">INFO CONTENT HERE</div>-->
+        <div class="media-sidebar" id="<?php echo FML::SLUG?>-media-sidebar"></div>
         <div id="<?php echo FML::SLUG ?>-ajax-error" class="error"></div>
         <ul tabindex="-1" class="attachments ui-sortable ui-sortable-disabled" id="<?php echo FML::SLUG ?>-photo-list">
-<!--
-            <li tabindex=0" role="checkbox" aria-label="LABEL" aria-checked="false" data-id="ID HERE" class="attachment save-ready">
-                <div class="attachment-preview js--select-attachment type-image subtype-jpeg landscape">
-                    <div class="thumbnail">
-                        <div class="centered">
-                            <img src="http://terrychay.dev/wp-content/uploads/2014/09/DSC0516_DxO-300x200.jpg" draggable="false" alt="">
-                        </div>
-                    </div>
-                </div>
-                <a class="check" href="#" title="Deselect" tabindex="-1"><div class="media-modal-icon"></div></a>
-            </li>         
--->
         </ul>
     </div>
     </form>
