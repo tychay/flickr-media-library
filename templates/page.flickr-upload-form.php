@@ -24,9 +24,7 @@ media_upload_header();
                     <option value="all">Everyone's Photos</option>
                 </select>
                 <label for="<?php echo FML::SLUG ?>-select-filtersort" class="screen-reader-text"><?php _e('Filter by date'); ?></label>
-                <select id="<?php echo FML::SLUG ?>-select-filtersort" class="attachment-filters">
-                    <option value="all">All dates</option><option value="0">September 2014</option><option value="1">September 2011</option><option value="2">June 2010</option><option value="3">May 2010</option><option value="4">April 2010</option><option value="5">March 2010</option><option value="6">February 2010</option>
-                </select>
+                <select id="<?php echo FML::SLUG ?>-select-filtersort" class="attachment-filters"></select>
                 <span class="spinner" style="display: none;"></span>
             </div>
             <div class="media-toolbar-primary search-form">

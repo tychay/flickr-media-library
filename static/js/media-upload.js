@@ -24,19 +24,21 @@
     this.num_pages = 1;
     this.user_id = null;
     this.query = null;
-    self.sort_by = null;
-    //self.photoset_id = null;
+    this.sort_by = null;
+    this.photoset_id = null;
     
     // flickr results
-    self.photos = [];
+    this.photos = [];
+    this.photosets = null;
     
     // form objects (initialized in onready)
-    this.$select_main  = null;
-    this.$search_query = null;
-    this.$photo_list   = null;
-    this.$error_box    = null;
-    this.$spinner      = null;
-    this.nonce         = null;
+    this.$select_main   = null;
+    this.$search_query  = null;
+    this.$search_filter = null;
+    this.$photo_list    = null;
+    this.$error_box     = null;
+    this.$spinner       = null;
+    this.nonce          = null;
 
     //self.alignments = ['alignment_none', 'alignment_left', 'alignment_center', 'alignment_right'];
     //self.flickr_url = '';
@@ -81,33 +83,44 @@
           case 'self':
             self.user_id = constants.flickr_user_id;
             self.photoset_id = null;
+            self.sort_by = self.getFilterValue('sort');
+            self.query = self.$search_query.val();
             break;
           case 'sets':
             self.user_id = constants.flickr_user_id;
-            //self.photoset_id = $('#photoset option:selected').val(); TODO
+            self.photoset_id = self.getFilterValue('sets');
+            self.sort_by = null;
+            self.query = '';
+            //self.$search_query.val(''); // clear search field
             break;
           case 'all':
             self.user_id = null;
             self.photoset_id = null;
+            self.sort_by = self.getFilterValue('sort');
+            self.query = self.$search_query.val();
             break;
         }
-        self.query = self.$search_query.val();
-        //self.sort_by = $('#sort_by').val(); TODO
         self.clearItems(true);
       } else {
         self.page += paging;
       }
 
       var query = {
-        text: self.query,
         page: self.page,
         per_page: self.perpage,
         //extras: 'url_s,url_q,url_n,url_z'
       };
-      //query.sort     = self.sort_by;
+      if ( self.query ) {
+        query.text = self.query;
+      }
+      if ( self.sort_by ) {
+        query.sort = self.sort_by;
+      }
       if ( self.user_id ) {
         query.user_id     = self.user_id;
-        query.photoset_id = self.photoset_id;
+        if ( self.photoset_id ) {
+          query.photoset_id = self.photoset_id;
+        }
       }
 
       if ( !query.text && !query.user_id ) {
@@ -118,9 +131,24 @@
         query.method = 'flickr.photos.search';
       }
 
+      console.log(query);
+
       self.getFlickrData(query, self.callbackSearchPhotos);
       return false;
     };
+
+    /**
+     * Get the value of the select filter (if the type is right)
+     * @param  {string} filterType either 'sort' or 'set'
+     * @return {mixed}             either NULL or the value of the select filter
+     */
+    this.getFilterValue = function(filterType) {
+      if ( !self.$select_filter ) { return null; }
+      if ( self.$select_filter.attr('data-type') != filterType ) {
+        return null;
+      }
+      return self.$select_filter.val();
+    }
 
     /**
      * + parse and show any photodata callback
@@ -190,34 +218,29 @@
      * this = $select_main
      */
     this.changeSearchType = function() {
-      switch ( this.val() ) {
+      switch ( self.$select_main.val() ) {
         case 'self':
+          self.$search_query.show();
           self.renderFilterMenu('self');
           self.searchPhoto(0);
           break;
         case 'sets':
+          self.$search_query.hide();
+          self.getPhotoSetsList(true);
+          //self.renderFilterMenu('sets');
           self.clearItems(true);
-          self.renderFilterMenu('sets');
           break;
         case 'all':
-          self.searchPhoto(0);
+          self.$search_query.show();
           self.renderFilterMenu('all');
+          self.searchPhoto(0);
           break;
       }
     };
 
-    /**
-     * Create secondary filter select box
-     * 
-     */
-    this.renderFilterMenu = function(searchType) {
-      //TODO:
-      /*
-      switch ( searchType) {
-
-      }
-      */
-    }
+    this.changeFilterType = function() {
+        self.searchPhoto(0);
+    };
 
     /**
      * + Handle defocus of search field (if edited)
@@ -226,11 +249,40 @@
      */
     this.blurSearchField = function() {
       // dont' force a refresh if query is unchanged
-      if ( self.query == this.val() ) {
+      if ( self.query == self.$search_query.val() ) {
         return;
       }
       self.searchPhoto(0);
-    }
+    };
+
+    /**
+     * API to call flickr and get user's photosets list
+     * @param  {Function} cb [description]
+     * @return {[type]}      [description]
+     */
+    self.getPhotoSetsList = function(forceApi) {
+      var params = {};
+
+      params.user_id = constants.flickr_user_id;
+      params.format = 'json';
+      params.method = 'flickr.photosets.getList';
+
+      self.getFlickrData(params, function(data) {
+        self.callbackPhotoSetsList(data);
+        self.renderFilterMenu('sets');
+        self.$spinner.hide();
+        if ( forceApi ) {
+          self.searchPhoto(0);
+        }
+      });
+    };
+
+    self.callbackPhotoSetsList = function(data) {
+      if( !data || !data.photosets || !data.photosets.photoset ) {
+        self.photosets = null;
+      }
+      self.photosets = data.photosets;
+    };
     // FLICKR API
     /**
      * Make a Flickr api call
@@ -407,23 +459,76 @@
       self.$photo_list.append($li.append($input));
     };
 
+    /**
+     * Create secondary filter select box
+     */
+    this.renderFilterMenu = function(searchType) {
+      switch ( searchType) {
+        case 'self':
+        case 'all':
+          if ( self.$select_filter.attr('data-type') != 'sort' ) {
+            self.renderSortMenu();
+          }
+          break;
+        case 'sets':
+          if ( self.$select_filter.attr('data-type') != 'sets' ) {
+            self.renderSetsMenu();
+          }
+      }
+    };
+
+    /**
+     * Render the sort_by select menu in the filter section
+     */
+    this.renderSortMenu = function() {
+      var $select_filter = self.$select_filter;
+
+      $select_filter.hide();
+      $select_filter.empty();
+      for (var val in constants.msgs_sort) {
+        //var option = $('<option>').attr('value', val).text(constants.msgs_sort[val]);
+        //$select_filter.append(option);
+        $select_filter.append(
+          new Option(constants.msgs_sort[val], val)
+        );
+      }
+      $select_filter.attr('data-type','sort');
+      $select_filter.show();
+    };
+
+    this.renderSetsMenu = function() {
+      var $select_filter = self.$select_filter;
+
+      $select_filter.hide();
+      $select_filter.empty();
+      if ( !self.photosets) { return; }
+      for( var i=0; i<self.photosets.photoset.length; ++i) {
+        $select_filter.append(
+          new Option(self.photosets.photoset[i].title._content, self.photosets.photoset[i].id)
+        );
+      }
+      $select_filter.attr('data-type','sets');
+      $select_filter.show();
+    };
+
     // onready for object
     $( function() {
       // initialize document element properties
-      self.$select_main  = $('#'+constants.slug+'-select-main');
-      self.$search_query = $('#'+constants.slug+'-search-input');
-      self.$photo_list   = $('#'+constants.slug+'-photo-list');
-      self.$error_box    = $('#ajax_error_msg');
-      self.$spinner      = $('.spinner');
-      self.nonce         = $('#'+constants.slug+'-search-nonce').val();
+      self.$select_main   = $('#'+constants.slug+'-select-main');
+      self.$select_filter = $('#'+constants.slug+'-select-filtersort');
+      self.$search_query  = $('#'+constants.slug+'-search-input');
+      self.$photo_list    = $('#'+constants.slug+'-photo-list');
+      self.$error_box     = $('#ajax_error_msg');
+      self.$spinner       = $('.spinner');
+      self.nonce          = $('#'+constants.slug+'-search-nonce').val();
+
+      // render
+      self.renderFilterMenu('self');
 
       // bind behaviors
       self.$select_main.on('change',self.changeSearchType);
+      self.$select_filter.on('change',self.changeFilterType);
       self.$search_query.on('blur',self.blurSearchField);
-      //$('div#alignments').on('change', ':radio', wpFlickrEmbed.changeAlignment);
-      //$('.sizes').on('change', ':radio', wpFlickrEmbed.changeSize);
-      //$('input.searchTypes').on('change', wpFlickrEmbed.changeSearchType);
-      //$('select#sort_by').on('change', wpFlickrEmbed.changeSortOrder);
     });
   } // of FMLSearchDisplay class
   //var wpFlickrEmbed = new WpFlickrEmbed();
@@ -496,12 +601,10 @@ String.prototype.htmlspecialchars = function() {
 };
 
 function WpFlickrEmbed() {
-  
 
   self.slugifySizeLabel = function(sizeLabel) {
     return sizeLabel.toLowerCase().replace(' ', '_');
   };
-
 
   self.flickrGetPhotoSizes = function(photo_id) {
     var params = {};
@@ -511,7 +614,6 @@ function WpFlickrEmbed() {
 
     self.getFlickrData(params, self.callbackPhotoSizes);
   };
-
 
   /**
    * Build DIV containing Radio button for selecting a size.
@@ -552,7 +654,6 @@ function WpFlickrEmbed() {
 
     return newSizeDiv;
   };
-
 
   self.callbackPhotoSizes = function(data) {
     if (! data) return self.error(data);
@@ -611,32 +712,6 @@ function WpFlickrEmbed() {
     $('#put_background').show();
   };
 
-
-  self.changeSortOrder = function() {
-    wpFlickrEmbed.searchPhoto(0);
-  };
-
-  self.flickrGetPhotoSetsList = function(cb) {
-    var params = {};
-    params.user_id = flickr_user_id;
-    params.format = 'json';
-    params.method = 'flickr.photosets.getList';
-
-    self.getFlickrData(params, function(data) {
-      self.callbackPhotoSetsList(data);
-      cb();
-      $('#loader').hide();
-    });
-  };
-
-  self.callbackPhotoSetsList = function(data) {
-    if(!data || !data.photosets || !data.photosets.photoset) {
-      $('#photoset').css('display', 'none');
-    }
-    for(var i=0;i<data.photosets.photoset.length;i++) {
-      $('#photoset').append(new Option(data.photosets.photoset[i].title._content, data.photosets.photoset[i].id));
-    }
-  };
 
   self.showInsertImageDialog = function(photo_id) {
     self.flickr_url = self.photos[photo_id].flickr_url;
@@ -739,9 +814,6 @@ function WpFlickrEmbed() {
     }
   };
 
-
-
-
   self.send_to_editor = function(h, close) {
     var ed;
 
@@ -775,8 +847,6 @@ function WpFlickrEmbed() {
     }
   };
 }
-
-
 
 
 

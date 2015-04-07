@@ -417,6 +417,15 @@ class FMLAdmin
 			'msg_flickr_error_unknown '=> __('Flickr API returned an unknown error.', FML::SLUG),
 			'msg_pagination'     => __('Load More'),
 			'msg_loading'        => __('Loading…', FML::SLUG),
+			'msgs_sort'			 => array(
+				'date-posted-desc'     => __('Date posted (desc)', FML::SLUG),
+				'date-posted-asc'      => __('Date posted (asc)', FML::SLUG),
+				'date-taken-desc'      => __('Date taken (asc)', FML::SLUG),
+				'date-taken-desc'      => __('Date taken (desc)', FML::SLUG),
+				'interestingness-asc'  => __('Interestingness (asc)', FML::SLUG),
+				'interestingness-desc' => __('Interestingness (desc)', FML::SLUG),
+				'relevance'            => __('Relevance', FML::SLUG),
+			),
 			//'plugin_uri' => 
 			//'plugin_img_uri' =>
 			//'msg_pages'          => __('(%1$s / %2$s page(s), %3$s photo(s))', FML::SLUG),
@@ -435,7 +444,7 @@ class FMLAdmin
 				100 => __('Invalid API key', FML::SLUG),
 				104 => __('Service currently unavailable', FML::SLUG),
 				999 => __('Unknonw error', FML::SLUG),
-				),
+			),
 		);
 		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
 		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
