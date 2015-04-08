@@ -387,9 +387,16 @@ class FMLAdmin
 	{
 		$settings = $this->_fml->settings;
 		wp_enqueue_style(
-			FML::SLUG.'-old-media-form-style',
-			$this->_fml->static_url.'/css/media-upload-basic.css'//,
+			'media-views',
+			admin_url('css/media-views.css')
 			// deps
+			// ver
+			// media
+		);
+		wp_enqueue_style(
+			FML::SLUG.'-old-media-form-style',
+			$this->_fml->static_url.'/css/media-upload-basic.css',
+			'media-views'
 			// ver
 			// media
 		);

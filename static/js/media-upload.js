@@ -568,8 +568,9 @@
       $select_filter.empty();
       if ( !self.photosets) { return; }
       for( var i=0; i<self.photosets.photoset.length; ++i) {
+        var short_name = (self.photosets.photoset[i].title._content.replace(/^(.{17}).*$/, '$1…'));
         $select_filter.append(
-          new Option(self.photosets.photoset[i].title._content, self.photosets.photoset[i].id)
+          new Option(short_name, self.photosets.photoset[i].id)
         );
       }
       $select_filter.attr('data-type','sets');
@@ -586,7 +587,7 @@
 
       var photo_data = self.photo_data[id];
       // if ( !photo_data ) { ???; } TODO
-      console.log(photo_data);
+      //console.log(photo_data);
       if ( !photo_data.loaded ) {
         self.getPhotoInfo(id);
       }
