@@ -50,8 +50,11 @@ class FMLAdmin
 		$this->_flickr_sign_action        = str_replace('-','_',FML::SLUG).'_sign';
 		$this->_fml_upload_id             = str_replace('-','_',FML::SLUG).'_insert_flickr';
 
+		// Stuff to do after initialization
+		add_action( 'admin_init', array( $this, 'init') );
 		// Add Settings & ? pages to admin menu
 		add_action( 'admin_menu', array( $this, 'create_admin_menus' ) );
+		add_action( 'load-options-permalink.php', array( $this, 'handle_permalink_form') );
 		// Add link to Settings page to Plugin page
 		add_filter( 'plugin_action_links_'.$this->_fml->plugin_basename, array($this, 'filter_plugin_settings_links'), 10, 2 );
 		// If in Settings page register plugin Settings page as Flickr callback
@@ -70,6 +73,57 @@ class FMLAdmin
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array($this, 'filter_media_upload_tabs') );
 		add_action( 'media_upload_'.$this->_fml_upload_id, array($this, 'get_media_upload_iframe') );
+	}
+
+	/**
+	 * Register settings, etc.
+	 * @return void
+	 */
+	public function init()
+	{
+		register_setting( 'permalink', $this->_fml->permalink_slug_id, 'urlencode');
+		add_settings_field(
+			$this->_fml->permalink_slug_id,
+			__('Flickr Media base', FML::SLUG), //title
+			array($this, 'render_permalink_field'), //form render callback
+			'permalink', //page
+			'optional', // section
+			array( //args
+				'label_for' => $this->_fml->permalink_slug_id
+			)
+		);
+
+	}
+
+	/**
+	 * Save the permalink base option.
+	 *
+	 * This is due to a bug in the Settings.api where options-permalink.php uses
+	 * the API for hooks but the URL goes to {@see options-permalink.php}
+	 * instead of {@see options.php} which has the settings stuff.
+	 */
+	public function handle_permalink_form()
+	{
+		if ( !empty($_POST[$this->_fml->permalink_slug_id]) ) {
+			check_admin_referer('update-permalink');
+			$this->_fml->permalink_slug = urlencode($_POST[$this->_fml->permalink_slug_id]);
+		}
+		// pass through
+	}
+
+	/**
+	 * Settings API to render base HTML form in options-permalink.php
+	 * @param  [type] $args [description]
+	 * @return [type]       [description]
+	 */
+	public function render_permalink_field($args)
+	{
+		$slug = $this->_fml->permalink_slug;
+		printf(
+			'<input name="%1$s" id="%1$s" type="text" value="%2$s" class="regular-text code" />',
+			$args['label_for'],
+			esc_attr($slug)
+		);
 	}
 	/**
 	 * Add the admin menus for FML to wp/admin

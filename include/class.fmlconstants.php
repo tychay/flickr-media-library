@@ -18,6 +18,10 @@ interface FMLConstants
      * The default flickr API secret of this plugin. This can be changed at runtime
      */
     const _FLICKR_SECRET = '02bf5327389eca85';
+    /**
+     * The default "base" (permalink slug) for the custom post type
+     */
+    const _DEFAULT_BASE = 'flickr_photo';
 
     const DISABLED_REASON_PHP_VERSION = 'php_version';
 

@@ -31,6 +31,10 @@ class FML implements FMLConstants
 	 * @var string Cache the plugin basename
 	 */
 	public $plugin_basename;
+	/**
+	 * @var string the option name for the permalink base (access through _get)
+	 */
+	private $_permalink_slug_id;
 
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
@@ -38,7 +42,11 @@ class FML implements FMLConstants
 	/**
 	 * Plugin Initialization
 	 *
-	 * Note that this plugin is not even initialized until WordPress init has been fired!
+	 * Note that this plugin is not even initialized until WordPress init has
+	 * been fired.
+	 *
+	 * This will set the static variables and register the custom post type
+	 * used for storing flickr photos
 	 *
 	 * @param  string $pluginFile __FILE__ for the plugin file
 	 */
@@ -46,6 +54,15 @@ class FML implements FMLConstants
 	{
 		$this->_set_statics($pluginFile);
 		// settings and flickr are lazy loaded
+		register_post_type('fml_photo', array(
+			'labels'      => array( //name of post type in plural and singualr form
+				'name'          => _x('Flickr Media', 'plural', self::SLUG),
+				'singular_name' => _x('Flickr Media', 'singular', self::SLUG),
+			),
+			'public'      => true, // display on admin screen and site content
+			'has_archive' => true, // can have archive template
+			'rewrite'     => array('slug' => $this->permalink_slug),
+		));
 	}
 	/**
 	 * Set up "static" properties
@@ -56,6 +73,7 @@ class FML implements FMLConstants
 		$this->template_dir = $this->plugin_dir . '/templates';
 		$this->static_url = plugins_url('static',$pluginFile);
 		$this->plugin_basename = plugin_basename($pluginFile);
+		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
 	}
 
 	//
@@ -84,12 +102,18 @@ class FML implements FMLConstants
 				return $this->_get_flickr();
 			case 'flickr_callback':
 				return $this->_flickr_callback;
+			case 'permalink_slug_id':
+				return $this->_permalink_slug_id;
+			case 'permalink_slug':
+				return get_option($this->permalink_slug_id, self::_DEFAULT_BASE);
+			default:
+				trigger_error(sprintf('Property %s does not exist',$name));
+				return null;
 		}
 	}
 	/**
 	 * __setter() override
 	 *
-	 * @todo  probably need to throw instead of return errors
 	 * @param string $name the property to set
 	 * @param mixed $value the value to set it to.
 	 */
@@ -97,18 +121,19 @@ class FML implements FMLConstants
 	{
 		switch( $name ) {
 			case 'settings':
-				return WP_Error(
-					self::SLUG.'-incorrect-setting',
-					'Set plugin settings through update_settings()'
-				 );
+				trigger_error(sprintf('Set plugin settings through update_settings()', $name));
+				break;
 			case 'flickr':
-				return WP_Error(
-					self::SLUG.'-api-locked',
-					'Not allowed to externally set flickr API'
-				 );
+				trigger_error(sprintf('Not allowed to externally set flickr API.', $name));
+				break;
 			case 'flickr_callback':
 				$this->_flickr_callback = $value;
 				break;
+			case 'permalink_slug':
+				update_option($this->permalink_slug_id, $value);
+			default:
+				trigger_error(sprintf('Property %s is not settable', $name));
+			break;
 		}
 	}
 	/**
