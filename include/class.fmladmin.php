@@ -28,7 +28,8 @@ class FMLAdmin
 	/**
 	 * User_meta field for if display apikey and secret.
 	 * 
-	 * Due to cookie stuff, this can contain only ascii, numbers and underscores.
+	 * (Due to future cookie stuff, this can contain only ascii, numbers and underscores.)
+	 * Also used as action for ajax request
 	 * @var string
 	 */
 	private $_flickr_apikey_option_name = '';
@@ -47,7 +48,8 @@ class FMLAdmin
 		$this->_flickr_auth_form_id       = FML::SLUG.'-flickr-auth';
 		$this->_flickr_deauth_form_id     = FML::SLUG.'-flickr-deauth';
 		$this->_flickr_apikey_option_name = str_replace('-','_',FML::SLUG).'_show_apikey';
-		$this->_flickr_sign_action        = str_replace('-','_',FML::SLUG).'_sign';
+		$this->_action_flickr_sign        = str_replace('-','_',FML::SLUG).'_sign';
+		$this->_action_add_flickr         = str_replace('-','_',FML::SLUG).'_add_flickr';
 		$this->_fml_upload_id             = str_replace('-','_',FML::SLUG).'_insert_flickr';
 
 		// Stuff to do after initialization
@@ -69,7 +71,9 @@ class FMLAdmin
 		// Add ajax server for handling ajax api options
 		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
 		// Add ajax for client to get flickr api signing
-		add_action( 'wp_ajax_'.$this->_flickr_sign_action, array($this, 'handle_ajax_sign_request') );
+		add_action( 'wp_ajax_'.$this->_action_flickr_sign, array($this, 'handle_ajax_sign_request') );
+		// Add ajax for client to adding flickr image to media library
+		add_action( 'wp_ajax_'.$this->_action_add_flickr, array($this, 'handle_ajax_add_flickr') );
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array($this, 'filter_media_upload_tabs') );
 		add_action( 'media_upload_'.$this->_fml_upload_id, array($this, 'get_media_upload_iframe') );
@@ -347,7 +351,7 @@ class FMLAdmin
 	public function handle_ajax_sign_request() {
 		// This nonce is created in the page.flickr-upload-form.php template
 		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
-			$return = array(
+			wp_send_json(array(
 				'status' => 'fail',
 				'code'   => 401, //HTTP code for unauthorized
 				'reason' => sprintf(
@@ -355,42 +359,79 @@ class FMLAdmin
 					'_ajax_nonce',
 					( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
 				),
-			);
-		} elseif ( empty( $_POST['request_data']) ) {
-			$return = array(
+			));
+			//dies
+		}
+		if ( empty( $_POST['request_data']) ) {
+			wp_send_json(array(
 				'status' => 'fail',
 				'code'   => 400, //HTTP code bad request
 				'reason' => sprintf(
 					__('Missing parameter: %s',FML::SLUG),
 					'request_data'
 				),
-			);
-		} else {
-			$json = @json_decode(stripslashes($_POST['request_data']));
-			if ( empty($json) || !is_object($json) ) {
-				$return = array(
-					'status' => 'fail',
-					'code'   => 400, //HTTP code bad request
-					'reason' => sprintf(
-						__('Invalid JSON input: %s',FML::SLUG),
-						$_POST['request_data']
-					),
-				);
-			} else {
-				$json->api_key = $this->_fml->settings['flickr_api_key'];
-
-				$return = array(
-					'status' => 'ok',
-					'signed' => $this->_fml->flickr->getSignedUrlParams(
-							$json->method,
-							get_object_vars($json)
-						),
-				);
-			}
+			));
+			//dies
 		}
-		header('Content-type: application/json');
-		echo json_encode($return);
-		die();
+		$json = @json_decode(stripslashes($_POST['request_data']));
+		if ( empty($json) || !is_object($json) ) {
+			wp_send_json(array(
+				'status' => 'fail',
+				'code'   => 400, //HTTP code bad request
+				'reason' => sprintf(
+					__('Invalid JSON input: %s',FML::SLUG),
+					$_POST['request_data']
+				),
+			));
+			//dies
+		}
+
+		$json->api_key = $this->_fml->settings['flickr_api_key'];
+		wp_send_json(array(
+			'status' => 'ok',
+			'signed' => $this->_fml->flickr->getSignedUrlParams(
+				$json->method,
+				get_object_vars($json)
+			),
+		));
+		//header('Content-type: application/json');
+		//echo json_encode($return);
+		//die();
+	}
+	/**
+	 * Client side ajax to add a flickr image to flickr media library (via ajax)
+	 */
+	public function handle_ajax_add_flickr() {
+		// This nonce is created in the page.flickr-upload-form.php template
+		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
+			wp_send_json(array(
+				'status' => 'fail',
+				'code'   => 401, // HTTP CODE for unauthorized
+				'reason' => sprintf(
+					__('Missing or incorrect nonce %s=%s',FML::SLUG),
+					'_ajax_nonce',
+					( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
+				),
+			));
+		}
+		if ( empty( $_POST['flickr_id']) ) {
+			wp_send_json(array(
+				'status' => 'fail',
+				'code'   => 400, //HTTP code bad request
+				'reason' => sprintf(
+					__('Missing parameter: %s',FML::SLUG),
+					'request_data'
+				),
+			));
+			//dies
+		}
+		// TODO add code for attaching image to post
+		// TODO: wp_insert_post here
+		wp_send_json(array(
+			'status' => 'ok',
+			'post_id' => 'TODO',
+			'flickr_id' => $_POST['flickr_id'],
+		));
 	}
 	/**
 	 * Show the Settings (Options) page which allows you to do Flickr oAuth.
@@ -474,7 +515,8 @@ class FMLAdmin
 			'slug'               => FML::SLUG,
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
-			'sign_action'        => $this->_flickr_sign_action,
+			'sign_action'        => $this->_action_flickr_sign,
+			'add_action'         => $this->_action_add_flickr,
 			'msg_ajax_error'     => __('AJAX error %s (%s).', FML::SLUG),
 			'msg_flickr_error'   => __('AJAX error %s (%s).', FML::SLUG),
 			'msg_flickr_error_unknown '=> __('Flickr API returned an unknown error.', FML::SLUG),

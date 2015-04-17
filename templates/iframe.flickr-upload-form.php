@@ -19,9 +19,9 @@ media_upload_header();
             <div class="media-toolbar-secondary">
                 <label for="<?php echo FML::SLUG ?>-select-main" class="screen-reader-text"><?php _e('Filter by type'); ?></label>
                 <select id="<?php echo FML::SLUG ?>-select-main" class="attachment-filters">
-                    <option value="self">Your Photos</option>
-                    <option value="sets">Your Sets</option>
-                    <option value="all">Everyone's Photos</option>
+                    <option value="self"><?php _e('Your Photos',FML::SLUG); ?></option>
+                    <option value="sets"><?php _e('Your Sets',FML::SLUG); ?></option>
+                    <option value="all"><?php _e('Everyone&rsquo;s Photos', FML::SLUG); ?></option>
                 </select>
                 <label for="<?php echo FML::SLUG ?>-select-filtersort" class="screen-reader-text"><?php _e('Filter by date'); ?></label>
                 <select id="<?php echo FML::SLUG ?>-select-filtersort" class="attachment-filters"></select>
@@ -41,6 +41,6 @@ media_upload_header();
 </div>
 <div class="media-iframe-toolbar">
     <div class="media-toolbar-primary search-form">
-        <a href="#" class="button media-button button-primary button-large media-button-select" disabled="disabled"><?php echo __('Add to media library', FML::SLUG); ?></a>
+        <a href="#" id="<?php echo FML::SLUG; ?>-media-add-button" class="button media-button button-primary button-large media-button-select" disabled="disabled"><?php echo __('Add to media library', FML::SLUG); ?></a>
     </div>
 </div>

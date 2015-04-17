@@ -38,6 +38,7 @@
     this.$search_filter = null;
     this.$photo_list    = null;
     this.$media_sidebar = null;
+    this.$add_button    = null;
     this.$error_box     = null;
     this.$spinner       = null;
     this.nonce          = null;
@@ -343,6 +344,43 @@
     this.showPhotoInfo = function(event) {
       var id = $(this).attr('data-id');
       self.renderPhotoInfo(id);
+      // TODO: insert check to see if already in database
+      // activate insert button
+      self.$add_button.attr({ // prop() doesn't seem to work :-(
+        'data-id' : id,
+        'disabled': false
+      });
+    };
+
+    /**
+     * + click on add button
+     *
+     * $this = "add to media library" button
+     */
+    this.submitAddButton = function(event) {
+      var id=$(this).attr('data-id');
+      // TODO: disable button and rename
+      self.requestAddLibrary(id);
+    };
+
+    this.requestAddLibrary = function(flickrId) {
+      self.$error_box.hide();
+      self.$spinner.show();
+
+      $.ajax( constants.ajax_url, {
+          timeout: 15000,
+          type: 'POST',
+          data: {
+            _ajax_nonce: self.nonce,
+            action: constants.add_action,
+            flickr_id: flickrId
+          },
+          dataType: 'json',
+          success: function(data) {
+            console.log(data);
+          },
+          error: self.handle_ajax_error
+      });
     };
 
     // FLICKR API
@@ -352,7 +390,6 @@
      * @param  {function} successCallback function to call on success
      */
     this.getFlickrData = function(params, successCallback) {
-
       self.$error_box.hide();
       self.$spinner.show();
 
@@ -579,8 +616,8 @@
 
     /**
      * Render a photo ont the sidebar
-     * @param  {[type]} id [description]
-     * @return {[type]}    [description]
+     * @param  {string} id flickr id of photo (data-id of li element clicked on)
+     * @return null     
      */
     this.renderPhotoInfo = function(id) {
       this.$media_sidebar.empty();
@@ -670,6 +707,7 @@
       self.$search_query  = $('#'+constants.slug+'-search-input');
       self.$photo_list    = $('#'+constants.slug+'-photo-list');
       self.$media_sidebar = $('#'+constants.slug+'-media-sidebar');
+      self.$add_button    = $('#'+constants.slug+'-media-add-button');
       self.$error_box     = $('#ajax_error_msg');
       self.$spinner       = $('.spinner');
       self.nonce          = $('#'+constants.slug+'-search-nonce').val();
@@ -678,9 +716,10 @@
       self.renderFilterMenu('self');
 
       // bind behaviors
-      self.$select_main.on('change',self.changeSearchType);
+      self.$select_main.on(  'change',self.changeSearchType);
       self.$select_filter.on('change',self.changeFilterType);
-      self.$search_query.on('blur',self.blurSearchField);
+      self.$search_query.on( 'blur',  self.blurSearchField);
+      self.$add_button.on(   'click', self.submitAddButton);
     });
   } // of FMLSearchDisplay class
   //var wpFlickrEmbed = new WpFlickrEmbed();
