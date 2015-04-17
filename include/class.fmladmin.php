@@ -345,7 +345,7 @@ class FMLAdmin
 	 * Client side flickr request signing service (via ajax)
 	 */
 	public function handle_ajax_sign_request() {
-		// This nocen is created in the page.flickr-upload-form.php template
+		// This nonce is created in the page.flickr-upload-form.php template
 		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
 			$return = array(
 				'status' => 'fail',
@@ -523,7 +523,7 @@ class FMLAdmin
 		$settings = $this->_fml->settings;
 		$admin_img_dir_url = admin_url('images/');
 
-		include $this->_fml->template_dir.'/page.flickr-upload-form.php';
+		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
 	}
 	/**
 	 * Are we viewing the plugin settings page?
