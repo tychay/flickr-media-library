@@ -76,12 +76,16 @@ class FMLAdmin
 	}
 
 	/**
-	 * Register settings, etc.
+	 * Admin init.
+	 *
+	 * Currently this just injects a settings field on the permalink page.
+	 * 
 	 * @return void
 	 */
 	public function init()
 	{
-		register_setting( 'permalink', $this->_fml->permalink_slug_id, 'urlencode');
+		// "As of WordPress 4.1, this function does not save settings if added to the permalink page."
+		//register_setting( 'permalink', $this->_fml->permalink_slug_id, 'urlencode');
 		add_settings_field(
 			$this->_fml->permalink_slug_id,
 			__('Flickr Media base', FML::SLUG), //title
@@ -92,9 +96,7 @@ class FMLAdmin
 				'label_for' => $this->_fml->permalink_slug_id
 			)
 		);
-
 	}
-
 	/**
 	 * Save the permalink base option.
 	 *
@@ -110,7 +112,6 @@ class FMLAdmin
 		}
 		// pass through
 	}
-
 	/**
 	 * Settings API to render base HTML form in options-permalink.php
 	 * @param  [type] $args [description]
@@ -126,7 +127,7 @@ class FMLAdmin
 		);
 	}
 	/**
-	 * Add the admin menus for FML to wp/admin
+	 * Add the admin menus for FML to /wp_admin
 	 */
 	public function create_admin_menus()
 	{
@@ -141,6 +142,7 @@ class FMLAdmin
 			add_action( 'load-'.$this->_options_suffix, array($this, 'loading_settings') );
 		}
 	}
+
 	/**
 	 * Loading the settings page:
 	 *
@@ -161,7 +163,7 @@ class FMLAdmin
 	 * 6) flickr plugin attempts to trade request token for access token
 	 * 7) This is saved to plugin options for future requests
 	 * 
-	 * @return null
+	 * @return void
 	 */
 	public function loading_settings()
 	{
@@ -246,7 +248,7 @@ class FMLAdmin
 		*/
 		$screen->add_help_tab( array(
 			'id'       => FML::SLUG.'-flickrauth',
-			'title'    => __('Flickr authorization'),
+			'title'    => __('Flickr authorization', FML::SLUG),
 			'content'  => '',
 			'callback' => array($this,'show_settings_help_flickrauth')
 		));
@@ -257,7 +259,7 @@ class FMLAdmin
 		wp_enqueue_script(
 			FML::SLUG.'-screen-settings', //handle
 			$this->_fml->static_url.'/js/admin-settings.js', //src
-			array('jquery'), //dependencies TODO: ajax
+			array('jquery'), //dependencies ajax
 			$this->_fml->version, //version
 			true //in footer?
 		);
@@ -266,28 +268,28 @@ class FMLAdmin
 	}
 	/**
 	 * Render the default help tab for settings
-	 * @return null
+	 * @return void
 	 */
 	public function show_settings_help_default()
 	{
-		include $this->_fml->template_dir.'/page.settings-help-default.php';
+		include $this->_fml->template_dir.'/help.settings-overview.php';
 	}
 	/**
-	 * Render the API Key help tab for settings
-	 * @return null
+	 * Render the "Flickr Authorization" help tab for plugin settings page.
+	 * @return void
 	 */
 	public function show_settings_help_flickrauth()
 	{
-		include $this->_fml->template_dir.'/page.settings-help-flickrauth.php';
+		include $this->_fml->template_dir.'/help.settings-flickrauth.php';
 	}
 	/**
-	 * Return contents of the default help tab for settings
-	 * @return null
+	 * Return contents of the help sidebar in the plugin settings page
+	 * @return string
 	 */
 	private function _get_settings_help_sidebar()
 	{
 		ob_start();
-		include $this->_fml->template_dir.'/page.settings-help-sidebar.php';
+		include $this->_fml->template_dir.'/help.settings-sidebar.php';
 		return ob_get_clean();
 	}
 	/**
