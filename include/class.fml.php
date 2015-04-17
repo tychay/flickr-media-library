@@ -121,7 +121,7 @@ class FML implements FMLConstants
 	{
 		switch( $name ) {
 			case 'settings':
-				trigger_error(sprintf('Set plugin settings through update_settings()', $name));
+				trigger_error('Set plugin settings through update_settings()');
 				break;
 			case 'flickr':
 				trigger_error(sprintf('Not allowed to externally set flickr API.', $name));
@@ -183,7 +183,7 @@ class FML implements FMLConstants
 	 * 
 	 * @param array $settings options to modify/save. If you jsut want to save
 	 *        the existing options, just don't provide any settings here.
-	 * @return null
+	 * @return void
 	 */
 	public function update_settings( $settings=array() )
 	{
