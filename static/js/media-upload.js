@@ -70,7 +70,7 @@
      */
     this.webUrl = function(photoObj) {
       //if (photoObj.urls && photoObj.urls.url && photoObj.urls.url.typ)
-      var ownername = (typeof photoObj.owner === 'string') ? photoObj.owner : photoObj.owner.username
+      var ownername = (typeof photoObj.owner === 'string') ? photoObj.owner : photoObj.owner.username;
       return 'http://www.flickr.com/photos'+ownername+'/'+photoObj.id;
     };
 
@@ -151,7 +151,7 @@
         return null;
       }
       return self.$select_filter.val();
-    }
+    };
 
     /**
      * + parse and show any photodata callback
