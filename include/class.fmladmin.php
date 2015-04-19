@@ -541,6 +541,11 @@ class FMLAdmin
 			'msg_url'            => __('URL'),
 			'msg_title'          => __('Title'),
 			'msg_description'    => __('Description'),
+			'msgs_add_btn'       => array(
+				'add_to'  => __( 'Add to media library', FML::SLUG ),
+				'adding'  => __( 'Adding…', FML::SLUG ),
+				'already' => __( 'Already added', FML::SLUG ),
+			),
 			'msgs_sort'			 => array(
 				'date-posted-desc'     => __('Date posted (desc)', FML::SLUG),
 				'date-posted-asc'      => __('Date posted (asc)', FML::SLUG),

@@ -193,7 +193,7 @@
       return self.renderPhotoList();
     };
 
-    this.addPhotoData = function( id, photo ) {
+    this.addPhotoData = function(id,photo) {
       // check to make sure ID is right
       if ( photo.id && (id != photo.id) ) {
         return;
@@ -346,10 +346,15 @@
       self.renderPhotoInfo(id);
       // TODO: insert check to see if already in database
       // activate insert button
-      self.$add_button.attr({ // prop() doesn't seem to work :-(
-        'data-id' : id,
-        'disabled': false
-      });
+      self.renderAddButton(constants.msgs_add_btn.add_to, false, id);
+    };
+
+    this.renderAddButton = function( msg, disabled, id ) {
+      // prop() doesn't seem to work :-(
+      self.$add_button.attr({
+        'disabled': disabled,
+        'data-id' : id
+      }).text(msg);
     };
 
     /**
@@ -357,10 +362,15 @@
      *
      * $this = "add to media library" button
      */
-    this.submitAddButton = function(event) {
+    this.clickAddButton = function(event) {
       var id=$(this).attr('data-id');
-      // TODO: disable button and rename
+      // disable button and rename
+      self.renderAddButton(constants.msgs_add_btn.adding, true, id);
+      // make ajax call
       self.requestAddLibrary(id);
+
+      // don't go through href
+      event.preventDefault();
     };
 
     this.requestAddLibrary = function(flickrId) {
@@ -377,9 +387,15 @@
           },
           dataType: 'json',
           success: function(data) {
+            //TODO do work
             console.log(data);
+            self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
+            self.$spinner.hide();
           },
-          error: self.handle_ajax_error
+          error: function(XHR, status, errorThrown) {
+            self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
+            self.handle_ajax_error(XHR, status, errorThrown);
+          }
       });
     };
 
@@ -719,7 +735,7 @@
       self.$select_main.on(  'change',self.changeSearchType);
       self.$select_filter.on('change',self.changeFilterType);
       self.$search_query.on( 'blur',  self.blurSearchField);
-      self.$add_button.on(   'click', self.submitAddButton);
+      self.$add_button.on(   'click', self.clickAddButton);
     });
   } // of FMLSearchDisplay class
   //var wpFlickrEmbed = new WpFlickrEmbed();
