@@ -12,10 +12,6 @@ class FML implements FMLConstants
 	// "STATIC" PROPERTIES
 	//
 	/**
-	 * @var string Version number of plugin
-	 */
-	public $version = '0.1';
-	/**
 	 * @var string Cache the location of this directory (for pathing)
 	 */
 	public $plugin_dir;
@@ -35,6 +31,7 @@ class FML implements FMLConstants
 	 * @var string the option name for the permalink base (access through _get)
 	 */
 	private $_permalink_slug_id;
+	private $_post_metas = array();
 
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
@@ -54,7 +51,7 @@ class FML implements FMLConstants
 	{
 		$this->_set_statics($pluginFile);
 		// settings and flickr are lazy loaded
-		register_post_type('fml_photo', array(
+		register_post_type(self::POST_TYPE, array(
 			'labels'      => array( //name of post type in plural and singualr form
 				'name'          => _x('Flickr Media', 'plural', self::SLUG),
 				'singular_name' => _x('Flickr Media', 'singular', self::SLUG),
@@ -74,6 +71,9 @@ class FML implements FMLConstants
 		$this->static_url = plugins_url('static',$pluginFile);
 		$this->plugin_basename = plugin_basename($pluginFile);
 		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
+		$this->_post_metas = array(
+			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
+		);
 	}
 
 	//
@@ -271,6 +271,261 @@ class FML implements FMLConstants
 			Flickr::OAUTH_ACCESS_TOKEN        => '',
 			Flickr::OAUTH_ACCESS_TOKEN_SECRET => '',
 		));
+	}
+	//
+	// FLICKR MEDIA
+	// 
+	/**
+	 * Adds an image from flickr into the flickr media library
+	 * 
+	 * @param  string $flickr_id the flickr ID of the image
+	 * @return WP_Post|false          the post created (or false if not)
+	 * @todo  consider updating post if already there
+	 */
+	public function add_flickr( $flickr_id ) {
+		// Check to see it's not already added, if so return that
+		$post_already_added = get_posts( array(
+			'name'           => $this->_flickr_id_to_name($flickr_id),
+			'post_type'      => self::POST_TYPE,
+			//'posts_per_page' => 1,
+		) );
+		if ( $post_already_added ) {
+			// update post and return it
+			return $this->_update_flickr_post( $post_already_added[0] );
+		}
+
+		$data = $this->_get_data_from_flickr_id( $flickr_id );
+		if ( empty( $data ) ) {
+			return false;
+		}
+		$post_id = $this->_new_post_from_flickr_data( $data );
+		return get_post($post_id);
+
+	}
+	/**
+	 * Generates a new post from the flickr data given
+	 * @param  [type] $data [description]
+	 * @return [type]       [description]
+	 */
+	private function _new_post_from_flickr_data( $data ) {
+		if ( empty($data ) ) { return 0; }
+		$post_data = $this->_post_data_from_flickr_data( $data );
+		$post_id = wp_insert_post( $post_data );
+
+		// add grabbed information into post_meta
+		// no need to update_post_meta as we know it can't exist
+		add_post_meta( $post_id,  $this->_post_metas['api_data'], $data, true );
+
+		return $post_id;
+	}
+	/**
+	 *
+	 * @param  WP_Post|integer $post The post or its post ID.
+	 * @return WP_Post               Updated content
+	 */
+	private function _update_flickr_post( $post ) {
+		if ( !is_object( $post ) ) {
+			$post = get_post( $post );
+		}
+		$flickr_data = get_post_meta( $post->ID, $this->_post_metas['api_data'], true );
+		$flickr_data = $this->_update_data_from_flickr( $flickr_data );
+		$post_data = $this->_post_data_from_flickr_data( $flickr_data );
+		$post_data['ID'] = $post->ID;
+
+		// update post
+		$post_id = wp_update_post( $post_data );
+		update_post_meta( $post->ID, $this->_post_metas['api_data'], $flickr_data );
+
+		return get_post( $post->ID );
+	}
+	/**
+	 * Grab photo information from flickr API using flickr ID of photo
+	 *
+	 * Structure of information is an array with the following parameters:
+	 *
+	 * - id: flickr photo id
+	 * - media: photo, ?
+	 * - secret: secret
+	 * - server: server #
+	 * - farm: farm #
+	 * - originalsecret: secret key
+	 * - originalformat: "jpg" or wahtever
+	 * - isfavorite: is favorited by self
+	 * - license: license # it is under
+	 * - safety_level: ?
+	 * - rotation: degrees rotated from original?
+	 * - owner: iconfarm:8, iconserver, location, nsid, path_alias, realname, username
+	 * - title._content
+	 * - description:_content: description file
+	 * - dateuploaded: unix time of date uploaded
+	 * - dates[lastupdate]: unix time of last update
+	 * - dates[posted]: unix time of posted date
+	 * - dates[taken]: UTC of date taken
+	 * - dates[takengranularity]: ?
+	 * - dates[takenunknown]: ?
+	 * - visibility[ispublic, isfriend, isfamily]
+	 * - permissions[permaddmeta,permcomment]: ???
+	 * - editability[canaddmeta,cancomment]: 1/0 
+	 * - publiceditability[canaddmeta,cancomment]: (0 or 1)
+	 * - views: #
+	 * - usage[candownload, canblog, canprint, canshare]
+	 * - comments._content: # of comments
+	 * - notes: ??
+	 * - people.haspeople: (# of people linked)
+	 * - tags[tag][#]: an array of _content objects with the tags applied has properties aid, author, raw and _content.
+	 * - location:
+	 * - geoperms:
+	 * - urls[url[0]]: link to photo page
+	 * - sizes[canblog, canprint, candownload]: permissions 1 or 0
+	 * - sizes[size]: array with properties [label,width,height,source,url,media]
+	 * - camera: exif extracted camer name
+	 * - exif[]: array with properties [tagspace, tagspaceid, tag, label, raw._content]
+	 * 
+	 * @param  string  $flickr_id    flickr ID of photo
+	 * @param  integer $last_updated the unix timestamp it was last updated
+	 * @return array                 array of various raw flickr data merged, empty if no data to add
+	 */
+	private function _get_data_from_flickr_id( $flickr_id, $last_updated=0 ) {
+		$return = array();
+		$params = array(
+			'photo_id' => $flickr_id,
+		);
+		// https://www.flickr.com/services/api/flickr.photos.getInfo.html
+		$result = $this->flickr->call('flickr.photos.getInfo', $params);
+		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
+			$return = $result['photo'];
+		}
+		// don't refresh if up-to-date
+		if ( $last_updated && ( $return['dates']['lastupdate'] <= $last_updated ) ) {
+			return array();
+		}
+		$result = $this->flickr->call('flickr.photos.getSizes', $params);
+		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
+			$return['sizes'] = $result['sizes'];
+		}
+		$result = $this->flickr->call('flickr.photos.getExif', $params);
+		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
+			$return = array_merge($return, $result['photo']);
+		}
+		//print_r($return);
+		return $return;
+	}
+	private function _update_data_from_flickr( $data ) {
+		$return = $this->_get_data_from_flickr_id( $data['id'], $data['dates']['lastupdate'] );
+		if ( empty( $return ) ) {
+			return $data;
+		} else {
+			return $return;
+		}
+	}
+	/**
+	 * Turns a flickr ID into a post slug
+	 * 
+	 * @param  string $flickr_id The number representing the flickr_id of the image
+	 * @return string            post slug if it exists in the database
+	 */
+	private function _flickr_id_to_name( $flickr_id ) {
+		return self::SLUG.'-'.$flickr_id;
+	}
+	/**
+	 * Turn flickr API data into post data
+	 * @param  srray $data  The photo data extracted from the flickr API
+	 * @return array        The data suitable for creating a post (or updating if you add the ID)
+	 * @todo  validate media is a photo
+	 * @todo  vary date based on configuration: date uploaded, date taken, date posted?
+	 */
+	private function _post_data_from_flickr_data( $data ) {
+		// generate list of tags
+		$post_tags = [];
+		if ( !empty( $data['tags']['tag'] ) ) {
+			$tags = $data['tags']['tag'];
+			foreach ( $tags as $idx=>$tag_data ) {
+				$post_tags[] = $tag_data['raw'];
+			}
+		}
+		// generate post array (from data)
+		$post_data = array(
+			'post_content'   => $this->_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
+			'post_name'      => $this->_flickr_id_to_name( $data['id'] ), //post slug
+			'post_title'     => $data['title']['_content'],
+			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
+			'post_type'      => self::POST_TYPE,
+			//'post_author'    => 0,//userid
+			//'ping_status'    => 'closed', //no pingbacks
+			//'post_parent'    => 0, // TODO
+			//'menu_order'     => (for page ordering)
+			//'to_ping'
+			//'pinged'
+			//'post_password'
+			//'guid' // Let wordpress handle
+			//'post_content_filtered' => let wordpress handle?
+			//'post_excerpt' 
+			'post_date'      => $data['dates']['taken'],
+			//'post_date_gmt' => above in GMT
+			'comment_status' => 'closed',
+			//'post_category' => array of cateogires
+			'tags_input'     => $post_tags,
+			//'tax_input' => other taxonomy
+			//'page_template' (empty)
+			//'file' (from attachment) @see https://codex.wordpress.org/Function_Reference/wp_insert_attachment
+		);
+		// make sure it has a title
+		if ( empty($post_data['post_title']) ) {
+			$post_data['post_title'] = $data['id'];
+		}
+		return $post_data;
+	}
+	/**
+	 * Turn a flickr photo into an image tag.
+	 *
+	 * This adds the responsive images in too.
+	 */
+	private function _img_from_flickr_data( $data, $default_size='Medium', $include_original=false ) {
+		$sizes = $data['sizes']['size'];
+		$src = '';
+		$size_offset = 1000000;
+		if ( !is_numeric( $default_size ) ) {
+			switch ( strtolower($default_size) ) {
+				case 'square': $default_size=75; break;
+				case 'large square': $default_size=150;break;
+				case 'thumbnail': $default_size=150; break;
+				case 'small': $default_size=240; break;
+				case 'small 320': $default_size=320; break;
+				case 'medium': $default_size=500; break;
+				case 'medium 640': $default_size=640; break;
+				case 'large': $default_size=1024; break;
+				case 'large 1600': $default_size=1600; break;
+				case 'large 2048': $default_size=2048; break;
+				default: $default_size=500; break;
+			}
+		}
+		foreach ( $sizes as $size ) {
+			// handle original
+			if ( $size['label'] == 'Original' ) {
+				if ( $include_original ) {
+					// TODO code to include the original if no rotation
+				} else {
+					// don't include original
+					continue;
+				}
+			}
+			// TODO: better handling of squares
+			if ( ( $size['label'] == 'Square' ) || ( $size['label'] == 'Large Square' ) ) { continue; }
+			$srcset[] = sprintf( '%s %dw', $size['source'], $size['width'] );
+
+			$this_size = max( $size['width'], $size['height'] );
+			$this_size_offset = abs( $this_size - $default_size ) / $this_size;
+			if ( $this_size_offset < $size_offset ) {
+				$size_offset = $this_size_offset;
+				$src = $size['source'];
+			}
+		}
+		return sprintf(
+			'<img src="%s" srcset="%s" alt="%s" />',
+			$src,
+			implode( ', ', $srcset ),
+			esc_attr( $data['title']['_content'] )
+		);
 	}
 	//
 	// CLASS FUNCTIONS

@@ -102,6 +102,25 @@ class FMLAdmin
 		);
 	}
 	/**
+	 * Add the admin menus for FML to /wp_admin
+	 */
+	public function create_admin_menus()
+	{
+		$this->_options_suffix = add_options_page(
+			__('Flickr Media Library Settings', FML::SLUG),
+			__('Flickr Media Library', FML::SLUG),
+			'manage_options',
+			$this->_options_page_id,
+			array( $this, 'show_settings_page' )
+		);
+		if ( $this->_options_suffix ) {
+			add_action( 'load-'.$this->_options_suffix, array($this, 'loading_settings') );
+		}
+	}
+	//
+	// PERMALINK PAGE
+	// 
+	/**
 	 * Save the permalink base option.
 	 *
 	 * This is due to a bug in the Settings.api where options-permalink.php uses
@@ -130,23 +149,9 @@ class FMLAdmin
 			esc_attr($slug)
 		);
 	}
-	/**
-	 * Add the admin menus for FML to /wp_admin
-	 */
-	public function create_admin_menus()
-	{
-		$this->_options_suffix = add_options_page(
-			__('Flickr Media Library Settings', FML::SLUG),
-			__('Flickr Media Library', FML::SLUG),
-			'manage_options',
-			$this->_options_page_id,
-			array( $this, 'show_settings_page' )
-		);
-		if ( $this->_options_suffix ) {
-			add_action( 'load-'.$this->_options_suffix, array($this, 'loading_settings') );
-		}
-	}
-
+	//
+	// SETTINGS PAGE
+	// 
 	/**
 	 * Loading the settings page:
 	 *
@@ -264,7 +269,7 @@ class FMLAdmin
 			FML::SLUG.'-screen-settings', //handle
 			$this->_fml->static_url.'/js/admin-settings.js', //src
 			array('jquery'), //dependencies ajax
-			$this->_fml->version, //version
+			FML::VERSION, //version
 			true //in footer?
 		);
 		// Save Settings screen options tab
@@ -333,7 +338,7 @@ class FMLAdmin
 	}
 	*/
 	/**
-	 * hide/show API key + secret screeen option settings coming via ajax
+	 * hide/show API key + secret screen option settings coming via ajax
 	 */
 	public function handle_ajax_option_setapi() {
 		// we are pirating the nonce created in screen for screen options :-)
@@ -346,9 +351,46 @@ class FMLAdmin
 		//die('there :-(');
 	}
 	/**
+	 * Show the Settings (Options) page which allows you to do Flickr oAuth.
+	 */
+	public function show_settings_page()
+	{
+		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
+		//$flickr = $this->_fml->flickr;
+		$settings = $this->_fml->settings;
+		$this_page_url = 'options-general.php?page=' . urlencode($this->_options_page_id);
+		$api_form_slug = FML::SLUG.'-apiform';
+		$api_secret_attr = ( $settings['flickr_api_secret'] == FML::_FLICKR_SECRET )
+		                 ? ''
+		                 : $settings['flickr_api_secret'];
+		include $this->_fml->template_dir.'/page.settings.php';
+	}
+	//
+	// PLUGINS PAGE
+	// 
+	/**
+	 * Filter to inject a Settings link to plugin on the Plugin page
+	 * 
+	 * @param  array $actions object to be filtered
+	 * @return array the $actions array with the link injected into it
+	 */
+	public function filter_plugin_settings_links( $actions, $plugin_file )
+	{
+		$actions[] = sprintf(
+			'<a href="%s">%s</a>',
+			admin_url('options-general.php?page='.FML::SLUG.'-settings'),
+			__('Settings')
+			);
+		return $actions;
+	}
+	//
+	// MEDIA UPLOAD IFRAME
+	// 
+	/**
 	 * Client side flickr request signing service (via ajax)
 	 */
-	public function handle_ajax_sign_request() {
+	public function handle_ajax_sign_request()
+	{
 		// This nonce is created in the page.flickr-upload-form.php template
 		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
 			wp_send_json(array(
@@ -401,7 +443,8 @@ class FMLAdmin
 	/**
 	 * Client side ajax to add a flickr image to flickr media library (via ajax)
 	 */
-	public function handle_ajax_add_flickr() {
+	public function handle_ajax_add_flickr()
+	{
 		// This nonce is created in the page.flickr-upload-form.php template
 		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
 			wp_send_json(array(
@@ -426,42 +469,14 @@ class FMLAdmin
 			//dies
 		}
 		// TODO add code for attaching image to post
+		$return = $this->_fml->add_flickr($_POST['flickr_id']);
 		// TODO: wp_insert_post here
 		wp_send_json(array(
-			'status' => 'ok',
-			'post_id' => 'TODO',
+			'status'    => 'ok',
+			'post_id'   => 'TODO',
+			'return'    => $return,
 			'flickr_id' => $_POST['flickr_id'],
 		));
-	}
-	/**
-	 * Show the Settings (Options) page which allows you to do Flickr oAuth.
-	 */
-	public function show_settings_page()
-	{
-		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
-		//$flickr = $this->_fml->flickr;
-		$settings = $this->_fml->settings;
-		$this_page_url = 'options-general.php?page=' . urlencode($this->_options_page_id);
-		$api_form_slug = FML::SLUG.'-apiform';
-		$api_secret_attr = ( $settings['flickr_api_secret'] == FML::_FLICKR_SECRET )
-		                 ? ''
-		                 : $settings['flickr_api_secret'];
-		include $this->_fml->template_dir.'/page.settings.php';
-	}
-	/**
-	 * Filter to inject a Settings link to plugin on the Plugin page
-	 * 
-	 * @param  array $actions object to be filtered
-	 * @return array the $actions array with the link injected into it
-	 */
-	public function filter_plugin_settings_links( $actions, $plugin_file )
-	{
-		$actions[] = sprintf(
-			'<a href="%s">%s</a>',
-			admin_url('options-general.php?page='.FML::SLUG.'-settings'),
-			__('Settings')
-			);
-		return $actions;
 	}
 	/**
 	 * Filter to inject my media tab to the media uploads iframe
@@ -567,6 +582,9 @@ class FMLAdmin
 
 		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
 	}
+	//
+	// UTILITY FUNCTIONS
+	// 
 	/**
 	 * Are we viewing the plugin settings page?
 	 * @return boolean true if viewing optiosn page
