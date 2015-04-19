@@ -89,7 +89,9 @@ register_activation_hook( __FILE__, 'flickr_media_library_activate' );
 /**
  * Code used to bootstrap plugin and bury namespace related stuff.
  *
- * (Triggered by init)
+ * (Triggered by plugins_loaded to ensure it is run AFTER an activation
+ * hook is called.) The actual code execution is buried inside another
+ * piece of code because namespacing is used in the library.
  * 
  * @return void
  */
@@ -98,8 +100,9 @@ function flickr_media_library_bootstrap() {
 	spl_autoload_register( 'flickr_media_library_class_loader' );
 
 	$fml_plugin_file = __FILE__;
-	// bury objects in here because they are namespaced...
-	require_once dirname(__FILE__).'/include/class.fml.php';
+	// bury object creation in here because they are namespaced...
+	require_once dirname(__FILE__).'/include/load.fml.php';
 };
 
-add_action( 'init', 'flickr_media_library_bootstrap' );
+
+add_action('plugins_loaded','flickr_media_library_bootstrap');

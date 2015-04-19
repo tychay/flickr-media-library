@@ -41,8 +41,7 @@ class FMLAdmin
 	 * Plugin Admin function initialization 
 	 * @param \FML\FML $fml the FML plugin object
 	 */
-	public function __construct($fml)
-	{
+	public function __construct($fml) {
 		$this->_fml                       = $fml;
 		$this->_options_page_id           = FML::SLUG.'-settings';
 		$this->_flickr_auth_form_id       = FML::SLUG.'-flickr-auth';
@@ -51,11 +50,26 @@ class FMLAdmin
 		$this->_action_flickr_sign        = str_replace('-','_',FML::SLUG).'_sign';
 		$this->_action_add_flickr         = str_replace('-','_',FML::SLUG).'_add_flickr';
 		$this->_fml_upload_id             = str_replace('-','_',FML::SLUG).'_insert_flickr';
-
-		// Stuff to do after initialization
+	}
+	/**
+	 * Stuff to do on plugins_loaded
+	 *
+	 * - Register init() on admin_init
+	 * - Add various menu pages (e.g. Settings) to admin menu 
+	 * - Add set permalink form to Permalink page 
+	 * - Add link to Settings page to Plugin Page
+	 * - If in Settings page, register plugin Settings page as Flickr callback for Auth
+	 * - Add various ajax servers
+	 * - Add tab to media upload button
+	 * 
+	 * @return void
+	 */
+	public function run() {
+		// Register init() on admin_init
 		add_action( 'admin_init', array( $this, 'init') );
-		// Add Settings & ? pages to admin menu
+		// Add various menu pages (e.g. Settings) to admin menu 
 		add_action( 'admin_menu', array( $this, 'create_admin_menus' ) );
+		// Add set permalink form to Permalink page 
 		add_action( 'load-options-permalink.php', array( $this, 'handle_permalink_form') );
 		// Add link to Settings page to Plugin page
 		add_filter( 'plugin_action_links_'.$this->_fml->plugin_basename, array($this, 'filter_plugin_settings_links'), 10, 2 );
@@ -68,11 +82,12 @@ class FMLAdmin
 				// do i need more parameters to detect flickr callback?
 			));
 		}
-		// Add ajax server for handling ajax api options
+		// Add ajax servers
+		// - for handling ajax api options
 		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
-		// Add ajax for client to get flickr api signing
+		// - for client to get flickr api signing
 		add_action( 'wp_ajax_'.$this->_action_flickr_sign, array($this, 'handle_ajax_sign_request') );
-		// Add ajax for client to adding flickr image to media library
+		// - for client to add flickr image to media library
 		add_action( 'wp_ajax_'.$this->_action_add_flickr, array($this, 'handle_ajax_add_flickr') );
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array($this, 'filter_media_upload_tabs') );

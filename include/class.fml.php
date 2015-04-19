@@ -1,9 +1,8 @@
 <?php 
-
 namespace FML;
 
 /**
- * Namespace for the Flickr Media Library
+ * Flickr Media Library plugin code that needs to be available everywhere
  * 
  */
 class FML implements FMLConstants
@@ -39,23 +38,56 @@ class FML implements FMLConstants
 	/**
 	 * Plugin Initialization
 	 *
-	 * Note that this plugin is not even initialized until WordPress init has
-	 * been fired.
+	 * Note that currently this is not called until `plugins_loaded` has been
+	 * fired, but in the future, it'd be created directly on the main page.
 	 *
-	 * This will set the static variables and register the custom post type
-	 * used for storing flickr photos
-	 *
+	 * This will set the static variables used by the plugin.
+	 * 
 	 * @param  string $pluginFile __FILE__ for the plugin file
 	 */
-	function __construct($pluginFile)
-	{
+	function __construct($pluginFile) {
 		$this->_set_statics($pluginFile);
 		// settings and flickr are lazy loaded
+	}
+	/**
+	 * Stuff to run on `plugins_loaded`
+	 *
+	 * - register `init` handler
+	 *
+	 * @return void
+	 */
+	public function run() {
+		add_action( 'init', array( $this, 'init' ) );
+	}
+	/**
+	 * Stuff to run on `init`
+	 * 
+	 * - Register the custom post type used for storing flickr photos. If the
+	 *   register is called earlier, it won't trigger due to missing object on
+	 *   rewrite rule.
+	 * 
+	 * @return void
+	 */
+	public function init() {
+		// https://codex.wordpress.org/Function_Reference/register_post_type
 		register_post_type(self::POST_TYPE, array(
 			'labels'      => array( //name of post type in plural and singualr form
-				'name'          => _x('Flickr Media', 'plural', self::SLUG),
-				'singular_name' => _x('Flickr Media', 'singular', self::SLUG),
+				'name'          => _x( 'Flickr Media', 'plural', self::SLUG ),
+				'singular_name' => _x( 'Flickr Media', 'singular', self::SLUG ),
+				// menu name
+				// name_admin_bar
+				// all_items
+				'add_new'       => __( 'Import Flickr', self::SLUG ), //using lang space, so no need to use context
+				'add_new_item'  => __( 'Import Flickr', self::SLUG ),
+				'edit_item'     => __( 'Edit photo', self::SLUG )
+				// new_items
+				// view_item
+				// search_items
+				// not_found
+				// not_found_in_trash_
+				// parent_item_colon
 			),
+			'description' => __( 'A mirror of media on Flickr', self::SLUG ),
 			'public'      => true, // display on admin screen and site content
 			'has_archive' => true, // can have archive template
 			'rewrite'     => array('slug' => $this->permalink_slug),
@@ -530,16 +562,4 @@ class FML implements FMLConstants
 	//
 	// CLASS FUNCTIONS
 	// 
-}
-
-/*
- * Remember, this code is executed in the _init_ hook of WordPress.
- *
- * Note that $fml_plugin_file is passed in from the bootstrap code
- */
-// Initialize plugin
-$fml = new FML($fml_plugin_file);
-// Load admin page functions if in the admin page
-if (is_admin()) {
-	$fmla = new FMLAdmin($fml);
 }
