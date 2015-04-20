@@ -367,10 +367,44 @@
       // disable button and rename
       self.renderAddButton(constants.msgs_add_btn.adding, true, id);
       // make ajax call
-      self.requestAddLibrary(id);
+      self.requestExists(id, self.callbackRequestExists);
 
       // don't go through href
       event.preventDefault();
+    };
+
+    this.callbackRequestExists = function(data) {
+      if ( data.post_id == 0 ) {
+        // it doesn't exist already //pass in calling flickr id
+        self.requestAddLibrary(data.flickr_id);
+      } else {
+        self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+        self.$spinner.hide();
+        // TODO Add all the information needed to render
+      }
+    };
+
+    this.requestExists = function(flickrId, successCallback) {
+      self.$error_box.hide();
+      self.$spinner.show();
+      $.ajax( constants.ajax_url, {
+        timeout: 15000,
+        type: 'POST',
+        data: {
+          _ajax_nonce: self.nonce,
+          action: constants.get_action,
+          flickr_id: flickrId
+        },
+        //dataType: 'json',
+        success: function(data) {
+          console.log(data);
+          successCallback(data);
+        },
+        error: function(XHR, status, errorThrown) {
+          self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
+          self.handle_ajax_error(XHR, status, errorThrown);
+        }
+      });
     };
 
     this.requestAddLibrary = function(flickrId) {
@@ -378,24 +412,24 @@
       self.$spinner.show();
 
       $.ajax( constants.ajax_url, {
-          timeout: 15000,
-          type: 'POST',
-          data: {
-            _ajax_nonce: self.nonce,
-            action: constants.add_action,
-            flickr_id: flickrId
-          },
-          dataType: 'json',
-          success: function(data) {
-            //TODO do work
-            console.log(data);
-            self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
-            self.$spinner.hide();
-          },
-          error: function(XHR, status, errorThrown) {
-            self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
-            self.handle_ajax_error(XHR, status, errorThrown);
-          }
+        timeout: 15000,
+        type: 'POST',
+        data: {
+          _ajax_nonce: self.nonce,
+          action: constants.add_action,
+          flickr_id: flickrId
+        },
+        dataType: 'json',
+        success: function(data) {
+          //TODO do work
+          console.log(data);
+          self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
+          self.$spinner.hide();
+        },
+        error: function(XHR, status, errorThrown) {
+          self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
+          self.handle_ajax_error(XHR, status, errorThrown);
+        }
       });
     };
 

@@ -49,6 +49,7 @@ class FMLAdmin
 		$this->_flickr_apikey_option_name = str_replace('-','_',FML::SLUG).'_show_apikey';
 		$this->_action_flickr_sign        = str_replace('-','_',FML::SLUG).'_sign';
 		$this->_action_add_flickr         = str_replace('-','_',FML::SLUG).'_add_flickr';
+		$this->_action_get_flickr_media   = str_replace('-','_',FML::SLUG).'_get_media';
 		$this->_fml_upload_id             = str_replace('-','_',FML::SLUG).'_insert_flickr';
 	}
 	/**
@@ -89,6 +90,8 @@ class FMLAdmin
 		add_action( 'wp_ajax_'.$this->_action_flickr_sign, array($this, 'handle_ajax_sign_request') );
 		// - for client to add flickr image to media library
 		add_action( 'wp_ajax_'.$this->_action_add_flickr, array($this, 'handle_ajax_add_flickr') );
+		// - for client to get (if exists) post from media library
+		add_action( 'wp_ajax_'.$this->_action_get_flickr_media, array($this, 'handle_ajax_get_flickr_media') );
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array($this, 'filter_media_upload_tabs') );
 		add_action( 'media_upload_'.$this->_fml_upload_id, array($this, 'get_media_upload_iframe') );
@@ -456,7 +459,8 @@ class FMLAdmin
 		//die();
 	}
 	/**
-	 * Client side ajax to add a flickr image to flickr media library (via ajax)
+	 * Client side ajax to add a flickr image to flickr media library. It
+	 * returns the post created
 	 */
 	public function handle_ajax_add_flickr()
 	{
@@ -478,20 +482,65 @@ class FMLAdmin
 				'code'   => 400, //HTTP code bad request
 				'reason' => sprintf(
 					__('Missing parameter: %s',FML::SLUG),
-					'request_data'
+					'flickr_id'
 				),
 			));
 			//dies
 		}
-		// TODO add code for attaching image to post
 		$return = $this->_fml->add_flickr($_POST['flickr_id']);
-		// TODO: wp_insert_post here
+		//if ( $return ) //TODO get extra infomration
 		wp_send_json(array(
 			'status'    => 'ok',
-			'post_id'   => 'TODO',
-			'return'    => $return,
+			'post_id'   => $return->ID,
+			'post'      => $return,
 			'flickr_id' => $_POST['flickr_id'],
 		));
+	}
+	/**
+	 * Client side ajax to get a flickr media post matching flickr id (if added)
+	 */
+	public function handle_ajax_get_flickr_media()
+	{
+		// This nonce is created in the page.flickr-upload-form.php template
+		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
+			wp_send_json(array(
+				'status' => 'fail',
+				'code'   => 401, // HTTP CODE for unauthorized
+				'reason' => sprintf(
+					__('Missing or incorrect nonce %s=%s',FML::SLUG),
+					'_ajax_nonce',
+					( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
+				),
+			));
+		}
+		if ( empty( $_POST['flickr_id']) ) {
+			wp_send_json(array(
+				'status' => 'fail',
+				'code'   => 400, //HTTP code bad request
+				'reason' => sprintf(
+					__('Missing parameter: %s',FML::SLUG),
+					'flickr_id'
+				),
+			));
+			//dies
+		}
+		$post = $this->_fml->get_media_by_flickr_id( $_POST['flickr_id'] );
+		if ( $post ) {
+			//TODO get extra information
+			wp_send_json(array(
+				'status'    => 'ok',
+				'post_id'   => $post->ID,
+				'post'      => $post,
+				'flickr_id' => $_POST['flickr_id'],
+			));
+		} else {
+			wp_send_json(array(
+				'status'    => 'ok',
+				'post_id'   => 0,
+				'flickr_id' => $_POST['flickr_id'],
+			));
+		}
+		die;
 	}
 	/**
 	 * Filter to inject my media tab to the media uploads iframe
@@ -547,6 +596,7 @@ class FMLAdmin
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
 			'sign_action'        => $this->_action_flickr_sign,
 			'add_action'         => $this->_action_add_flickr,
+			'get_action'         => $this->_action_get_flickr_media,
 			'msg_ajax_error'     => __('AJAX error %s (%s).', FML::SLUG),
 			'msg_flickr_error'   => __('AJAX error %s (%s).', FML::SLUG),
 			'msg_flickr_error_unknown '=> __('Flickr API returned an unknown error.', FML::SLUG),
@@ -557,7 +607,8 @@ class FMLAdmin
 			'msg_title'          => __('Title'),
 			'msg_description'    => __('Description'),
 			'msgs_add_btn'       => array(
-				'add_to'  => __( 'Add to media library', FML::SLUG ),
+				//'add_to'  => __( 'Add to media library', FML::SLUG ),
+				'add_to'  => __( 'Insert into post' ),
 				'adding'  => __( 'Adding…', FML::SLUG ),
 				'already' => __( 'Already added', FML::SLUG ),
 			),

@@ -341,21 +341,14 @@ class FML implements FMLConstants
 	 * Adds an image from flickr into the flickr media library
 	 * 
 	 * @param  string $flickr_id the flickr ID of the image
-	 * @return WP_Post|false          the post created (or false if not)
-	 * @todo  consider updating post if already there
+	 * @return WP_Post|false     the post created (or false if not)
 	 */
 	public function add_flickr( $flickr_id ) {
 		// Check to see it's not already added, if so return that
-		$post_already_added = get_posts( array(
-			'name'           => $this->_flickr_id_to_name($flickr_id),
-			'post_type'      => self::POST_TYPE,
-			//'posts_per_page' => 1,
-		) );
-		if ( $post_already_added ) {
+		if ( $post_already_added = $this->get_media_by_flickr_id( $flickr_id ) ) {
 			// update post and return it
-			return $this->_update_flickr_post( $post_already_added[0] );
+			return $this->_update_flickr_post( $post_already_added );
 		}
-
 		$data = $this->_get_data_from_flickr_id( $flickr_id );
 		if ( empty( $data ) ) {
 			return false;
@@ -363,6 +356,24 @@ class FML implements FMLConstants
 		$post_id = $this->_new_post_from_flickr_data( $data );
 		return get_post($post_id);
 
+	}
+	/**
+	 * Attempts to get post stored by flickr_id
+	 * @param  string $flickr_id the flickr ID of the image
+	 * @return WP_Post|false     the post found (or false if not)
+	 * @todo   consider doing extra work
+	 */
+	public function get_media_by_flickr_id( $flickr_id ) {
+		$post_already_added = get_posts( array(
+			'name'           => $this->_flickr_id_to_name($flickr_id),
+			'post_type'      => self::POST_TYPE,
+			//'posts_per_page' => 1,
+		) );
+		if ( $post_already_added ) {
+			return $post_already_added[0];
+			// TODO: extra work
+		}
+		return false;
 	}
 	/**
 	 * Generates a new post from the flickr data given

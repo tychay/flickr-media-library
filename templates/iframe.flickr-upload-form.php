@@ -41,6 +41,6 @@ media_upload_header();
 </div>
 <div class="media-iframe-toolbar">
     <div class="media-toolbar-primary search-form">
-        <a href="#" id="<?php echo FML::SLUG; ?>-media-add-button" class="button media-button button-primary button-large media-button-select" disabled="disabled"><?php echo __('Add to media library', FML::SLUG); ?></a>
+        <a href="#" id="<?php echo FML::SLUG; ?>-media-add-button" class="button media-button button-primary button-large media-button-select" disabled="disabled"><?php _e( 'Insert into post' ); ?></a>
     </div>
 </div>
