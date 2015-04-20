@@ -366,76 +366,102 @@
       var id=$(this).attr('data-id');
       // disable button and rename
       self.renderAddButton(constants.msgs_add_btn.adding, true, id);
-      // make ajax call
-      self.requestExists(id, self.callbackRequestExists);
-
-      // don't go through href
+      // make ajax call to see if it exists
+      self.callApi(
+        'get_media_by_flickr_id',
+        { flickr_id: id },
+        self.callbackRequestExists,
+        function(XHR, status, errorThrown) {
+          // TODO:
+          self.renderAddButton(constants.msgs_add_btn.add_to, true, id);
+          return true; //do default action
+        }
+      );
+      // don't go to href
       event.preventDefault();
     };
 
     this.callbackRequestExists = function(data) {
-      if ( data.post_id == 0 ) {
-        // it doesn't exist already //pass in calling flickr id
-        self.requestAddLibrary(data.flickr_id);
+      if ( data.status != 'ok' ) {
+        // TODO: handle work on error
+        self.handle_fml_error(data);
+        return true; //cancel spinner
+      }
+      if ( data.post_id === 0 ) {
+        // it doesn't exist already, add the file
+        self.callApi(
+          'new_media_from_flickr_id',
+          { flickr_id: data.flickr_id },
+          self.callbackRequestAdd,
+          function(XHR, status, errorThrown) {
+            // TODO:
+            self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+          }
+        );
+        return false; //making another call, don't cancel the spinner
       } else {
-        self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
-        self.$spinner.hide();
+        // It already exists!
         // TODO Add all the information needed to render
+        self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+        return true; //cancel spinner
       }
     };
 
-    this.requestExists = function(flickrId, successCallback) {
-      self.$error_box.hide();
-      self.$spinner.show();
-      $.ajax( constants.ajax_url, {
-        timeout: 15000,
-        type: 'POST',
-        data: {
-          _ajax_nonce: self.nonce,
-          action: constants.get_action,
-          flickr_id: flickrId
-        },
-        //dataType: 'json',
-        success: function(data) {
-          console.log(data);
-          successCallback(data);
-        },
-        error: function(XHR, status, errorThrown) {
-          self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
-          self.handle_ajax_error(XHR, status, errorThrown);
-        }
-      });
+    this.callbackRequestAdd = function(data) {
+      if ( data.status != 'ok' ) {
+        // TODO: handle work on error
+        self.handle_fml_error(data);
+        return true; //cancel spinner
+      }
+      //TODO do work
+      console.log(data);
+      self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+
     };
 
-    this.requestAddLibrary = function(flickrId) {
+    // APIs
+    /**
+     * Make call to WordPress AJAX API for Flickr Media Library 
+     * 
+     * @param  {String}   method           The API method to call
+     * @param  {Object}   params           Other params to pass API
+     * @param  {function} responseCallback callback function, return true if it can continue to do stuff
+     * @param  {function|boolean} errorCallback  if false, do default, else callback function if XHR error
+     * @return {null}
+     */
+    this.callApi = function(method, params, responseCallback, errorCallback) {
       self.$error_box.hide();
       self.$spinner.show();
 
+      // compose rest of query
+      params._ajax_nonce = self.nonce;
+      params.action = constants.ajax_action_call;
+      params.method = method;
       $.ajax( constants.ajax_url, {
         timeout: 15000,
-        type: 'POST',
-        data: {
-          _ajax_nonce: self.nonce,
-          action: constants.add_action,
-          flickr_id: flickrId
-        },
+        type: 'POST', //using "type" instead of "method" in case our jQuery older than 1.9
+        data: params,
         dataType: 'json',
         success: function(data) {
-          //TODO do work
-          console.log(data);
-          self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
-          self.$spinner.hide();
+          //console.log(data); //debugging
+          if ( responseCallback(data) ) {
+            self.$spinner.hide();
+          }
         },
         error: function(XHR, status, errorThrown) {
-          self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
-          self.handle_ajax_error(XHR, status, errorThrown);
+          //self.renderAddButton(constants.msgs_add_btn.add_to, true, flickrId);
+          if ( !errorCallback ) {
+            self.handle_ajax_error(XHR, status, errorThrown);
+          } else if ( errorCallback(XHR, status, errorThrown) ) {
+            // will also turn off spinner
+            self.handle_ajax_error(XHR, status, errorThrown);
+          }
         }
       });
-    };
 
-    // FLICKR API
+    };
     /**
-     * Make a Flickr api call
+     * Form and make a Flickr api call
      * @param  {object} params          hash of API call params
      * @param  {function} successCallback function to call on success
      */
@@ -448,23 +474,16 @@
 
 
       // first let's sign the request
-      $.ajax( constants.ajax_url, {
-        //async: true, //ajax is already async
-        timeout: 15000,
-        type: 'POST', //using "type" instead of "method" in case our jQuery older than 1.9
-        data: {
-          _ajax_nonce: self.nonce,
-          action: constants.sign_action,
-          request_data: JSON.stringify(params)
-        },
-        dataType: 'json',
-        success: function(data) {
-          // error from server
+      self.callApi(
+        'sign_flickr_request',
+        { request_data: JSON.stringify(params) },
+        function(data) {
+          // FML API error
           if (data.status != 'ok') {
-            return self.handle_ajax_error( null, data.code, data.reason);
+            return self.handle_fml_error( data );
           } 
           //console.log(data.signed.params);
-          // now we call flickr
+          // …now we call flickr
           $.ajax( data.signed.url, {
             //async: true, //ajax is already async
             timeout: 10000,
@@ -480,8 +499,8 @@
             error: self.handle_ajax_error
           });
         },
-        error: self.handle_ajax_error
-      });
+        false //error is default
+      );
     };
     
     /**
@@ -505,6 +524,14 @@
       }
       return self._show_error( sprintf(constants.msg_flickr_error, code, msg ) );
     };
+
+    /**
+     * WordPress FML API error thrown
+     * @param {object} data the ajax return
+     */
+    this.handle_fml_error = function(data) {
+      return self._show_error( sprintf(constants.msg_fml_error, data.code, data.reason) );
+    }
 
     /**
      * + handle parsing errors in flickr dataset

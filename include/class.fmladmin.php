@@ -34,6 +34,15 @@ class FMLAdmin
 	 */
 	private $_flickr_apikey_option_name = '';
 	/**
+	 * action name for FML ajax api
+	 * 
+	 * We merge all ajax apis into this and instead use the "method" param to
+	 * distinguish different API calls into the FML ajax API.
+	 * 
+	 * @var  string 
+	 */
+	private $action_api = '';
+	/**
 	 * Tab ID of the "Insert from Flickr" upload tab
 	 */
 	private $_fml_upload_id = '';
@@ -46,10 +55,9 @@ class FMLAdmin
 		$this->_options_page_id           = FML::SLUG.'-settings';
 		$this->_flickr_auth_form_id       = FML::SLUG.'-flickr-auth';
 		$this->_flickr_deauth_form_id     = FML::SLUG.'-flickr-deauth';
+		$this->_action_api                = str_replace('-','_',FML::SLUG).'_api';
+
 		$this->_flickr_apikey_option_name = str_replace('-','_',FML::SLUG).'_show_apikey';
-		$this->_action_flickr_sign        = str_replace('-','_',FML::SLUG).'_sign';
-		$this->_action_add_flickr         = str_replace('-','_',FML::SLUG).'_add_flickr';
-		$this->_action_get_flickr_media   = str_replace('-','_',FML::SLUG).'_get_media';
 		$this->_fml_upload_id             = str_replace('-','_',FML::SLUG).'_insert_flickr';
 	}
 	/**
@@ -84,14 +92,9 @@ class FMLAdmin
 			));
 		}
 		// Add ajax servers
+		add_action( 'wp_ajax_'.$this->_action_api, array($this, 'handle_ajax') );
 		// - for handling ajax api options
 		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
-		// - for client to get flickr api signing
-		add_action( 'wp_ajax_'.$this->_action_flickr_sign, array($this, 'handle_ajax_sign_request') );
-		// - for client to add flickr image to media library
-		add_action( 'wp_ajax_'.$this->_action_add_flickr, array($this, 'handle_ajax_add_flickr') );
-		// - for client to get (if exists) post from media library
-		add_action( 'wp_ajax_'.$this->_action_get_flickr_media, array($this, 'handle_ajax_get_flickr_media') );
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array($this, 'filter_media_upload_tabs') );
 		add_action( 'media_upload_'.$this->_fml_upload_id, array($this, 'get_media_upload_iframe') );
@@ -459,88 +462,128 @@ class FMLAdmin
 		//die();
 	}
 	/**
-	 * Client side ajax to add a flickr image to flickr media library. It
-	 * returns the post created
+	 * Process all client side ajax requests
+	 *
+	 * The following parameters are required in $_POST
+	 * - action: $this->_action_api already used to trigger this
+	 * - method: which method to call
+	 * - ??: nonce varies based on where form is
+	 * - ??: other parameters vary based on method
+	 *
+	 * The following methods are supported
+	 *
+	 * - sign_flickr_request: sign a client size TBD Flickr API reqest with
+	 *   request_data (returns 'signed')
+	 * - get_media_by_flickr_id: get existing post information by flickr_id
+	 *   (returns post_id=0 if none found)
+	 * - new_media_from_flickr_id: create a new post from the flickr_id
+	 *   (will update the post if post already exists)
 	 */
-	public function handle_ajax_add_flickr()
+	public function handle_ajax()
 	{
-		// This nonce is created in the page.flickr-upload-form.php template
-		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 401, // HTTP CODE for unauthorized
-				'reason' => sprintf(
-					__('Missing or incorrect nonce %s=%s',FML::SLUG),
-					'_ajax_nonce',
-					( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
-				),
-			));
+		//print_r($_POST);
+		$this->_require_ajax_post('method');
+		switch ( $_POST['method'] ) {
+			case 'sign_flickr_request':
+				// This nonce is created in the page.flickr-upload-form.php template
+				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
+				$this->_require_ajax_post('request_data'); //the API call to sign
+				$json = @json_decode(stripslashes($_POST['request_data']));
+				if ( empty($json) || !is_object($json) ) {
+					wp_send_json(array(
+						'status' => 'fail',
+						'code'   => 400, //HTTP code bad request
+						'reason' => sprintf(
+							__('Invalid JSON input: %s',FML::SLUG),
+							$_POST['request_data']
+						),
+					));
+				}
+				$json->api_key = $this->_fml->settings['flickr_api_key'];
+				$return = array(
+					'status' => 'ok',
+					'signed' => $this->_fml->flickr->getSignedUrlParams(
+						$json->method,
+						get_object_vars($json)
+					),
+				);
+				break;
+			case 'get_media_by_flickr_id':
+				// This nonce is created in the page.flickr-upload-form.php template
+				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
+				$this->_require_ajax_post('flickr_id');
+				$post = $this->_fml->get_media_by_flickr_id( $_POST['flickr_id'] );
+				if ( $post ) {
+					//TODO get extra information
+					$return = array(
+						'status'    => 'ok',
+						'post_id'   => $post->ID,
+						'post'      => $post,
+						'flickr_id' => $_POST['flickr_id'],
+					);
+				} else {
+					$return = array(
+						'status'    => 'ok',
+						'post_id'   => 0,
+						'flickr_id' => $_POST['flickr_id'],
+					);
+				}
+				break;
+			case 'new_media_from_flickr_id':
+				// This nonce is created in the page.flickr-upload-form.php template
+				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
+				$this->_require_ajax_post('flickr_id');
+				$post = $this->_fml->add_flickr($_POST['flickr_id']);
+				//if ( $return ) //TODO get extra infomration
+				$return = array(
+					'status'    => 'ok',
+					'post_id'   => $post->ID,
+					'post'      => $post,
+					'flickr_id' => $_POST['flickr_id'],
+				);
+				break;
 		}
-		if ( empty( $_POST['flickr_id']) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 400, //HTTP code bad request
-				'reason' => sprintf(
-					__('Missing parameter: %s',FML::SLUG),
-					'flickr_id'
-				),
-			));
-			//dies
-		}
-		$return = $this->_fml->add_flickr($_POST['flickr_id']);
-		//if ( $return ) //TODO get extra infomration
-		wp_send_json(array(
-			'status'    => 'ok',
-			'post_id'   => $return->ID,
-			'post'      => $return,
-			'flickr_id' => $_POST['flickr_id'],
-		));
+		wp_send_json( $return );
 	}
 	/**
-	 * Client side ajax to get a flickr media post matching flickr id (if added)
+	 * If a parameter is missing, AJAX return a 400 Fail
+	 * 
+	 * @param  string $post_key a post variable that must be set (and not zero).
+	 *                          This should be html-safe
+	 * @return void|die
 	 */
-	public function handle_ajax_get_flickr_media()
-	{
-		// This nonce is created in the page.flickr-upload-form.php template
-		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 401, // HTTP CODE for unauthorized
-				'reason' => sprintf(
-					__('Missing or incorrect nonce %s=%s',FML::SLUG),
-					'_ajax_nonce',
-					( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
-				),
-			));
-		}
-		if ( empty( $_POST['flickr_id']) ) {
+	private function _require_ajax_post( $post_key ) {
+		if ( empty ( $_POST[$post_key] ) ) {
 			wp_send_json(array(
 				'status' => 'fail',
 				'code'   => 400, //HTTP code bad request
 				'reason' => sprintf(
 					__('Missing parameter: %s',FML::SLUG),
-					'flickr_id'
+					$post_key
 				),
 			));
 			//dies
 		}
-		$post = $this->_fml->get_media_by_flickr_id( $_POST['flickr_id'] );
-		if ( $post ) {
-			//TODO get extra information
-			wp_send_json(array(
-				'status'    => 'ok',
-				'post_id'   => $post->ID,
-				'post'      => $post,
-				'flickr_id' => $_POST['flickr_id'],
-			));
-		} else {
-			wp_send_json(array(
-				'status'    => 'ok',
-				'post_id'   => 0,
-				'flickr_id' => $_POST['flickr_id'],
-			));
+	}
+	/**
+	 * Verify the ajax request has correct nonce. If not, return 401 Fail.
+	 * 
+	 * @param  string $action    the hidden form that had the nonce
+	 * @param  string $query_arg where in $_POST to look for nonce
+	 * @return void|die
+	 */
+	private function _verify_ajax_nonce( $action, $query_arg ) {
+		if ( !check_ajax_referer( $action , $query_arg, false) ) {
+			wp_send_json( array(
+				'status' => 'fail',
+				'code'   => 401, // HTTP CODE for unauthorized
+				'reason' => sprintf(
+					__('Missing or incorrect nonce %s=%s',FML::SLUG),
+					$query_arg,
+					( empty($_POST[$query_arg]) ) ? '' : $_POST[$query_arg]
+				),
+			) );
 		}
-		die;
 	}
 	/**
 	 * Filter to inject my media tab to the media uploads iframe
@@ -594,12 +637,11 @@ class FMLAdmin
 			'slug'               => FML::SLUG,
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
-			'sign_action'        => $this->_action_flickr_sign,
-			'add_action'         => $this->_action_add_flickr,
-			'get_action'         => $this->_action_get_flickr_media,
+			'ajax_action_call'   => $this->_action_api,
 			'msg_ajax_error'     => __('AJAX error %s (%s).', FML::SLUG),
-			'msg_flickr_error'   => __('AJAX error %s (%s).', FML::SLUG),
+			'msg_flickr_error'   => __('Flickr API error %s (%s).', FML::SLUG),
 			'msg_flickr_error_unknown '=> __('Flickr API returned an unknown error.', FML::SLUG),
+			'msg_fml_error'      => __('Flickr Media Library API error %s (%s).', FML::SLUG),
 			'msg_pagination'     => __('Load More'),
 			'msg_loading'        => __('Loading…', FML::SLUG),
 			'msg_attachment_details' => __('Attachment Details'),
@@ -607,8 +649,8 @@ class FMLAdmin
 			'msg_title'          => __('Title'),
 			'msg_description'    => __('Description'),
 			'msgs_add_btn'       => array(
-				//'add_to'  => __( 'Add to media library', FML::SLUG ),
-				'add_to'  => __( 'Insert into post' ),
+				'add_to'  => __( 'Add to media library', FML::SLUG ),
+				'insert'  => __( 'Insert into post' ),
 				'adding'  => __( 'Adding…', FML::SLUG ),
 				'already' => __( 'Already added', FML::SLUG ),
 			),
