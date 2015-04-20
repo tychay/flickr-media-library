@@ -46,7 +46,14 @@ class FML implements FMLConstants
 	 * @param  string $pluginFile __FILE__ for the plugin file
 	 */
 	function __construct($pluginFile) {
-		$this->_set_statics($pluginFile);
+		$this->plugin_dir = dirname($pluginFile);
+		$this->template_dir = $this->plugin_dir . '/templates';
+		$this->static_url = plugins_url('static',$pluginFile);
+		$this->plugin_basename = plugin_basename($pluginFile);
+		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
+		$this->_post_metas = array(
+			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
+		);
 		// settings and flickr are lazy loaded
 	}
 	/**
@@ -64,48 +71,71 @@ class FML implements FMLConstants
 	 * 
 	 * - Register the custom post type used for storing flickr photos. If the
 	 *   register is called earlier, it won't trigger due to missing object on
-	 *   rewrite rule.
+	 *   rewrite rule. {@see https://codex.wordpress.org/Function_Reference/register_post_type}
 	 * 
 	 * @return void
 	 */
 	public function init() {
 		// https://codex.wordpress.org/Function_Reference/register_post_type
 		register_post_type(self::POST_TYPE, array(
-			'labels'      => array( //name of post type in plural and singualr form
-				'name'          => _x( 'Flickr Media', 'plural', self::SLUG ),
-				'singular_name' => _x( 'Flickr Media', 'singular', self::SLUG ),
-				// menu name
-				// name_admin_bar
-				// all_items
-				'add_new'       => __( 'Import Flickr', self::SLUG ), //using lang space, so no need to use context
-				'add_new_item'  => __( 'Import Flickr', self::SLUG ),
-				'edit_item'     => __( 'Edit photo', self::SLUG )
-				// new_items
-				// view_item
-				// search_items
-				// not_found
-				// not_found_in_trash_
-				// parent_item_colon
+			'labels'              => array(
+				// name of post type in plural and singualr form
+				'name'               => _x( 'Flickr Media', 'plural', self::SLUG ),
+				'singular_name'      => _x( 'Flickr Media', 'singular', self::SLUG ),
+				//'menu_name'          => __( 'menu_name', self::SLUG ), //name that appears in custom menu and listing
+				//'name_admin_bar'     => __( 'name_admin_bar', self::SLUG ), //as post appears in the + New part of the admin bar
+				'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
+				'add_new'            => __( 'Import Flickr', self::SLUG ), // name for "add new" menu and button using lang space, so no need to use context
+				'add_new_item'       => __( 'add_new_item', self::SLUG ),
+				'edit_item'          => __( 'edit_item', self::SLUG ),
+				'new_items'          => __( 'new_items', self::SLUG ),
+				'search_items'       => __( 'search_items', self::SLUG ),
+				'not_found'          => __( 'not_found', self::SLUG ),
+				'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
+				'parent_item_colon'  => __( 'parent_item_colon', self::SLUG ),
 			),
-			'description' => __( 'A mirror of media on Flickr', self::SLUG ),
-			'public'      => true, // display on admin screen and site content
-			'has_archive' => true, // can have archive template
-			'rewrite'     => array('slug' => $this->permalink_slug),
+			'description'         => __( 'A mirror of media on Flickr', self::SLUG ),
+			'public'              => true, // shortcut for show_in_nav_menus, show_ui, exclude_from_search, publicly_queryable
+			'exclude_from_search' => false, // show on front end search results site/?s=search-term
+			'publicly_queryable'  => true,  // can show on front end
+			'show_ui'             => true,  // TODO: display admin panel interface for this post type
+			'show_in_nav_menus'   => true,  // TODO: allow to show in navigation menus
+			'show_in_menu'        => 'upload.php',  // TODO: shows in admin menu inside Media menu
+			
+			'show_in_admin_bar'   => false, //whether + New post type is available in admin bar
+			//'menu_position'       => null,  // where to show menu in main menu
+			//'menu_icon'           => '', // url to icon for menu or anme of icon in iconfont
+			//'capability_type'     => 'post', //base capability type, attachment/mediapage is not allowed :-(
+			//'capabilities'        => array(), //TODO
+			//'map_meta_cap'        => null,
+			'hierarchical'        => true, //post type can have parent, support'page-attributes'
+			'supports'            => array(
+				'title',
+				'editor',
+				'author', //can have author
+				'thumbnail', // can have featured image?
+				//'excerpt',
+				//'trackbacks',
+				'custom-fields',
+				'comments',
+				//'revisions', //TODO
+				//'page-attributes', //menu order if hierarchical is true
+				//'post-formats', //TODO
+			),
+			//'register_meta_box_cb'=> //TODO: callback function when setting up metaboxes
+			'taxonomies'          => array( 'post_tag' ), // support post tags taxonom
+			'has_archive'         => true, // can have archive template
+			//'permalink_epmask'    => // endpoint bitmask?
+			'rewrite'             => array(
+				'slug' => $this->permalink_slug
+				//'with_front'
+				//'feeds'
+				//'pages'
+				////ep_mask
+			),
+			//'query_var'           => '', default query var
+			//'can_export'          => true, // can be exported
 		));
-	}
-	/**
-	 * Set up "static" properties
-	 */
-	private function _set_statics($pluginFile)
-	{
-		$this->plugin_dir = dirname($pluginFile);
-		$this->template_dir = $this->plugin_dir . '/templates';
-		$this->static_url = plugins_url('static',$pluginFile);
-		$this->plugin_basename = plugin_basename($pluginFile);
-		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
-		$this->_post_metas = array(
-			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
-		);
 	}
 
 	//
