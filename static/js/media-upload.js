@@ -137,7 +137,7 @@
       }
 
       //console.log(query);
-      self.getFlickrData(query, self.callbackSearchPhotos);
+      self.callFlickrApi(query, self.callbackSearchPhotos);
       return false;
     };
 
@@ -187,20 +187,51 @@
         */
         var idx = (self.page-1)*self.perpage + i;
         self.photos[idx] = photo.id;
-        self.addPhotoData(photo.id,photo);
+        self.addPhotoDataFromFlickr(photo.id,photo);
       }
 
       return self.renderPhotoList();
     };
 
-    this.addPhotoData = function(id,photo) {
+    /**
+     * Inject data from Flickr API calls into phto_data array
+     *
+     * This is modeled after data that goes into the media template:
+     * - type: should be 'image' for now
+     * - sizes: ??
+     * - size.url: img src?
+     * - filename: name of the file
+     * - dateFormatted: date file uploaded
+     * - filesizeHumanReadable: file size in human readable terms
+     * - width: width of image
+     * - height: height of image
+     * - editLink: link to edit image
+     * - url:
+     * - title:
+     * - caption: caption of image
+     * - alt: alt text
+     * - description: description text
+     * 
+     * - uploading. can.remove, status userSettings: not supported
+     * - SUPPORT EVERYTHING ELSE
+     * 
+     * @param {Number} id    The flickr_id of the photo
+     * @param {Object} photo The data from the flickrApi
+     */
+    this.addPhotoDataFromFlickr = function(id,photo) {
       // check to make sure ID is right
       if ( photo.id && (id != photo.id) ) {
         return;
       }
+
       // first time added info
       if ( !self.photo_data[id] ) {
-        self.photo_data[id] = photo; 
+        self.photo_data[id] = {
+          _flickrData: photo,
+          flickrId: photo.id,
+          title: photo.title,
+          alt: '' //flickr doesn't have this
+        };
         return;
       }
       // everything else overwrites existing set
@@ -208,26 +239,15 @@
       for( var idx in photo ) {
         // handle title special case:
         if ( idx === 'title' ) {
-          // title fro photoinfo is in XML content
+          // title from photoinfo is in XML content
           if ( photo.title._content ) {
             photo_data.title = photo.title._content;
+            photo_data.flickrId.title = photo.title._content;
           }
-          // also generate short title
-          photo_data.short_title = photo_data.title.replace(/^(.{17}).*$/, '$1…');
           continue;
         }
-        photo_data[idx] = photo[idx];
+        photo_data._flickrData[idx] = photo[idx];
       }
-
-        /*
-        photo.img_urls = {
-          's': convert_https_to_http(photo.url_s),
-          'q': convert_https_to_http(photo.url_q),
-          'm': convert_https_to_http(photo.url_m),
-          'z': convert_https_to_http(photo.url_z),
-        };
-        */
-        //var image_s_url = self.convertHTTPStoHTTP(photo.url_sq);
     };
 
     /**
@@ -294,7 +314,7 @@
         method: 'flickr.photosets.getList'
       };
 
-      self.getFlickrData(params, function(data) {
+      self.callFlickrApi(params, function(data) {
         if ( !data || !data.photosets || !data.photosets.photoset ) {
           self.photosets = null;
           self.error(data);
@@ -319,12 +339,12 @@
         method: 'flickr.photos.getInfo'
       };
 
-      self.getFlickrData(params, function(data) {
+      self.callFlickrApi(params, function(data) {
         if ( !data || !data.photo || !data.photo.id ) {
           self.error(data);
           return;
         }
-        self.addPhotoData(data.photo.id, data.photo);
+        self.addPhotoDataFromFlickr(data.photo.id, data.photo);
         // make sure it's the same before rendering
         if (photoId == $('.attachment-details').attr('data-id') ) {
           // render udpated data
@@ -342,20 +362,38 @@
      * @param  {event} event event object of tirgger
      */
     this.showPhotoInfo = function(event) {
-      var id = $(this).attr('data-id');
-      self.renderPhotoInfo(id);
-      // TODO: insert check to see if already in database
+      var flickr_id = $(this).attr('data-id');
+      // First check to see if it's already in media library
+      self.callApi(
+        'get_media_by_flickr_id',
+        { 'flickr_id': flickr_id },
+        function( data ) {
+          // fml api error
+          if ( data.status != 'ok') {
+            self.handle_fml_error(data);
+            return true; //cancel spinner
+          }
+          if ( data.post_id === 0 ) {
+            // It doesn't exist yet in ML
+            var photo_data = self.photo_data[id];
+            //TODO: do api calls
+            if ( !photo_data.loaded ) {
+              self.getPhotoInfo(flickr_id);
+            }
+            self.renderPhotoInfo(flickr_id);
+          } else {
+            // It is already in media library
+            //TODO: add data to media library
+            self.renderPhotoInfo(flickr_id);
+            return true; //cancel spinner
+          }
+        },
+        false //default error behavior
+      );
       // activate insert button
-      self.renderAddButton(constants.msgs_add_btn.add_to, false, id);
+      self.renderAddButton(constants.msgs_add_btn.add_to, false, flickr_id);
     };
 
-    this.renderAddButton = function( msg, disabled, id ) {
-      // prop() doesn't seem to work :-(
-      self.$add_button.attr({
-        'disabled': disabled,
-        'data-id' : id
-      }).text(msg);
-    };
 
     /**
      * + click on add button
@@ -363,7 +401,16 @@
      * $this = "add to media library" button
      */
     this.clickAddButton = function(event) {
-      var id=$(this).attr('data-id');
+      var $this = $(this),
+          disabled = $this.prop('disabled'),
+          id=$this.attr('data-id');
+
+      // don't support click if disabled
+      if ( $this.prop('disabled') ) {
+          event.preventDefault();
+          return;
+      }
+
       // disable button and rename
       self.renderAddButton(constants.msgs_add_btn.adding, true, id);
       // make ajax call to see if it exists
@@ -372,8 +419,7 @@
         { flickr_id: id },
         self.callbackRequestExists,
         function(XHR, status, errorThrown) {
-          // TODO:
-          self.renderAddButton(constants.msgs_add_btn.add_to, true, id);
+          self.renderAddButton(constants.msgs_add_btn.add_to, true, 0);
           return true; //do default action
         }
       );
@@ -395,14 +441,14 @@
           self.callbackRequestAdd,
           function(XHR, status, errorThrown) {
             // TODO:
-            self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+            self.renderAddButton(constants.msgs_add_btn.add_to, true, 0);
           }
         );
         return false; //making another call, don't cancel the spinner
       } else {
         // It already exists!
         // TODO Add all the information needed to render
-        self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+        self.renderAddButton(constants.msgs_add_btn.insert, false, data.flickr_id);
         return true; //cancel spinner
       }
     };
@@ -415,7 +461,7 @@
       }
       //TODO do work
       console.log(data);
-      self.renderAddButton(constants.msgs_add_btn.add_to, true, data.flickr_id);
+      self.renderAddButton(constants.msgs_add_btn.insert, false, data.flickr_id);
 
     };
 
@@ -465,7 +511,7 @@
      * @param  {object} params          hash of API call params
      * @param  {function} successCallback function to call on success
      */
-    this.getFlickrData = function(params, successCallback) {
+    this.callFlickrApi = function(params, successCallback) {
       self.$error_box.hide();
       self.$spinner.show();
 
@@ -531,7 +577,7 @@
      */
     this.handle_fml_error = function(data) {
       return self._show_error( sprintf(constants.msg_fml_error, data.code, data.reason) );
-    }
+    };
 
     /**
      * + handle parsing errors in flickr dataset
@@ -593,17 +639,18 @@
         var $li = $('<li>').attr({
           tabindex: 0,
           role: 'checkbox',
-          'aria-label': photo.short_title,
+          'aria-label': photo.title,
           'aria-checked': 'false',
-          'data-id': photo.id,
+          'data-id': photo.flickrId,
           class: 'attachment save-ready'
         }).click(self.showPhotoInfo);
 
         var $img = $('<img>').attr({
-          src: self.imgUrl(photo,'s'),
-          srcset: self.imgUrl(photo,'s')+' 1x, '+self.imgUrl(photo,'q')+' 2x',
+          src: self.imgUrl(photo._flickrData,'s'),
+          srcset: self.imgUrl(photo._flickrData,'s')+' 1x, '+self.imgUrl(photo._flickrData,'q')+' 2x',
           draggable: 'false',
-          alt: photo.title
+          alt: photo.alt,
+          title: photo.title
         });
 
         $li.append($img);
@@ -613,6 +660,8 @@
       if (self.page < self.num_pages) {
           self.renderPagination();
       }
+
+      // check to see if picturefill exists and if so, call it
       self.$spinner.hide();
     };
 
@@ -692,7 +741,7 @@
     };
 
     /**
-     * Render a photo ont the sidebar
+     * Render a photo onto the sidebar
      * @param  {string} id flickr id of photo (data-id of li element clicked on)
      * @return null     
      */
@@ -702,9 +751,6 @@
       var photo_data = self.photo_data[id];
       // if ( !photo_data ) { ???; } TODO
       //console.log(photo_data);
-      if ( !photo_data.loaded ) {
-        self.getPhotoInfo(id);
-      }
 
       var info_box = $('<div>').attr({
         tabindex: 0,
@@ -776,6 +822,26 @@
       return label;
     };
 
+    /**
+     * Control the display of the add button on the form.
+     * 
+     * @param  {String} msg      text of add button
+     * @param  {bool}   disabled set disable state
+     * @param  {Number} id       the flickrId to set it to, or 0 to remvoe
+     * @return {null} 
+     */
+    this.renderAddButton = function( msg, disabled, id ) {
+      // prop() doesn't seem to work :-(
+      if (id) {
+        self.$add_button.attr({
+          'disabled': disabled,
+          'data-id' : id
+        }).text(msg);
+      } else {
+        self.$add_button.attr('disabled', disabled).removeAttr('data-id').text(msg);
+      }
+    };
+
     // ONREADY
     $( function() {
       // initialize document element properties
@@ -785,7 +851,7 @@
       self.$photo_list    = $('#'+constants.slug+'-photo-list');
       self.$media_sidebar = $('#'+constants.slug+'-media-sidebar');
       self.$add_button    = $('#'+constants.slug+'-media-add-button');
-      self.$error_box     = $('#ajax_error_msg');
+      self.$error_box     = $('#'+constants.slug+'-ajax-error');
       self.$spinner       = $('.spinner');
       self.nonce          = $('#'+constants.slug+'-search-nonce').val();
 

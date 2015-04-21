@@ -626,6 +626,11 @@ class FMLAdmin
 			'71d33bf', // version
 			true // in footer?
 		);
+		// for it to queue properly, picturefill.js needs to be patched.
+		// still it's not rendering 1x, 2x properly in firefox
+		if( defined('PICTUREFILL_WP_VERSION') ) {
+			wp_enqueue_script('picturefill');
+		}
 		wp_register_script(
 			FML::SLUG.'-old-media-form-script',
 			$this->_fml->static_url.'/js/media-upload.js',

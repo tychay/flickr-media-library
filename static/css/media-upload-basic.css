@@ -41,13 +41,20 @@ li.attachment {
     max-width: 240px; /* default is 120px, but let's make it larger because we can */
     max-height: 240px;
 }
-
+.attachments-browser .attachments {
+    top:70px; /* leave enough room for an error */
+}
+/* If picturefill kicks in, it may break Firefox */
+.attachments-browser .attachments img {
+    width: 75px;
+    height: 75px;
+}
 #flickr-media-library-select-filtersort {
     display:none; /* initially hide sorting */
 }
 #flickr-media-library-ajax-error {
     display:none;
-    margin: 10px;
+    margin: 50px 10px 15px 12px;
 }
 /* loader *
 #loader {
