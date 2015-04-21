@@ -665,6 +665,8 @@
     this.renderPhotoList = function () {
       this.clearItems(false);
 
+      this.picturefills = [];
+
       for (var i=0; i<self.photos.length; ++i) {
         photo = self.photo_data[self.photos[i]];
         if ( typeof(photo) != 'object' ) { continue; } // should never happen, but let's handle sparse arrays just in case
@@ -686,8 +688,15 @@
           title: photo.title
         });
 
+        this.picturefills.push($img);
+
         $li.append($img);
         self.$photo_list.append($li);
+      }
+
+      // if picturefill available, make sure we process the newly created images (firefox fix)
+      if (window.picturefill) {
+        window.picturefill(this.picturefills);
       }
 
       if (self.page < self.num_pages) {
@@ -794,18 +803,20 @@
       );
 
       // TODO: remove dependency on core _flickrData
+      // declare image so we can run picturefill on it after rendering
+      var $img = $('<img>').attr({
+        src: self.imgUrl(photo_data._flickrData,'m'),
+        srcset: self.imgUrl(photo_data._flickrData,'m')+' 1x, '+self.imgUrl(photo_data._flickrData,'z')+' 2x, '+self.imgUrl(photo_data._flickrData,'c')+' 3x',
+        draggable: 'false',
+        title: photo_data.title,
+        alt: photo_data.alt
+      });
+
       var attachment_info = $('<div>').attr('class', 'attachment-info').append(
         $('<div>').attr('class','thumbnail thumbnail-image')
-        .append(
-          $('<img>').attr({
-            src: self.imgUrl(photo_data._flickrData,'m'),
-            srcset: self.imgUrl(photo_data._flickrData,'m')+' 1x, '+self.imgUrl(photo_data._flickrData,'z')+' 2x, '+self.imgUrl(photo_data._flickrData,'c')+' 3x',
-            draggable: 'false',
-            title: photo_data.title,
-            alt: photo_data.alt
-          })
-        )
+        .append( $img )
       );
+
 
       var details = $('<div>').attr('class', 'details');
       details.append($('<div>').attr('class', 'filename').text(photo_data.title));
@@ -833,6 +844,8 @@
       }
 
       this.$media_sidebar.append(info_box);
+
+      if (window.picturefill) { window.picturefill($img); }
     };
 
     this._makeLabelTag = function(dataSetting, name, value, textArea)  {
