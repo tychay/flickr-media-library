@@ -514,11 +514,11 @@ class FMLAdmin
 				$this->_require_ajax_post('flickr_id');
 				$post = $this->_fml->get_media_by_flickr_id( $_POST['flickr_id'] );
 				if ( $post ) {
-					//TODO get extra information
+					$this->_fml->update_flickr_post($post);  //TODO: temporary repair of broken posts
 					$return = array(
 						'status'    => 'ok',
 						'post_id'   => $post->ID,
-						'post'      => $post,
+						'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
 						'flickr_id' => $_POST['flickr_id'],
 					);
 				} else {
@@ -534,11 +534,10 @@ class FMLAdmin
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post('flickr_id');
 				$post = $this->_fml->add_flickr($_POST['flickr_id']);
-				//if ( $return ) //TODO get extra infomration
 				$return = array(
 					'status'    => 'ok',
 					'post_id'   => $post->ID,
-					'post'      => $post,
+					'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
 					'flickr_id' => $_POST['flickr_id'],
 				);
 				break;

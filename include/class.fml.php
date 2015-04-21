@@ -53,6 +53,7 @@ class FML implements FMLConstants
 		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
 		$this->_post_metas = array(
 			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
+			'flickr_id' => '_flickr_id',
 		);
 		// settings and flickr are lazy loaded
 	}
@@ -347,7 +348,7 @@ class FML implements FMLConstants
 		// Check to see it's not already added, if so return that
 		if ( $post_already_added = $this->get_media_by_flickr_id( $flickr_id ) ) {
 			// update post and return it
-			return $this->_update_flickr_post( $post_already_added );
+			return $this->update_flickr_post( $post_already_added );
 		}
 		$data = $this->_get_data_from_flickr_id( $flickr_id );
 		if ( empty( $data ) ) {
@@ -376,6 +377,22 @@ class FML implements FMLConstants
 		return false;
 	}
 	/**
+	 * Just like wp_prepare_attachment_for_js() but for media images.
+	 * 
+	 * @param  WP_Post $post 
+	 * @return Array|null   hash for use in js
+	 */
+	public function wp_prepare_attachment_for_js( $post ) {
+		if ( $post->post_type != self::POST_TYPE ) { return; }
+		$post->post_type = 'attachment';
+		$response = wp_prepare_attachment_for_js($post);
+		$post->post_type = self::POST_TYPE;
+
+		$response['flickrId'] = get_post_meta( $post->ID, $this->_post_metas['flickr_id'], true );
+		$response['_flickrData'] = get_post_meta( $post->ID, $this->_post_metas['api_data'], true );
+		return $response;
+	}
+	/**
 	 * Generates a new post from the flickr data given
 	 * @param  [type] $data [description]
 	 * @return [type]       [description]
@@ -386,8 +403,7 @@ class FML implements FMLConstants
 		$post_id = wp_insert_post( $post_data );
 
 		// add grabbed information into post_meta
-		// no need to update_post_meta as we know it can't exist
-		add_post_meta( $post_id,  $this->_post_metas['api_data'], $data, true );
+		$this->_update_flickr_post_meta( $post_id, $data );
 
 		return $post_id;
 	}
@@ -396,7 +412,7 @@ class FML implements FMLConstants
 	 * @param  WP_Post|integer $post The post or its post ID.
 	 * @return WP_Post               Updated content
 	 */
-	private function _update_flickr_post( $post ) {
+	function update_flickr_post( $post ) {
 		if ( !is_object( $post ) ) {
 			$post = get_post( $post );
 		}
@@ -407,9 +423,13 @@ class FML implements FMLConstants
 
 		// update post
 		$post_id = wp_update_post( $post_data );
-		update_post_meta( $post->ID, $this->_post_metas['api_data'], $flickr_data );
+		$this->_update_flickr_post_meta( $post->ID, $flickr_data );
 
 		return get_post( $post->ID );
+	}
+	private function _update_flickr_post_meta( $post_id, $flickr_data) {
+		update_post_meta( $post_id, $this->_post_metas['api_data'], $flickr_data );
+		update_post_meta( $post_id, $this->_post_metas['flickr_id'], $flickr_data['id'] );
 	}
 	/**
 	 * Grab photo information from flickr API using flickr ID of photo

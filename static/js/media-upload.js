@@ -196,24 +196,42 @@
     /**
      * Inject data from Flickr API calls into phto_data array
      *
+     * {@see wp_prepare_attachment_for_js()}.
+     * 
      * This is modeled after data that goes into the media template:
+     *
+     * - id: Post ID
+     * - title
+     * - filename: name of file
+     * - url
+     * - link
+     * - alt: alt link
+     * - author
+     * - description: description text
+     * - caption: caption of image
+     * - name
+     * - status
+     * - uploadedTo
+     * - date
+     * - modified
+     * - menuOrder
+     * - mime
      * - type: should be 'image' for now
-     * - sizes: ??
-     * - size.url: img src?
-     * - filename: name of the file
+     * - subtype
+     * - icon
      * - dateFormatted: date file uploaded
-     * - filesizeHumanReadable: file size in human readable terms
+     * - nonces
+     * - editLink: link to the edit page
+     * - sizes
      * - width: width of image
      * - height: height of image
-     * - editLink: link to edit image
-     * - url:
-     * - title:
-     * - caption: caption of image
-     * - alt: alt text
-     * - description: description text
+     * - fileLength
+     * - compat
      * 
+     * - sizes: ??
+     * - size.url: img src?
+     * - filesizeHumanReadable: file size in human readable terms
      * - uploading. can.remove, status userSettings: not supported
-     * - SUPPORT EVERYTHING ELSE
      * 
      * @param {Number} id    The flickr_id of the photo
      * @param {Object} photo The data from the flickrApi
@@ -226,27 +244,35 @@
 
       // first time added info
       if ( !self.photo_data[id] ) {
+        //console.log(photo);
         self.photo_data[id] = {
           _flickrData: photo,
           flickrId: photo.id,
           title: photo.title,
-          alt: '' //flickr doesn't have this
+          id: 0,
+          alt: '', //flickr doesn't have this
+          description: ''//not on first call
         };
         return;
       }
+
       // everything else overwrites existing set
       var photo_data = self.photo_data[id];
       for( var idx in photo ) {
-        // handle title special case:
-        if ( idx === 'title' ) {
-          // title from photoinfo is in XML content
-          if ( photo.title._content ) {
-            photo_data.title = photo.title._content;
-            photo_data.flickrId.title = photo.title._content;
-          }
-          continue;
-        }
         photo_data._flickrData[idx] = photo[idx];
+      }
+
+      // extract flickr parameters
+      var flickr_data = photo_data._flickrData;
+      if ( flickr_data.title._content ) {
+          photo_data.title = flickr_data.title._content;
+      }
+      if ( flickr_data.description && flickr_data.description._content ) {
+          photo_data.description = flickr_data.description._content;
+      }
+      // TODO allow configuration to choose which date shows
+      if ( flickr_data.dates && flickr_data.dates.posted ) {
+          photo_data.date = flickr_data.dates.posted * 1000;
       }
     };
 
@@ -362,7 +388,14 @@
      * @param  {event} event event object of tirgger
      */
     this.showPhotoInfo = function(event) {
-      var flickr_id = $(this).attr('data-id');
+      var flickr_id  = $(this).attr('data-id'),
+          photo_data = self.photo_data[flickr_id];
+      // First check to see if I already have gotten all the info
+      if ( photo_data.id || photo_data.loaded ) {
+        self.renderPhotoInfo(flickr_id);
+        self.renderAddButton(constants.msgs_add_btn.insert, false, flickr_id);
+        return true;
+      }
       // First check to see if it's already in media library
       self.callApi(
         'get_media_by_flickr_id',
@@ -375,15 +408,15 @@
           }
           if ( data.post_id === 0 ) {
             // It doesn't exist yet in ML
-            var photo_data = self.photo_data[id];
-            //TODO: do api calls
-            if ( !photo_data.loaded ) {
-              self.getPhotoInfo(flickr_id);
-            }
+            // call flickr API to get more information
+            self.getPhotoInfo(flickr_id);
+            // meanwhile, render what we have.
             self.renderPhotoInfo(flickr_id);
+            return false; //since we are calling API again, don't stop spinner
           } else {
-            // It is already in media library
-            //TODO: add data to media library
+            // It is already in media library, so add the data we have
+            //console.log(data.post);
+            self.photo_data[flickr_id] = data.post;
             self.renderPhotoInfo(flickr_id);
             return true; //cancel spinner
           }
@@ -760,22 +793,25 @@
         $('<h3>').text(constants.msg_attachment_details)
       );
 
+      // TODO: remove dependency on core _flickrData
       var attachment_info = $('<div>').attr('class', 'attachment-info').append(
         $('<div>').attr('class','thumbnail thumbnail-image')
         .append(
           $('<img>').attr({
-            src: self.imgUrl(photo_data,'m'),
-            srcset: self.imgUrl(photo_data,'m')+' 1x, '+self.imgUrl(photo_data,'z')+' 2x, '+self.imgUrl(photo_data,'c')+' 3x',
+            src: self.imgUrl(photo_data._flickrData,'m'),
+            srcset: self.imgUrl(photo_data._flickrData,'m')+' 1x, '+self.imgUrl(photo_data._flickrData,'z')+' 2x, '+self.imgUrl(photo_data._flickrData,'c')+' 3x',
             draggable: 'false',
-            alt: photo_data.title
+            title: photo_data.title,
+            alt: photo_data.alt
           })
         )
       );
 
       var details = $('<div>').attr('class', 'details');
       details.append($('<div>').attr('class', 'filename').text(photo_data.title));
-      if ( photo_data.dates && photo_data.dates.posted ) {
-        var date = new Date(parseInt(photo_data.dates.posted)*1000);
+      // TODO: fix dates
+      if ( photo_data.date ) {
+        var date = new Date(parseInt(photo_data.date));
         details.append($('<div>').attr('class', 'uploaded').text(date.toLocaleString()));
       }
       // file-size
@@ -787,19 +823,19 @@
       attachment_info.append(details);
       info_box.append(attachment_info);
       
-      info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data), false ));
+      info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data._flickrData), false ));
       info_box.append(self._makeLabelTag('title', constants.msg_title, photo_data.title, false ));
       // label title
       // label caption
       // label alt text
-      if ( photo_data.description && photo_data.description._content ) {
-        info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description._content, true ));
+      if ( photo_data.description ) {
+        info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description, true ));
       }
 
       this.$media_sidebar.append(info_box);
     };
 
-    this._makeLabelTag = function (dataSetting, name, value, textArea)  {
+    this._makeLabelTag = function(dataSetting, name, value, textArea)  {
       var label = $('<label>').attr({
           'class': 'setting',
           'data-setting': dataSetting
