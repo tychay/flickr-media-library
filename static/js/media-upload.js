@@ -72,7 +72,7 @@
     this.webUrl = function(photoObj) {
       //if (photoObj.urls && photoObj.urls.url && photoObj.urls.url.typ)
       var ownername = (typeof photoObj.owner === 'string') ? photoObj.owner : photoObj.owner.username;
-      return 'http://www.flickr.com/photos'+ownername+'/'+photoObj.id;
+      return 'http://www.flickr.com/photos/'+ownername+'/'+photoObj.id;
     };
 
     // SEARCH QUERY API
@@ -792,8 +792,9 @@
 
       var photo_data = self.photo_data[id];
       // if ( !photo_data ) { ???; } TODO
-      //console.log(photo_data);
+      console.log(photo_data);
 
+      // ATTACHEMENT DETAILS
       var info_box = $('<div>').attr({
         tabindex: 0,
         'data-id': id,
@@ -802,6 +803,8 @@
         $('<h3>').text(constants.msg_attachment_details)
       );
 
+      // spinner is elsewhere
+      
       // TODO: remove dependency on core _flickrData
       // declare image so we can run picturefill on it after rendering
       var $img = $('<img>').attr({
@@ -811,37 +814,51 @@
         title: photo_data.title,
         alt: photo_data.alt
       });
-
       var attachment_info = $('<div>').attr('class', 'attachment-info').append(
         $('<div>').attr('class','thumbnail thumbnail-image')
         .append( $img )
       );
 
-
       var details = $('<div>').attr('class', 'details');
+      // filename: use title
       details.append($('<div>').attr('class', 'filename').text(photo_data.title));
-      // TODO: fix dates
-      if ( photo_data.date ) {
+      // uploaded: if not uploaded, use flickr data
+      if ( photo_data.dateFormatted ) {
+        details.append($('<div>').attr('class', 'uploaded').text(photo_data.dateFormatted));
+      } else if ( photo_data.date ) {
         var date = new Date(parseInt(photo_data.date));
         details.append($('<div>').attr('class', 'uploaded').text(date.toLocaleString()));
       }
-      // file-size
+      // X file-size
       // dimensions
+      if ( photo_data.width && photo_data.height ) {
+        details.append($('<div>').attr('class', 'dimensions').html(photo_data.width+' &times; '+photo_data.height));
+      }
       // X edit attachment link
       // X refresh attachment link
-      // X delete attachment link
-      // <div class="compat-meta"></div>
+      // X delete/tras/untrash attachment link
+      // TODO: compat-meta: <div class="compat-meta">data.compat.meta</div>
       attachment_info.append(details);
       info_box.append(attachment_info);
-      
+
+      // FORM
+      // url      
       info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data._flickrData), false ));
+      // title
       info_box.append(self._makeLabelTag('title', constants.msg_title, photo_data.title, false ));
-      // label title
-      // label caption
-      // label alt text
+      // TODO: caption
+      // TODO: alt text
+      // description
       if ( photo_data.description ) {
         info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description, true ));
       }
+
+      // X media_selection info?
+      
+      // TODO: ATTACHMENT DISPLAY SETTINGS
+      // TODO: Alignment
+      // TODO: Link To
+      // TODO: Sizes
 
       this.$media_sidebar.append(info_box);
 

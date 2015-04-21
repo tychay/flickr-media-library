@@ -73,6 +73,7 @@ class FML implements FMLConstants
 	 * - Register the custom post type used for storing flickr photos. If the
 	 *   register is called earlier, it won't trigger due to missing object on
 	 *   rewrite rule. {@see https://codex.wordpress.org/Function_Reference/register_post_type}
+	 * - filter image_downsize()
 	 * 
 	 * @return void
 	 */
@@ -137,6 +138,7 @@ class FML implements FMLConstants
 			//'query_var'           => '', default query var
 			//'can_export'          => true, // can be exported
 		));
+		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
 	}
 
 	//
@@ -205,6 +207,7 @@ class FML implements FMLConstants
 	private $_settings = array();
 	//
 	// Properties
+	// 
 	/**
 	 * Load options array into settings variable
 	 * 
@@ -336,6 +339,160 @@ class FML implements FMLConstants
 		));
 	}
 	//
+	// ATTACHEMENT EMULATIONS
+	// 
+	/**
+	 * Inject Flickr image downsize code if image is Flickr Media
+	 * 
+	 * @see https://developer.wordpress.org/reference/hooks/image_downsize/
+	 * @param  bool         $downsize current status of filter
+	 * @param  int          $id       attachement ID of image
+	 * @param  array|string $size     size of image (e.g. dimensions, 'medium')
+	 * @return array|bool             do not short-circuit downsizing
+	 *                                or array with url, width, height, is_intermediate
+	 * @todo  untested
+	 */
+	public function filter_image_downsize($downsize, $id, $size) {
+		global $_wp_additional_image_sizes;
+
+		$post = get_post( $id );
+		// Only operate on flickr media images
+		if ( $post->post_type != self::POST_TYPE ) {
+			return $downsize;
+		}
+
+		$flickr_data = $this->get_flickr_data( $id );
+		$img_sizes = $flickr_data['sizes']['size'];
+		$count_img_sizes = count($img_sizes);
+
+		if ( is_string($size) ) {
+			switch ( $size ) {
+				case 'thumbnail':
+					$size = array(
+						'width'  => get_option( 'thumbnail_size_w', 150 ),
+						'height' => get_option( 'thumbnail_size_h', 150 ),
+						'crop'  => true,
+					);
+					break;
+				case 'medium':
+					$size = array(
+						'width'  => get_option( 'medium_size_w', 300 ),
+						'height' => get_option( 'medium_size_h', 300 ),
+						'crop'  => false,
+					);
+					break;
+				case 'large':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 1024 ),
+						'height' => get_option( 'large_size_h', 1024 ),
+						'crop'  => false,
+					);
+					break;
+				case 'full':
+					// return original image if possible, if not return the
+					// largest one available.
+					
+					// Take advantage of the fact that they're ordered by size
+					// from the flickr api
+					$img = $sizes[ $count_img_sizes-1 ];
+					if ( ( $flickr_data['rotation'] != 0 ) && ( $img['label'] == 'Original' ) ) {
+						$img = $sizes[ $count_img_sizes-2 ];
+					}
+					return array( $img['source'], $img['width'], $img['height'], false );
+				default:
+					$size = $_wp_additional_image_sizes[$size];
+			}
+		}
+		// TODO: find closest image size
+		// Find an image >= biggest dimension, when they're equal, prefer width
+		if ( $size['height'] > $size['width'] ) {
+
+		}
+
+		$img = array();
+		if ( $size['crop'] ) {
+			// If image is crop, then make sure we choose an image that is 
+			// bigger than the smallest dimension
+			foreach ( $img_sizes as $img ) {
+				$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
+				$min_ratio = min( $img['width']/$size['width'], $img['height']/$size['height'] );
+				if ( $min_ratio >= 1 ) {
+					if ( $max_ratio == 1 ) {
+						// perfect match
+						return array( $img['source'], $img['width'], $img['height'], false );
+					}
+					// imperfect match
+					return array( $img['source'], intval($img['width']/$min_ratio), intval($img['height']/$min_ratio), true );
+				}
+			}
+		} else {
+			// If image is not crop, choose an image where the object that is
+			// exactly or slightly larger than the most constraining dimension
+			foreach ( $img_sizes as $img ) {
+				$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
+				if ( $max_ratio == 1 ) {
+					return array( $img['source'], $img['width'], $img['height'], false );
+				}
+				if ( $max_ratio >= 1 ) {
+					return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+				}
+			}
+		}
+		// if we got here, then we need to return the largest practical size
+		// scaled up to the dimensions
+		// 
+		// Take advantage of the fact that they're ordered by size
+		// from the flickr api
+		$img = $sizes[ $count_img_sizes-1 ];
+		if ( ( $flickr_data['rotation'] != 0 ) && ( $img['label'] == 'Original' ) ) {
+			$img = $sizes[ $count_img_sizes-2 ];
+		}
+		$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
+		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+	}
+	/**
+	 * Just like wp_prepare_attachment_for_js() but for media images.
+	 * 
+	 * @param  WP_Post $post 
+	 * @return Array|null   hash for use in js
+	 * @todo  support injecting sizes
+	 */
+	public function wp_prepare_attachment_for_js( $post ) {
+		if ( $post->post_type != self::POST_TYPE ) { return; }
+
+		// "defaults" recovered from emulation
+		$post->post_type = 'attachment';
+		$response = wp_prepare_attachment_for_js($post);
+		$post->post_type = self::POST_TYPE;
+
+		$flickr_data = $this->get_flickr_data( $post );
+
+		// other emulated things
+		foreach ( $flickr_data['sizes']['size'] as $size_data ) {
+			if ( ( $size_data['label'] == 'Original' )  && ( $flickr_data['rotation'] != 0 ) ) {
+				continue;
+			}
+			$sizes[$size_data['label']] = array(
+				'url'         => $size_data['source'],
+				'width'       => intval($size_data['width']),
+				'height'      => intval($size_data['height']),
+				'orientation' => ( $size_data['height'] > $size_data['width'] ) ? 'portrait' : 'landscape',
+			);
+			$response['width']  = intval($size_data['width']);
+			$response['height'] = intval($size_data['height']);
+		}
+		$response['sizes'] = $sizes;
+		
+		// FML-specific
+		$response['flickrId'] = get_post_meta( $post->ID, $this->_post_metas['flickr_id'], true );
+		$response['_flickrData'] = $flickr_data;
+
+		return $response;
+	}
+	//
+	// SHORTCODE HANDLING
+	// 
+	//
 	// FLICKR MEDIA
 	// 
 	/**
@@ -377,20 +534,18 @@ class FML implements FMLConstants
 		return false;
 	}
 	/**
-	 * Just like wp_prepare_attachment_for_js() but for media images.
+	 * Get the Flickr API data from post meta
 	 * 
-	 * @param  WP_Post $post 
-	 * @return Array|null   hash for use in js
+	 * @param  int|WP_Post $post [description]
+	 * @return [type]       [description]
 	 */
-	public function wp_prepare_attachment_for_js( $post ) {
-		if ( $post->post_type != self::POST_TYPE ) { return; }
-		$post->post_type = 'attachment';
-		$response = wp_prepare_attachment_for_js($post);
-		$post->post_type = self::POST_TYPE;
-
-		$response['flickrId'] = get_post_meta( $post->ID, $this->_post_metas['flickr_id'], true );
-		$response['_flickrData'] = get_post_meta( $post->ID, $this->_post_metas['api_data'], true );
-		return $response;
+	public function get_flickr_data( $post ) {
+		if ( is_object($post) ) {
+			$post_id = $post->ID;
+		} else {
+			$post_id = $post;
+		}
+		return get_post_meta( $post->ID, $this->_post_metas['api_data'], true );
 	}
 	/**
 	 * Generates a new post from the flickr data given
@@ -416,7 +571,7 @@ class FML implements FMLConstants
 		if ( !is_object( $post ) ) {
 			$post = get_post( $post );
 		}
-		$flickr_data = get_post_meta( $post->ID, $this->_post_metas['api_data'], true );
+		$flickr_data = $this->get_flickr_data( $post );
 		$flickr_data = $this->_update_data_from_flickr( $flickr_data );
 		$post_data = $this->_post_data_from_flickr_data( $flickr_data );
 		$post_data['ID'] = $post->ID;
@@ -536,26 +691,35 @@ class FML implements FMLConstants
 				$post_tags[] = $tag_data['raw'];
 			}
 		}
+		// TODO handle this better
+		//switch ( $data['media'] ) {}
+		$mime_type = 'image/jpeg';
 		// generate post array (from data)
 		$post_data = array(
-			'post_content'   => $this->_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
-			'post_name'      => $this->_flickr_id_to_name( $data['id'] ), //post slug
-			'post_title'     => $data['title']['_content'],
-			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
-			'post_type'      => self::POST_TYPE,
+			//ID
 			//'post_author'    => 0,//userid
-			//'ping_status'    => 'closed', //no pingbacks
-			//'post_parent'    => 0, // TODO
-			//'menu_order'     => (for page ordering)
+			'post_date'      => $data['dates']['taken'], //TODO: consider varying date
+			//'post_date_gmt' => above in GMT
+			'post_content'   => $this->_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
+			'post_title'     => $data['title']['_content'],
+			//'post_excerpt' 
+			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
+			'comment_status' => 'closed', //comments should be on flickr page only
+			'ping_status'    => 'closed', //no pingbacks
+			//'post_password'
+			'post_name'      => $this->_flickr_id_to_name( $data['id'] ), //post slug
 			//'to_ping'
 			//'pinged'
-			//'post_password'
-			//'guid' // Let wordpress handle
+			//'post_modified'
+			'post_modified_gmt' => gmdate( 'Y m d H:i:s', $data['dates']['lastupdate'] ),
 			//'post_content_filtered' => let wordpress handle?
-			//'post_excerpt' 
-			'post_date'      => $data['dates']['taken'],
-			//'post_date_gmt' => above in GMT
-			'comment_status' => 'closed',
+			//'post_parent'    => 0, // TODO
+			//'guid' // Let wordpress handle
+			//'menu_order'     => (for page ordering)
+			'post_type'      => self::POST_TYPE,
+			'post_mime_type' => $mime_type,
+			//'comment_count' => TODO
+			
 			//'post_category' => array of cateogires
 			'tags_input'     => $post_tags,
 			//'tax_input' => other taxonomy
