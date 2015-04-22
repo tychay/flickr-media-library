@@ -479,8 +479,9 @@
         self.callApi(
           'new_media_from_flickr_id',
           {
-            flickr_id: data.flickr_id
-            // TODO: handle alt and caption text here
+            flickr_id: id,
+            alt: $('label[data-setting=alt] input').val(),
+            caption: $('label[data-setting=caption] textarea').val()
           },
           self.callbackFMLPostSuccess, //Return looks exactly like a if exists query on a match
           function(XHR, status, errorThrown) {
@@ -488,7 +489,6 @@
             return true; //do default action
           }
         );
-        /* */
       }
       // don't go to href
       event.preventDefault();
@@ -788,7 +788,7 @@
 
       var photo_data = self.photo_data[id];
       // if ( !photo_data ) { ???; } TODO
-      console.log(photo_data);
+      //console.log(photo_data);
 
       // ATTACHEMENT DETAILS
       var info_box = $('<div>').attr({
@@ -845,7 +845,7 @@
       // caption
       info_box.append(self._makeLabelTag('caption', constants.msg_caption, photo_data.caption, 'textarea', false));
       // alt text
-      info_box.append(self._makeLabelTag('alt', constants.msg_alt, photo_data.caption, 'textarea', false));
+      info_box.append(self._makeLabelTag('alt', constants.msg_alt, photo_data.alt, false, false));
       // description
       if ( photo_data.description ) {
         info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description, 'textarea', 'readonly'));

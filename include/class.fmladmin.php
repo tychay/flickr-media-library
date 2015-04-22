@@ -534,6 +534,19 @@ class FMLAdmin
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post('flickr_id');
 				$post = $this->_fml->add_flickr($_POST['flickr_id']);
+				$update = array();
+				if ( !empty( $_POST['caption'] ) ) {
+					$update['post_excerpt'] = $_POST['caption'];
+				}
+				if ( !empty( $_POST['alt']) ) {
+					update_post_meta( $post->ID, '_wp_attachment_image_alt', $_POST['alt'] );
+				}
+				if ( !empty($update) ) {
+					$update['ID'] = $post->ID;
+					$post_id = wp_update_post( $update );
+					// data's been changed.
+					$post = wp_get_post($post->ID);
+				}
 				$return = array(
 					'status'    => 'ok',
 					'flickr_id' => $_POST['flickr_id'],

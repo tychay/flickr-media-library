@@ -114,11 +114,11 @@ class FML implements FMLConstants
 			'supports'            => array(
 				'title',
 				'editor',
-				'author', //can have author
-				'thumbnail', // can have featured image?
-				//'excerpt',
+				//'author', //can have author
+				'thumbnail', // TODO: can have featured image?
+				'excerpt', //caption text
 				//'trackbacks',
-				'custom-fields',
+				//'custom-fields',
 				'comments',
 				//'revisions', //TODO
 				//'page-attributes', //menu order if hierarchical is true
@@ -699,10 +699,10 @@ class FML implements FMLConstants
 			//ID
 			//'post_author'    => 0,//userid
 			'post_date'      => $data['dates']['taken'], //TODO: consider varying date
-			//'post_date_gmt' => above in GMT
+			//'post_date_gmt'  => above in GMT
 			'post_content'   => $this->_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
 			'post_title'     => $data['title']['_content'],
-			//'post_excerpt' 
+			//'post_excerpt'   => //ALT TEXT
 			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
 			'comment_status' => 'closed', //comments should be on flickr page only
 			'ping_status'    => 'closed', //no pingbacks
