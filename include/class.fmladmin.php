@@ -517,9 +517,9 @@ class FMLAdmin
 					$this->_fml->update_flickr_post($post);  //TODO: temporary repair of broken posts
 					$return = array(
 						'status'    => 'ok',
+						'flickr_id' => $_POST['flickr_id'],
 						'post_id'   => $post->ID,
 						'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
-						'flickr_id' => $_POST['flickr_id'],
 					);
 				} else {
 					$return = array(
@@ -536,9 +536,9 @@ class FMLAdmin
 				$post = $this->_fml->add_flickr($_POST['flickr_id']);
 				$return = array(
 					'status'    => 'ok',
+					'flickr_id' => $_POST['flickr_id'],
 					'post_id'   => $post->ID,
 					'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
-					'flickr_id' => $_POST['flickr_id'],
 				);
 				break;
 		}
@@ -656,7 +656,8 @@ class FMLAdmin
 				'add_to'  => __( 'Add to media library', FML::SLUG ),
 				'insert'  => __( 'Insert into post' ),
 				'adding'  => __( 'Adding…', FML::SLUG ),
-				'already' => __( 'Already added', FML::SLUG ),
+				'query'   => __( 'Querying…', FML::SLUG ),
+				//'already' => __( 'Already added', FML::SLUG ),
 			),
 			'msgs_sort'			 => array(
 				'date-posted-desc'     => __('Date posted (desc)', FML::SLUG),

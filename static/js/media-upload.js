@@ -194,7 +194,7 @@
     };
 
     /**
-     * Inject data from Flickr API calls into phto_data array
+     * Inject data from Flickr API calls into photo_data array
      *
      * {@see wp_prepare_attachment_for_js()}.
      * 
@@ -373,8 +373,9 @@
         self.addPhotoDataFromFlickr(data.photo.id, data.photo);
         // make sure it's the same before rendering
         if (photoId == $('.attachment-details').attr('data-id') ) {
-          // render udpated data
+          // render updated data
           self.renderPhotoInfo(photoId);
+          self.guessRenderAddButton(photoId);
         }
         self.$spinner.hide();
       });
@@ -390,53 +391,70 @@
     this.showPhotoInfo = function(event) {
       var flickr_id  = $(this).attr('data-id'),
           photo_data = self.photo_data[flickr_id];
+      // Disable from future clicks
+      self.renderAddButton(constants.msgs_add_btn.query, true, flickr_id);
       // First check to see if I already have gotten all the info
       if ( photo_data.id || photo_data.loaded ) {
         self.renderPhotoInfo(flickr_id);
-        self.renderAddButton(constants.msgs_add_btn.insert, false, flickr_id);
+        self.guessRenderAddButton(flickr_id);
         return true;
       }
       // First check to see if it's already in media library
       self.callApi(
         'get_media_by_flickr_id',
         { 'flickr_id': flickr_id },
-        function( data ) {
-          // fml api error
-          if ( data.status != 'ok') {
-            self.handle_fml_error(data);
-            return true; //cancel spinner
-          }
-          if ( data.post_id === 0 ) {
-            // It doesn't exist yet in ML
-            // call flickr API to get more information
-            self.getPhotoInfo(flickr_id);
-            // meanwhile, render what we have.
-            self.renderPhotoInfo(flickr_id);
-            return false; //since we are calling API again, don't stop spinner
-          } else {
-            // It is already in media library, so add the data we have
-            //console.log(data.post);
-            self.photo_data[flickr_id] = data.post;
-            self.renderPhotoInfo(flickr_id);
-            return true; //cancel spinner
-          }
-        },
-        false //default error behavior
+        self.callbackFMLPostSuccess,
+        function(XHR,status,errorThrown) {
+          self.guessRenderAddButton(flickr_id);
+        }
       );
-      // activate insert button
-      self.renderAddButton(constants.msgs_add_btn.add_to, false, flickr_id);
     };
 
+    /**
+     * Handle return on a query of if FML post exists or if FML post created
+     * 
+     * @param  {Object} data AJAX response. Has status, flickr_id, post_id, post
+     * @return {bool}        whether to stop the spinner
+     */
+    this.callbackFMLPostSuccess = function(data) {
+      // fml api error
+      if ( data.status != 'ok') {
+        self.handle_fml_error(data);
+        self.guessRenderAddButton(0);
+        return true; //cancel spinner
+      }
+      // this should never happen after an ADD, just when CLICKING on something
+      // NEW
+      if ( data.post_id === 0 ) {
+        // It doesn't exist yet in ML
+        // call flickr API to get more information
+        self.getPhotoInfo(data.flickr_id);
+        // meanwhile, render what we have.
+        self.renderPhotoInfo(data.flickr_id);
+        // keep the button disabled
+        return false; //since we are calling API again, don't stop spinner
+      } else {
+        // It is already in media library, so add the data we have
+        //console.log(data.post);
+        self.photo_data[data.flickr_id] = data.post;
+        self.renderPhotoInfo(data.flickr_id);
+        self.guessRenderAddButton(data.flickr_id);
+        return true; //cancel spinner
+      }
+    };
 
     /**
      * + click on add button
      *
      * $this = "add to media library" button
+     *
+     * There are two behaviors:
+     * - if it is in media library already: inject HTML shortcode into page
+     * - if it is not in library: add to media library
      */
     this.clickAddButton = function(event) {
-      var $this = $(this),
-          disabled = $this.prop('disabled'),
-          id=$this.attr('data-id');
+      var $this    = $(this),
+          disabled = $this.prop('disabled');
 
       // don't support click if disabled
       if ( $this.prop('disabled') ) {
@@ -444,58 +462,36 @@
           return;
       }
 
-      // disable button and rename
-      self.renderAddButton(constants.msgs_add_btn.adding, true, id);
-      // make ajax call to see if it exists
-      self.callApi(
-        'get_media_by_flickr_id',
-        { flickr_id: id },
-        self.callbackRequestExists,
-        function(XHR, status, errorThrown) {
-          self.renderAddButton(constants.msgs_add_btn.add_to, true, 0);
-          return true; //do default action
-        }
-      );
-      // don't go to href
-      event.preventDefault();
-    };
+      var id         = $this.attr('data-id'),
+          photo_data = self.photo_data[id];
 
-    this.callbackRequestExists = function(data) {
-      if ( data.status != 'ok' ) {
-        // TODO: handle work on error
-        self.handle_fml_error(data);
-        return true; //cancel spinner
-      }
-      if ( data.post_id === 0 ) {
-        // it doesn't exist already, add the file
+      if ( photo_data.id ) {
+        //It's already in library
+        console.log('TODO: INJECTION CODE HERE');
+        // disable button and rename
+        self.renderAddButton(constants.msgs_add_btn.adding, true, id);
+
+      } else {
+        // Not in library yet
+        // disable button and rename
+        self.renderAddButton(constants.msgs_add_btn.adding, true, id);
+        // call api to add it to media library
         self.callApi(
           'new_media_from_flickr_id',
-          { flickr_id: data.flickr_id },
-          self.callbackRequestAdd,
+          {
+            flickr_id: data.flickr_id
+            // TODO: handle alt and caption text here
+          },
+          self.callbackFMLPostSuccess, //Return looks exactly like a if exists query on a match
           function(XHR, status, errorThrown) {
-            // TODO:
-            self.renderAddButton(constants.msgs_add_btn.add_to, true, 0);
+            self.guessRenderAddButton(0);
+            return true; //do default action
           }
         );
-        return false; //making another call, don't cancel the spinner
-      } else {
-        // It already exists!
-        // TODO Add all the information needed to render
-        self.renderAddButton(constants.msgs_add_btn.insert, false, data.flickr_id);
-        return true; //cancel spinner
+        /* */
       }
-    };
-
-    this.callbackRequestAdd = function(data) {
-      if ( data.status != 'ok' ) {
-        // TODO: handle work on error
-        self.handle_fml_error(data);
-        return true; //cancel spinner
-      }
-      //TODO do work
-      console.log(data);
-      self.renderAddButton(constants.msgs_add_btn.insert, false, data.flickr_id);
-
+      // don't go to href
+      event.preventDefault();
     };
 
     // APIs
@@ -905,6 +901,24 @@
         }).text(msg);
       } else {
         self.$add_button.attr('disabled', disabled).removeAttr('data-id').text(msg);
+      }
+    };
+    /**
+     * Shortcut to renderAddButton to handle most common cases
+     * 
+     * @param  {Number} flickr_id The flickr id to add to the data field
+     * @return {null}
+     */
+    this.guessRenderAddButton = function(flickr_id) {
+      if (flickr_id === 0) {
+        self.renderAddButton(constants.msgs_add_btn.add_to, true, 0);
+        return;
+      }
+      var photo_data = self.photo_data[flickr_id];
+      if ( photo_data.id ) {
+        self.renderAddButton(constants.msgs_add_btn.insert, false, flickr_id);
+      } else {
+        self.renderAddButton(constants.msgs_add_btn.add_to, false, flickr_id);
       }
     };
 
