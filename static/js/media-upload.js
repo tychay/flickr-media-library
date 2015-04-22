@@ -949,9 +949,9 @@
     };
     this._makeTextArea = function(value, readOnly) {
       if ( readOnly ) {
-        return $('textarea').text(value);
-      } else {
         return $('<textarea>').attr('readonly', 'readonly').text(value);
+      } else {
+        return $('<textarea>').text(value);
       }
     };
     this._makeSelectInput = function(values, selected, dataSetting, className) {
