@@ -4,7 +4,8 @@
  * This is going to be janky!
  */
 (function ($, window, constants) {
-   var sprintf = window.sprintf;
+  var sprintf = window.sprintf;
+  //console.log(constants);
 
   /**
    * + Convert HTTPS URL into HTTP.
@@ -281,7 +282,7 @@
      * @return {boolean} false to override default behaviuor
      */
     this.loadMore = function() {
-      $('#pagination').prop('disabled',true).val(constants.msg_loading); //dont allow to keep clicking on it
+      $('#pagination').prop('disabled',true).val(constants.msgs_pagination.loading); //dont allow to keep clicking on it
       self.searchPhoto(1); // get next page
       return false;
     };
@@ -585,7 +586,7 @@
      * @param  {string} errorThrown string description of error
      */
     this.handle_ajax_error = function(XHR, status, errorThrown) {
-      return self._show_error( sprintf(constants.msg_ajax_error, status, errorThrown ) );
+      return self._show_error( sprintf(constants.msgs_error.ajax, status, errorThrown ) );
     };
 
     /**
@@ -595,9 +596,9 @@
      */
     this.handle_flickr_error = function(code, msg) {
       if ( msg === '') {
-        return self._show_error( constants.msg_flickr_error_unknown );
+        return self._show_error( constants.msgs_error.flickr_unk );
       }
-      return self._show_error( sprintf(constants.msg_flickr_error, code, msg ) );
+      return self._show_error( sprintf(constants.msgs_error.flickr, code, msg ) );
     };
 
     /**
@@ -605,7 +606,7 @@
      * @param {object} data the ajax return
      */
     this.handle_fml_error = function(data) {
-      return self._show_error( sprintf(constants.msg_fml_error, data.code, data.reason) );
+      return self._show_error( sprintf(constants.msgs_error.fml, data.code, data.reason) );
     };
 
     /**
@@ -716,7 +717,7 @@
         id:      'pagination',
         type:    'button',
         'class': 'button',
-        value:    constants.msg_pagination
+        value:    constants.msgs_pagination.load//,
         //style:   'display:inline-block;'
       }).click(self.loadMore);
       self.$photo_list.append($li.append($input));
@@ -786,7 +787,9 @@
     this.renderPhotoInfo = function(id) {
       this.$media_sidebar.empty();
 
-      var photo_data = self.photo_data[id];
+      var photo_data = self.photo_data[id],
+          msgs = constants.msgs_attachment;
+
       // if ( !photo_data ) { ???; } TODO
       //console.log(photo_data);
 
@@ -796,7 +799,7 @@
         'data-id': id,
         'class': 'attachment-details save-ready'
       }).append(
-        $('<h3>').text(constants.msg_attachment_details)
+        $('<h3>').text(msgs.attachment_details)
       );
 
       // spinner is elsewhere
@@ -839,16 +842,16 @@
 
       // FORM
       // url      
-      info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data._flickrData), false, 'readonly'));
+      info_box.append(self._makeLabelTag('url', msgs.url, self.webUrl(photo_data._flickrData), false, 'readonly'));
       // title
-      info_box.append(self._makeLabelTag('title', constants.msg_title, photo_data.title, false, 'readonly'));
+      info_box.append(self._makeLabelTag('title', msgs.title, photo_data.title, false, 'readonly'));
       // caption
-      info_box.append(self._makeLabelTag('caption', constants.msg_caption, photo_data.caption, 'textarea', false));
-      // alt text
-      info_box.append(self._makeLabelTag('alt', constants.msg_alt, photo_data.alt, false, false));
+      info_box.append(self._makeLabelTag('caption', msgs.caption, photo_data.caption, 'textarea', false));
+      // alt tex
+      info_box.append(self._makeLabelTag('alt', msgs.alt, photo_data.alt, false, false));
       // description
       if ( photo_data.description ) {
-        info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description, 'textarea', 'readonly'));
+        info_box.append(self._makeLabelTag('description', msgs.description, photo_data.description, 'textarea', 'readonly'));
       }
 
       // X media_selection info?

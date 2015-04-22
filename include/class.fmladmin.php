@@ -616,7 +616,16 @@ class FMLAdmin
 	 */
 	public function get_media_upload_iframe()
 	{
-		$settings = $this->_fml->settings;
+		/*
+		if ( empty($_GET['post_id']) ) {
+			wp_enqueue_media();
+		} else {
+			wp_enqueue_media( array( 'post' => (int) $_GET['post_id'] ) );
+
+		}
+		// has some constants to make our lives easier
+		wp_enqueue_script('media-views');
+		*/
 		wp_enqueue_style(
 			'media-views',
 			admin_url('css/media-views.css')
@@ -650,26 +659,50 @@ class FMLAdmin
 			false, // version
 			true // in footer?
 		);
+		$settings = $this->_fml->settings;
+		// see wp_enqueue_media()
+		$props = array(
+			'link'  => get_option( 'image_default_link_type' ), // db default is 'file'
+			'align' => get_option( 'image_default_align' ), // empty default
+			'size'  => ucfirst(get_option( 'image_default_size' )),  // empty default
+			// capitalize to make it have a chance of matching flickr's sizes if set
+		);
+		if ( !empty( $_GET['post_id'] ) ) {
+			$post_id = (int) $_GET['post_id'];
+			$post = get_post($post_id);
+			$hier = $post && is_post_type_hierarchical( $post->post_type );
+			$insert_msg = ( $hier ) ? __( 'Insert into page' ) : __( 'Insert into post' );
+		} else {
+			$post_id = 0;
+			$insert_msg = __( 'Insert into post' );
+		}
 		$constants = array(
 			'slug'               => FML::SLUG,
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
 			'ajax_action_call'   => $this->_action_api,
-			'msg_ajax_error'     => __('AJAX error %s (%s).', FML::SLUG),
-			'msg_flickr_error'   => __('Flickr API error %s (%s).', FML::SLUG),
-			'msg_flickr_error_unknown '=> __('Flickr API returned an unknown error.', FML::SLUG),
-			'msg_fml_error'      => __('Flickr Media Library API error %s (%s).', FML::SLUG),
-			'msg_pagination'     => __('Load More'),
-			'msg_loading'        => __('Loading…', FML::SLUG),
-			'msg_attachment_details' => __( 'Attachment Details' ),
-			'msg_url'            => __( 'URL' ),
-			'msg_title'          => __( 'Title' ),
-			'msg_description'    => __( 'Description' ),
-			'msg_caption'        => __( 'Caption' ),
-			'msg_alt'            => __( 'Alt Text' ),
+			'default_props'      => $props,
+			'msgs_error'         => array(
+				'ajax'       => __('AJAX error %s (%s).', FML::SLUG),
+				'flickr'     => __('Flickr API error %s (%s).', FML::SLUG),
+				'flickr_unk' => __('Flickr API returned an unknown error.', FML::SLUG),
+				'fml'        => __('Flickr Media Library API error %s (%s).', FML::SLUG),
+			),
+			'msgs_pagination' => array(
+				'load'    => __('Load More'),
+				'loading' => __('Loading…', FML::SLUG),
+			),
+			'msgs_attachment'    => array(
+				'attachment_details' => __( 'Attachment Details' ),
+				'url'                => __( 'URL' ),
+				'title'              => __( 'Title' ),
+				'description'        => __( 'Description' ),
+				'caption'            => __( 'Caption' ),
+				'alt'                => __( 'Alt Text' ),
+			),
 			'msgs_add_btn'       => array(
 				'add_to'  => __( 'Add to media library', FML::SLUG ),
-				'insert'  => __( 'Insert into post' ),
+				'insert'  => $insert_msg,
 				'adding'  => __( 'Adding…', FML::SLUG ),
 				'query'   => __( 'Querying…', FML::SLUG ),
 				//'already' => __( 'Already added', FML::SLUG ),
@@ -703,6 +736,9 @@ class FMLAdmin
 				999 => __('Unknonw error', FML::SLUG),
 			),
 		);
+		if ( $post_id ) {
+			$constants['post_id'] = $post_id;
+		}
 		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
 		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
 		return wp_iframe(array($this,'show_media_upload_form'));
