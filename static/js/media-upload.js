@@ -842,60 +842,144 @@
 
       // FORM
       // url      
-      info_box.append(self._makeLabelTag('url', msgs.url, self.webUrl(photo_data._flickrData), false, 'readonly'));
+      info_box.append(self._wrapLabelTag(
+        self._makeTextInput(self.webUrl(photo_data._flickrData), 'readonly'),
+        'url',
+        msgs.url
+      ) );
       // title
-      info_box.append(self._makeLabelTag('title', msgs.title, photo_data.title, false, 'readonly'));
+      info_box.append(self._wrapLabelTag(
+        self._makeTextInput(photo_data.title, 'readonly'),
+        'title',
+        msgs.title
+      ) );
       // caption
-      info_box.append(self._makeLabelTag('caption', msgs.caption, photo_data.caption, 'textarea', false));
-      // alt tex
-      info_box.append(self._makeLabelTag('alt', msgs.alt, photo_data.alt, false, false));
+      info_box.append(self._wrapLabelTag(
+        self._makeTextArea(photo_data.caption, false),
+        'caption',
+        msgs.caption
+      ) );
+      // alt text
+      info_box.append(self._wrapLabelTag(
+        self._makeTextInput(photo_data.alt, false),
+        'alt',
+        msgs.alt
+      ) );
       // description
       if ( photo_data.description ) {
-        info_box.append(self._makeLabelTag('description', msgs.description, photo_data.description, 'textarea', 'readonly'));
+        info_box.append(self._wrapLabelTag(
+          self._makeTextArea(photo_data.description, 'readonly'),
+          'description',
+          msgs.description
+        ) );
+      }
+      self.$media_sidebar.append(info_box);
+
+      // TODO: compat-item?
+      
+      // Only allow injection if it's in the media library 
+      // TODO: ATTACHMENT DISPLAY SETTINGS
+      if ( photo_data.id ) {
+        var insert_box = $('<div>').attr({
+          'class': 'attachment-display-settings'
+        }).append(
+          $('<h3>').text(msgs.attachment_settings)
+        );
+        // Alignment
+        insert_box.append(self._wrapLabelTag(
+          self._makeSelectInput(
+            {'left':msgs.left, 'center':msgs.center, 'right':msgs.right, 'none':msgs.none},
+            constants.default_props.align,
+            'align',
+            'alignment'
+          ),
+          false,
+          msgs.alignment
+        ));
+        // Link To
+        insert_box.append(self._wrapLabelTag(
+          self._makeSelectInput(
+            {'file':msgs.file, 'post':msgs.post, 'custom':msgs.flickr, 'none':msgs.none},
+            constants.default_props.link,
+            'link',
+            'link-to'
+          ),
+          false,
+          msgs.linkto
+        ));
+        // TODO: add text box <input type="text" class="link-to-custom" data-setting="linkUrl" />
+        // TODO: add controls
+        // Sizes
+        insert_box.append(self._wrapLabelTag(
+          self._makeSelectInput(
+            self._generateSizesArray(photo_data.sizes),
+            constants.default_props.size,
+            'size',
+            'size'
+          ),
+          false,
+          msgs.size
+        ));
+        self.$media_sidebar.append(insert_box);
       }
 
-      // X media_selection info?
-      
-      // TODO: ATTACHMENT DISPLAY SETTINGS
-      // TODO: Alignment
-      // TODO: Link To
-      // TODO: Sizes
-
-      this.$media_sidebar.append(info_box);
 
       if (window.picturefill) { window.picturefill($img); }
     };
-
-    this._makeLabelTag = function(dataSetting, name, value, textArea, readOnly)  {
-      var label = $('<label>').attr({
-          'class': 'setting',
-          'data-setting': dataSetting
-        }).append(
-          $('<span>').attr('class','name').text(name)
-        );
-      if ( textArea ) {
-        if ( readOnly ) {
-          label.append(
-            $('<textarea>').attr('readonly', 'readonly').text(value)
-          );
-        } else {
-          label.append(
-            $('<textarea>').text(value)
-          );
-        }
-      } else {
-        var attrs = {
-          'type': 'text',
-          'value': value
-        };
-        if ( readOnly ) {
-          attrs.readonly = 'readonly';
-        }
-        label.append(
-          $('<input>').attr(attrs)
-        );
+    this._wrapLabelTag = function(formElement, dataSetting, name) {
+      var attrs = {'class':'setting'};
+      if ( dataSetting ) {
+        attrs['data-setting'] = dataSetting;
       }
+      var label = $('<label>').attr(attrs).append(
+        $('<span>').attr('class','name').text(name)
+      );
+      label.append(formElement);
       return label;
+    };
+    this._makeTextInput = function(value, readOnly) {
+      var attrs = {
+        'type': 'text',
+        'value': value
+      };
+      if ( readOnly ) {
+        attrs.readonly = 'readonly';
+      }
+      return $('<input>').attr(attrs);
+    };
+    this._makeTextArea = function(value, readOnly) {
+      if ( readOnly ) {
+        return $('textarea').text(value);
+      } else {
+        return $('<textarea>').attr('readonly', 'readonly').text(value);
+      }
+    };
+    this._makeSelectInput = function(values, selected, dataSetting, className) {
+      if ( !values[selected] ) {
+        switch (dataSetting) {
+          case 'size': selected='Medium';break;
+          case 'link': selected='custom';break;
+          default:     selected='none';
+        }
+      }
+      var select_input = $('<select>').attr({
+        'class': className,
+        'data-setting': dataSetting
+      });
+      for ( var idx in values ) {
+        var attrs = { 'value': idx };
+        if ( idx === selected ) { attrs.selected='selected'; }
+        select_input.append( $('<option>').attr(attrs).text(values[idx]));
+      }
+      return select_input;
+    };
+    this._generateSizesArray = function(sizes) {
+      var return_obj = {};
+      for (var size in sizes) {
+        var size_pruned = size.replace(/\d+$/, ''); // remove numbers from rendering as it is confusing
+        return_obj[size] = size_pruned+ ' ' +sizes[size].width + ' × ' + sizes[size].height;
+      }
+      return return_obj;
     };
 
     /**

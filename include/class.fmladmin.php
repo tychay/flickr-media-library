@@ -660,6 +660,7 @@ class FMLAdmin
 			true // in footer?
 		);
 		$settings = $this->_fml->settings;
+		// TODO: Make this configurable
 		// see wp_enqueue_media()
 		$props = array(
 			'link'  => get_option( 'image_default_link_type' ), // db default is 'file'
@@ -693,12 +694,23 @@ class FMLAdmin
 				'loading' => __('Loading…', FML::SLUG),
 			),
 			'msgs_attachment'    => array(
-				'attachment_details' => __( 'Attachment Details' ),
-				'url'                => __( 'URL' ),
-				'title'              => __( 'Title' ),
-				'description'        => __( 'Description' ),
-				'caption'            => __( 'Caption' ),
-				'alt'                => __( 'Alt Text' ),
+				'attachment_details'  => __( 'Attachment Details' ),
+				'attachment_settings' => __( 'Attachment Display Settings' ),
+				'url'                 => __( 'URL' ),
+				'title'               => __( 'Title' ),
+				'description'         => __( 'Description' ),
+				'caption'             => __( 'Caption' ),
+				'alt'                 => __( 'Alt Text' ),
+				'alignment'           => __( 'Alignment' ),
+				'left'                => __( 'Left' ),
+				'center'              => __( 'Center' ),
+				'right'               => __( 'Right' ),
+				'none'                => __( 'None' ),
+				'linkto'              => __( 'Link To' ),
+				'file'                => __( 'Media File' ),
+				'post'                => __( 'Attachment Page' ),
+				'flickr'              => __( 'Flickr Page' ),
+				'size'                => __( 'Size' ),
 			),
 			'msgs_add_btn'       => array(
 				'add_to'  => __( 'Add to media library', FML::SLUG ),
