@@ -839,14 +839,16 @@
 
       // FORM
       // url      
-      info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data._flickrData), false ));
+      info_box.append(self._makeLabelTag('url', constants.msg_url, self.webUrl(photo_data._flickrData), false, 'readonly'));
       // title
-      info_box.append(self._makeLabelTag('title', constants.msg_title, photo_data.title, false ));
-      // TODO: caption
-      // TODO: alt text
+      info_box.append(self._makeLabelTag('title', constants.msg_title, photo_data.title, false, 'readonly'));
+      // caption
+      info_box.append(self._makeLabelTag('caption', constants.msg_caption, photo_data.caption, 'textarea', false));
+      // alt text
+      info_box.append(self._makeLabelTag('alt', constants.msg_alt, photo_data.caption, 'textarea', false));
       // description
       if ( photo_data.description ) {
-        info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description, true ));
+        info_box.append(self._makeLabelTag('description', constants.msg_description, photo_data.description, 'textarea', 'readonly'));
       }
 
       // X media_selection info?
@@ -861,7 +863,7 @@
       if (window.picturefill) { window.picturefill($img); }
     };
 
-    this._makeLabelTag = function(dataSetting, name, value, textArea)  {
+    this._makeLabelTag = function(dataSetting, name, value, textArea, readOnly)  {
       var label = $('<label>').attr({
           'class': 'setting',
           'data-setting': dataSetting
@@ -869,16 +871,25 @@
           $('<span>').attr('class','name').text(name)
         );
       if ( textArea ) {
-        label.append(
-          $('<textarea>').attr('readonly', 'readonly').text(value)
-        );
+        if ( readOnly ) {
+          label.append(
+            $('<textarea>').attr('readonly', 'readonly').text(value)
+          );
+        } else {
+          label.append(
+            $('<textarea>').text(value)
+          );
+        }
       } else {
+        var attrs = {
+          'type': 'text',
+          'value': value
+        };
+        if ( readOnly ) {
+          attrs.readonly = 'readonly';
+        }
         label.append(
-          $('<input>').attr({
-            'type': 'text',
-            'value': value,
-            'readonly': 'readonly'
-          })
+          $('<input>').attr(attrs)
         );
       }
       return label;
