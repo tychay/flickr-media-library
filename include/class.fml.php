@@ -387,6 +387,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'full':
+				case 'Original': //flickr size, if it is available then this shoudl be fine
 					$img = $this->_get_largest_image( $flickr_data );
 					return array( $img['source'], $img['width'], $img['height'], false );
 				// Flickr built-in types
@@ -398,6 +399,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'Large Square':
+				case 'Large_Square':
 					$size = array(
 						'width'  => 150,
 						'height' => 150,
@@ -419,6 +421,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'Small 320':
+				case 'Small_320':
 					$size = array(
 						'width'  => 320,
 						'height' => 320,
@@ -433,6 +436,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'Medium 640':
+				case 'Medium_640':
 					$size = array(
 						'width'  => 640,
 						'height' => 640,
@@ -440,6 +444,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'Medium 800':
+				case 'Medium_800':
 					$size = array(
 						'width'  => 800,
 						'height' => 800,
@@ -454,6 +459,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'Large 1600':
+				case 'Large_1600':
 					$size = array(
 						'width'  => 1600,
 						'height' => 1600,
@@ -461,6 +467,7 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'Large 2048':
+				case 'Large_2048':
 					$size = array(
 						'width'  => 2048,
 						'height' => 2048,

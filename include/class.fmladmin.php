@@ -617,7 +617,7 @@ class FMLAdmin
 						isset( $attachment['align'] ) ? $attachment['align'] : 'none',
 						$url,
 						$rel,
-						( isset( $attachment['image-size'] ) ) ? $attachment['image-size'] : 'Medium',
+						( isset( $attachment['image-size'] ) ) ? str_replace( ' ', '_', $attachment['image-size'] ) : 'Medium', // replace spaces in image-size so it can be used in class names
 						( isset( $attachment['image_alt'] ) ) ? $attachment['image_alt'] : ''
 					);
 				} //TODO: add support for video
