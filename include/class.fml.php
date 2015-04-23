@@ -31,7 +31,6 @@ class FML implements FMLConstants
 	 */
 	private $_permalink_slug_id;
 	private $_post_metas = array();
-
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
@@ -58,14 +57,32 @@ class FML implements FMLConstants
 		// settings and flickr are lazy loaded
 	}
 	/**
+	 * Returns instance.
+	 *
+	 * Used for static method calls
+	 * 
+	 * @param  string $plugin_file pass to constructor (on creation)
+	 * @return [type]              [description]
+	 */
+	static function get_instance($plugin_file='') {
+		static $_self;
+		if ( $_self )	{
+			return $_self;
+		}
+		$_self = new FML($plugin_file);
+		return $_self;
+	}
+	/**
 	 * Stuff to run on `plugins_loaded`
 	 *
 	 * - register `init` handler
+	 * - add shortcode handler
 	 *
 	 * @return void
 	 */
 	public function run() {
 		add_action( 'init', array( $this, 'init' ) );
+		add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
 	}
 	/**
 	 * Stuff to run on `init`
@@ -73,7 +90,8 @@ class FML implements FMLConstants
 	 * - Register the custom post type used for storing flickr photos. If the
 	 *   register is called earlier, it won't trigger due to missing object on
 	 *   rewrite rule. {@see https://codex.wordpress.org/Function_Reference/register_post_type}
-	 * - filter image_downsize()
+	 * - register filter image_downsize to add fmlmedia image_downsize() support
+	 * - register filter media_send_to_editor to wrap shortcode around fmlmedia
 	 * 
 	 * @return void
 	 */
@@ -156,11 +174,10 @@ class FML implements FMLConstants
 	 * @param  string $name the property to get
 	 * @return mixed the thing to be gotten
 	 */
-	public function __get($name)
-	{
+	public function __get($name) {
 		switch( $name ) {
 			case 'settings':
-				if ( empty($this->_settings) ) {
+				if ( empty( $this->_settings ) ) {
 					$this->_load_settings();
 				}
 				return $this->_settings;
@@ -171,7 +188,9 @@ class FML implements FMLConstants
 			case 'permalink_slug_id':
 				return $this->_permalink_slug_id;
 			case 'permalink_slug':
-				return get_option($this->permalink_slug_id, self::_DEFAULT_BASE);
+				return get_option( $this->permalink_slug_id, self::_DEFAULT_BASE );
+			case 'post_metas':
+				return $this->_post_metas;
 			default:
 				trigger_error(sprintf('Property %s does not exist',$name));
 				return null;
@@ -183,22 +202,21 @@ class FML implements FMLConstants
 	 * @param string $name the property to set
 	 * @param mixed $value the value to set it to.
 	 */
-	public function __set($name, $value)
-	{
+	public function __set($name, $value) {
 		switch( $name ) {
 			case 'settings':
-				trigger_error('Set plugin settings through update_settings()');
+				trigger_error( 'Set plugin settings through update_settings()' );
 				break;
 			case 'flickr':
-				trigger_error(sprintf('Not allowed to externally set flickr API.', $name));
+				trigger_error( sprintf( 'Not allowed to externally set flickr API.', $name ) );
 				break;
 			case 'flickr_callback':
 				$this->_flickr_callback = $value;
 				break;
 			case 'permalink_slug':
-				update_option($this->permalink_slug_id, $value);
+				update_option( $this->permalink_slug_id, $value );
 			default:
-				trigger_error(sprintf('Property %s is not settable', $name));
+				trigger_error( sprintf( 'Property %s is not settable', $name ) );
 			break;
 		}
 	}
@@ -207,7 +225,7 @@ class FML implements FMLConstants
 	 */
 	private $_settings = array();
 	//
-	// Properties
+	// PROPERTIES: Settings
 	// 
 	/**
 	 * Load options array into settings variable
@@ -259,6 +277,9 @@ class FML implements FMLConstants
 		}
 		update_option(self::SLUG, $this->_settings);
 	}
+	//
+	// PROPERTES: Flickr
+	// 
 	/**
 	 * @var \FML\Flickr Flickr API object
 	 */
@@ -340,6 +361,20 @@ class FML implements FMLConstants
 		));
 	}
 	//
+	// SHORTCODE HANDLING
+	//
+	/**
+	 * Process shortcode for $content
+	 * 
+	 * @param  [type] $attrs   [description]
+	 * @param  string $content [description]
+	 * @return [type]          [description]
+	 */
+	public function shortcode( $attrs, $content='' ) {
+		//TODO
+		return $content;	
+	}
+	//
 	// ATTACHEMENT EMULATIONS
 	// 
 	/**
@@ -362,7 +397,7 @@ class FML implements FMLConstants
 			return $downsize;
 		}
 
-		$flickr_data = $this->get_flickr_data( $id );
+		$flickr_data = self::get_flickr_data( $id );
 		$img_sizes = $flickr_data['sizes']['size'];
 		if ( is_string($size) ) {
 			switch ( $size ) {
@@ -389,7 +424,7 @@ class FML implements FMLConstants
 					break;
 				case 'full':
 				case 'Original': //flickr size, if it is available then this shoudl be fine
-					$img = $this->_get_largest_image( $flickr_data );
+					$img = self::_get_largest_image( $flickr_data );
 					return array( $img['source'], $img['width'], $img['height'], false );
 				// Flickr built-in types
 				case 'Square':
@@ -509,7 +544,7 @@ class FML implements FMLConstants
 				}
 			}
 		}
-		$img = $this->_get_largest_image( $flickr_data );
+		$img = self::_get_largest_image( $flickr_data );
 		$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
 	}
@@ -540,7 +575,9 @@ class FML implements FMLConstants
 	 * @return Array|null   hash for use in js
 	 * @todo  support injecting sizes
 	 */
-	public function wp_prepare_attachment_for_js( $post ) {
+	static public function wp_prepare_attachment_for_js( $post ) {
+		$self = self::get_instance();
+
 		if ( $post->post_type != self::POST_TYPE ) { return; }
 
 		// "defaults" recovered from emulation
@@ -548,7 +585,7 @@ class FML implements FMLConstants
 		$response = wp_prepare_attachment_for_js($post);
 		$post->post_type = self::POST_TYPE;
 
-		$flickr_data = $this->get_flickr_data( $post );
+		$flickr_data = self::get_flickr_data( $post );
 
 		// other emulated things
 		foreach ( $flickr_data['sizes']['size'] as $size_data ) {
@@ -567,16 +604,13 @@ class FML implements FMLConstants
 		$response['sizes'] = $sizes;
 		
 		// FML-specific
-		$response['flickrId'] = get_post_meta( $post->ID, $this->_post_metas['flickr_id'], true );
+		$response['flickrId'] = get_post_meta( $post->ID, $self->post_metas['flickr_id'], true );
 		$response['_flickrData'] = $flickr_data;
 
 		return $response;
 	}
 	//
-	// SHORTCODE HANDLING
-	// 
-	//
-	// FLICKR MEDIA
+	// FLICKR MEDIA POSTTYPE
 	// 
 	/**
 	 * Adds an image from flickr into the flickr media library
@@ -584,19 +618,18 @@ class FML implements FMLConstants
 	 * @param  string $flickr_id the flickr ID of the image
 	 * @return WP_Post|false     the post created (or false if not)
 	 */
-	public function add_flickr( $flickr_id ) {
+	static public function create_media_from_flickr_id( $flickr_id ) {
 		// Check to see it's not already added, if so return that
-		if ( $post_already_added = $this->get_media_by_flickr_id( $flickr_id ) ) {
+		if ( $post_already_added = self::get_media_by_flickr_id( $flickr_id ) ) {
 			// update post and return it
-			return $this->update_flickr_post( $post_already_added );
+			return self::update_flickr_post( $post_already_added );
 		}
-		$data = $this->_get_data_from_flickr_id( $flickr_id );
+		$data = self::_get_data_from_flickr_id( $flickr_id );
 		if ( empty( $data ) ) {
 			return false;
 		}
-		$post_id = $this->_new_post_from_flickr_data( $data );
+		$post_id = self::_new_post_from_flickr_data( $data );
 		return get_post($post_id);
-
 	}
 	/**
 	 * Attempts to get post stored by flickr_id
@@ -604,9 +637,9 @@ class FML implements FMLConstants
 	 * @return WP_Post|false     the post found (or false if not)
 	 * @todo   consider doing extra work
 	 */
-	public function get_media_by_flickr_id( $flickr_id ) {
+	static public function get_media_by_flickr_id( $flickr_id ) {
 		$post_already_added = get_posts( array(
-			'name'           => $this->_flickr_id_to_name($flickr_id),
+			'name'           => self::_flickr_id_to_name($flickr_id),
 			'post_type'      => self::POST_TYPE,
 			//'posts_per_page' => 1,
 		) );
@@ -617,44 +650,31 @@ class FML implements FMLConstants
 		return false;
 	}
 	/**
-	 * Generates a new post from the flickr data given
-	 * @param  [type] $data [description]
-	 * @return [type]       [description]
-	 */
-	private function _new_post_from_flickr_data( $data ) {
-		if ( empty($data ) ) { return 0; }
-		$post_data = $this->_post_data_from_flickr_data( $data );
-		$post_id = wp_insert_post( $post_data );
-
-		// add grabbed information into post_meta
-		$this->_update_flickr_post_meta( $post_id, $data );
-
-		return $post_id;
-	}
-	/**
 	 *
 	 * @param  WP_Post|integer $post The post or its post ID.
 	 * @return WP_Post               Updated content
 	 */
-	function update_flickr_post( $post ) {
+	static function update_flickr_post( $post ) {
 		if ( !is_object( $post ) ) {
 			$post = get_post( $post );
 		}
-		$flickr_data = $this->get_flickr_data( $post );
-		$flickr_data = $this->_update_data_from_flickr( $flickr_data );
-		$post_data = $this->_post_data_from_flickr_data( $flickr_data );
+		$flickr_data = self::get_flickr_data( $post );
+		$flickr_data = self::_update_data_from_flickr( $flickr_data );
+		$post_data = self::_post_data_from_flickr_data( $flickr_data );
 		$post_data['ID'] = $post->ID;
 
 		// update post
 		$post_id = wp_update_post( $post_data );
-		$this->_update_flickr_post_meta( $post->ID, $flickr_data );
+		self::_update_flickr_post_meta( $post->ID, $flickr_data );
 
 		return get_post( $post->ID );
 	}
-	private function _update_flickr_post_meta( $post_id, $flickr_data) {
-		update_post_meta( $post_id, $this->_post_metas['api_data'], $flickr_data );
-		update_post_meta( $post_id, $this->_post_metas['flickr_id'], $flickr_data['id'] );
-		$img = $this->_get_largest_image( $flickr_data );
+	static private function _update_flickr_post_meta( $post_id, $flickr_data) {
+		$self = self::get_instance();
+
+		update_post_meta( $post_id, $self->post_metas['api_data'], $flickr_data );
+		update_post_meta( $post_id, $self->post_metas['flickr_id'], $flickr_data['id'] );
+		$img = self::_get_largest_image( $flickr_data );
 		update_post_meta( $post_id, '_wp_attached_file', $img['source'] );
 	}
 	/**
@@ -663,13 +683,15 @@ class FML implements FMLConstants
 	 * @param  int|WP_Post $post id or post of a flickr media library attachment
 	 * @return array       cached output from flickr API
 	 */
-	public function get_flickr_data( $post ) {
+	static public function get_flickr_data( $post ) {
+		$self = self::get_instance();
+
 		if ( is_object($post) ) {
 			$post_id = $post->ID;
 		} else {
 			$post_id = $post;
 		}
-		return get_post_meta( $post_id, $this->_post_metas['api_data'], true );
+		return get_post_meta( $post_id, $self->post_metas['api_data'], true );
 	}
 	/**
 	 * Get the flickr link to the photo page
@@ -677,8 +699,32 @@ class FML implements FMLConstants
 	 * @todo  could add better checking and verify it's the photopage
 	 */
 	public function get_flickr_link( $post ) {
-		$flickr_data = $this->get_flickr_data( $post );
+		$flickr_data = self::get_flickr_data( $post );
 		return $flickr_data['urls']['url'][0]['_content'];
+	}
+	// PRIVATE METHODS
+	/**
+	 * Generates a new post from the flickr data given
+	 * @param  [type] $data [description]
+	 * @return [type]       [description]
+	 */
+	static private function _new_post_from_flickr_data( $data ) {
+		if ( empty($data ) ) { return 0; }
+		$post_data = self::_post_data_from_flickr_data( $data );
+		$post_id = wp_insert_post( $post_data );
+
+		// add grabbed information into post_meta
+		self::_update_flickr_post_meta( $post_id, $data );
+
+		return $post_id;
+	}
+	static private function _update_data_from_flickr( $data ) {
+		$return = self::_get_data_from_flickr_id( $data['id'], $data['dates']['lastupdate'] );
+		if ( empty( $return ) ) {
+			return $data;
+		} else {
+			return $return;
+		}
 	}
 	/**
 	 * Grab photo information from flickr API using flickr ID of photo
@@ -727,13 +773,16 @@ class FML implements FMLConstants
 	 * @param  integer $last_updated the unix timestamp it was last updated
 	 * @return array                 array of various raw flickr data merged, empty if no data to add
 	 */
-	private function _get_data_from_flickr_id( $flickr_id, $last_updated=0 ) {
+	static private function _get_data_from_flickr_id( $flickr_id, $last_updated=0 ) {
+		$self == self::get_instance();
+		$flickr_api = $self->flickr;
+
 		$return = array();
 		$params = array(
 			'photo_id' => $flickr_id,
 		);
 		// https://www.flickr.com/services/api/flickr.photos.getInfo.html
-		$result = $this->flickr->call('flickr.photos.getInfo', $params);
+		$result = $flickr_api->call('flickr.photos.getInfo', $params);
 		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
 			$return = $result['photo'];
 		}
@@ -741,33 +790,15 @@ class FML implements FMLConstants
 		if ( $last_updated && ( $return['dates']['lastupdate'] <= $last_updated ) ) {
 			return array();
 		}
-		$result = $this->flickr->call('flickr.photos.getSizes', $params);
+		$result = $flickr_api->call('flickr.photos.getSizes', $params);
 		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
 			$return['sizes'] = $result['sizes'];
 		}
-		$result = $this->flickr->call('flickr.photos.getExif', $params);
+		$result = $flickr_api->call('flickr.photos.getExif', $params);
 		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
 			$return = array_merge($return, $result['photo']);
 		}
-		//print_r($return);
 		return $return;
-	}
-	private function _update_data_from_flickr( $data ) {
-		$return = $this->_get_data_from_flickr_id( $data['id'], $data['dates']['lastupdate'] );
-		if ( empty( $return ) ) {
-			return $data;
-		} else {
-			return $return;
-		}
-	}
-	/**
-	 * Turns a flickr ID into a post slug
-	 * 
-	 * @param  string $flickr_id The number representing the flickr_id of the image
-	 * @return string            post slug if it exists in the database
-	 */
-	private function _flickr_id_to_name( $flickr_id ) {
-		return self::SLUG.'-'.$flickr_id;
 	}
 	/**
 	 * Turn flickr API data into post data
@@ -776,7 +807,7 @@ class FML implements FMLConstants
 	 * @todo  validate media is a photo
 	 * @todo  vary date based on configuration: date uploaded, date taken, date posted?
 	 */
-	private function _post_data_from_flickr_data( $data ) {
+	static private function _post_data_from_flickr_data( $data ) {
 		// generate list of tags
 		$post_tags = [];
 		if ( !empty( $data['tags']['tag'] ) ) {
@@ -794,14 +825,14 @@ class FML implements FMLConstants
 			//'post_author'    => 0,//userid
 			'post_date'      => $data['dates']['taken'], //TODO: consider varying date
 			//'post_date_gmt'  => above in GMT
-			'post_content'   => $this->_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
+			'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
 			'post_title'     => $data['title']['_content'],
 			//'post_excerpt'   => //ALT TEXT
 			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
 			'comment_status' => 'closed', //comments should be on flickr page only
 			'ping_status'    => 'closed', //no pingbacks
 			//'post_password'
-			'post_name'      => $this->_flickr_id_to_name( $data['id'] ), //post slug
+			'post_name'      => self::_flickr_id_to_name( $data['id'] ), //post slug
 			//'to_ping'
 			//'pinged'
 			//'post_modified'
@@ -827,6 +858,15 @@ class FML implements FMLConstants
 		return $post_data;
 	}
 	/**
+	 * Turns a flickr ID into a post slug
+	 * 
+	 * @param  string $flickr_id The number representing the flickr_id of the image
+	 * @return string            post slug if it exists in the database
+	 */
+	static private function _flickr_id_to_name( $flickr_id ) {
+		return self::SLUG.'-'.$flickr_id;
+	}
+	/**
 	 * Get the largest usable flickr image.
 	 *
 	 * Return original image if possible, if not return the largest one
@@ -837,14 +877,14 @@ class FML implements FMLConstants
 	 *                                else it's the flickr_data
 	 * @return array     the sizes array element of the largest size
 	 */
-	private function _get_largest_image( $flickr_data ) {
+	static private function _get_largest_image( $flickr_data ) {
 		if ( !is_array( $flickr_data ) ) {
 			$post = get_post( $flickr_data );
 			// Only operate on flickr media images
 			if ( $post->post_type != self::POST_TYPE ) {
 				return false;
 			}
-			$flickr_data = $this->get_flickr_data( $id );
+			$flickr_data = self::get_flickr_data( $id );
 		}
 		$sizes = $flickr_data['sizes']['size'];
 		$count_img_sizes = count($sizes);
@@ -860,8 +900,10 @@ class FML implements FMLConstants
 	 * Turn a flickr photo into an image tag.
 	 *
 	 * This adds the responsive images in too.
+	 * 
+	 * @deprecated Getting rid of this function
 	 */
-	private function _img_from_flickr_data( $data, $default_size='Medium', $include_original=false ) {
+	static private function _img_from_flickr_data( $data, $default_size='Medium', $include_original=false ) {
 		$sizes = $data['sizes']['size'];
 		$src = '';
 		$size_offset = 1000000;

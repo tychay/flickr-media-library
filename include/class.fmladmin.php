@@ -514,14 +514,14 @@ class FMLAdmin
 				// This nonce is created in the page.flickr-upload-form.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'flickr_id' );
-				$post = $this->_fml->get_media_by_flickr_id( $_POST['flickr_id'] );
+				$post = FML::get_media_by_flickr_id( $_POST['flickr_id'] );
 				if ( $post ) {
-					$this->_fml->update_flickr_post($post);  //TODO: temporary repair of broken posts
+					FML::update_flickr_post($post);  //TODO: temporary repair of broken posts
 					$return = array(
 						'status'    => 'ok',
 						'flickr_id' => $_POST['flickr_id'],
 						'post_id'   => $post->ID,
-						'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
+						'post'      => FML::wp_prepare_attachment_for_js($post),
 					);
 				} else {
 					$return = array(
@@ -535,7 +535,7 @@ class FMLAdmin
 				// This nonce is created in the page.flickr-upload-form.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'flickr_id' );
-				$post = $this->_fml->add_flickr($_POST['flickr_id']);
+				$post = FML::create_media_from_flickr_id($_POST['flickr_id']);
 				$update = array();
 				if ( !empty( $_POST['caption'] ) ) {
 					$update['post_excerpt'] = $_POST['caption'];
@@ -553,7 +553,7 @@ class FMLAdmin
 					'status'    => 'ok',
 					'flickr_id' => $_POST['flickr_id'],
 					'post_id'   => $post->ID,
-					'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
+					'post'      => FML::wp_prepare_attachment_for_js($post),
 				);
 				break;
 			case 'send_attachment_to_editor':
@@ -586,14 +586,14 @@ class FMLAdmin
 						case 'file':
 						//$url = get_attached_file( $id );
 						//Flickr community guidelines: link the download page
-						$url = $this->_fml->get_flickr_link( $id ).'sizes/';
+						$url = FML::get_flickr_link( $id ).'sizes/';
 						break;
 						case 'post':
 						$url = get_permalink( $id );
 						$rel = true;
 						break;
 						case 'custom':
-						$url = $this->_fml->get_flickr_link( $id );
+						$url = FML::get_flickr_link( $id );
 						break;
 						default:
 						$url = '';
