@@ -547,7 +547,7 @@ class FMLAdmin
 					$update['ID'] = $post->ID;
 					$post_id = wp_update_post( $update );
 					// data's been changed.
-					$post = wp_get_post($post->ID);
+					$post = get_post($post->ID);
 				}
 				$return = array(
 					'status'    => 'ok',
