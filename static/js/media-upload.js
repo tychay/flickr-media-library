@@ -469,12 +469,12 @@
       if ( photo_data.id ) {
         //It's already in library: API get the HTML to inject
         var params = {
-          'attachment[id]': photo_data.id,
-          'attachment[image_alt]': $('label[data-setting=alt] input').val(),
+          'attachment[id]'          : photo_data.id,
+          'attachment[image_alt]'   : $('label[data-setting=alt] input').val(),
           'attachment[post_excerpt]': $('label[data-setting=caption] textarea').val(),
-          'attachment[align]': $('select[data-setting=align]').val(),
-          'attachment[size]': $('select[data-setting=size]').val(),
-          'attachment[link]': $('select[data-setting=link]').val()
+          'attachment[align]'       : $('select[data-setting=align]').val(),
+          'attachment[image-size]'  : $('select[data-setting=size]').val(),
+          'attachment[link]'        : $('select[data-setting=link]').val()
         };
         if ( constants.post_id ) { params.post_id = post_id; }
         //console.log(params);
@@ -488,6 +488,7 @@
               return true; //cancel spinner
             }
             self.guessRenderAddButton(0);
+            //console.log(data);
             // Inject code into parent frame
             var win = window.dialogArguments || opener || parent || top;
             win.send_to_editor(data.html);

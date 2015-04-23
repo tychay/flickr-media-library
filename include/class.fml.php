@@ -363,7 +363,6 @@ class FML implements FMLConstants
 
 		$flickr_data = $this->get_flickr_data( $id );
 		$img_sizes = $flickr_data['sizes']['size'];
-
 		if ( is_string($size) ) {
 			switch ( $size ) {
 				case 'thumbnail':
@@ -393,71 +392,78 @@ class FML implements FMLConstants
 				// Flickr built-in types
 				case 'Square':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 75 ),
-						'height' => get_option( 'large_size_h', 75 ),
+						'width'  => 75,
+						'height' => 75,
 						'crop'  => true,
 					);
 					break;
 				case 'Large Square':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 150 ),
-						'height' => get_option( 'large_size_h', 150 ),
-						'crop'  => false,
+						'width'  => 150,
+						'height' => 150,
+						'crop'  => true,
 					);
 					break;
 				case 'Thumbnail':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 150 ),
-						'height' => get_option( 'large_size_h', 150 ),
+						'width'  => 100,
+						'height' => 100,
 						'crop'  => false,
 					);
 					break;
 				case 'Small':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 240 ),
-						'height' => get_option( 'large_size_h', 240 ),
+						'width'  => 240,
+						'height' => 240,
 						'crop'  => false,
 					);
 					break;
 				case 'Small 320':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 320 ),
-						'height' => get_option( 'large_size_h', 320 ),
+						'width'  => 320,
+						'height' => 320,
 						'crop'  => false,
 					);
 					break;
 				case 'Medium':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 500 ),
-						'height' => get_option( 'large_size_h', 500 ),
+						'width'  => 500,
+						'height' => 500,
 						'crop'  => false,
 					);
 					break;
 				case 'Medium 640':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 640 ),
-						'height' => get_option( 'large_size_h', 640 ),
+						'width'  => 640,
+						'height' => 640,
+						'crop'  => false,
+					);
+					break;
+				case 'Medium 800':
+					$size = array(
+						'width'  => 800,
+						'height' => 800,
 						'crop'  => false,
 					);
 					break;
 				case 'Large':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 1024 ),
-						'height' => get_option( 'large_size_h', 1024 ),
+						'width'  => 1024,
+						'height' => 1024,
 						'crop'  => false,
 					);
 					break;
 				case 'Large 1600':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 1600 ),
-						'height' => get_option( 'large_size_h', 1600 ),
+						'width'  => 1600,
+						'height' => 1600,
 						'crop'  => false,
 					);
 					break;
 				case 'Large 2048':
 					$size = array(
-						'width'  => get_option( 'large_size_w', 2048 ),
-						'height' => get_option( 'large_size_h', 2048 ),
+						'width'  => 2048,
+						'height' => 2048,
 						'crop'  => false,
 					);
 					break;
@@ -465,12 +471,7 @@ class FML implements FMLConstants
 					$size = $_wp_additional_image_sizes[$size];
 			}
 		}
-		// TODO: find closest image size
-		// Find an image >= biggest dimension, when they're equal, prefer width
-		if ( $size['height'] > $size['width'] ) {
-
-		}
-
+		// Find closest image size
 		$img = array();
 		if ( $size['crop'] ) {
 			// If image is crop, then make sure we choose an image that is 
@@ -840,11 +841,12 @@ class FML implements FMLConstants
 			switch ( strtolower($default_size) ) {
 				case 'square': $default_size=75; break;
 				case 'large square': $default_size=150;break;
-				case 'thumbnail': $default_size=150; break;
+				case 'thumbnail': $default_size=100; break;
 				case 'small': $default_size=240; break;
 				case 'small 320': $default_size=320; break;
 				case 'medium': $default_size=500; break;
 				case 'medium 640': $default_size=640; break;
+				case 'medium 800': $default_size=800; break;
 				case 'large': $default_size=1024; break;
 				case 'large 1600': $default_size=1600; break;
 				case 'large 2048': $default_size=2048; break;

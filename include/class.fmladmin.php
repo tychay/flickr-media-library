@@ -626,7 +626,6 @@ class FMLAdmin
 				$return = array(
 					'status'    => 'ok',
 					'html'      => $html,
-					'image'     => wp_attachment_is_image( $id ),
 				);
 				if ( !empty( $_POST['post_id'] ) ) {
 					$return['post_id'] = $_POST['post_id'];
