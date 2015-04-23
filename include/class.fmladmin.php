@@ -478,16 +478,18 @@ class FMLAdmin
 	 *   (returns post_id=0 if none found)
 	 * - new_media_from_flickr_id: create a new post from the flickr_id
 	 *   (will update the post if post already exists)
+	 * - send_attachment_to_editor: emulates wp_send_atttachment_to_editor()
+	 *   for flickr media library posts
 	 */
 	public function handle_ajax()
 	{
 		//print_r($_POST);
-		$this->_require_ajax_post('method');
+		$this->_require_ajax_post( 'method' );
 		switch ( $_POST['method'] ) {
 			case 'sign_flickr_request':
 				// This nonce is created in the page.flickr-upload-form.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
-				$this->_require_ajax_post('request_data'); //the API call to sign
+				$this->_require_ajax_post( 'request_data' ); //the API call to sign
 				$json = @json_decode(stripslashes($_POST['request_data']));
 				if ( empty($json) || !is_object($json) ) {
 					wp_send_json(array(
@@ -511,7 +513,7 @@ class FMLAdmin
 			case 'get_media_by_flickr_id':
 				// This nonce is created in the page.flickr-upload-form.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
-				$this->_require_ajax_post('flickr_id');
+				$this->_require_ajax_post( 'flickr_id' );
 				$post = $this->_fml->get_media_by_flickr_id( $_POST['flickr_id'] );
 				if ( $post ) {
 					$this->_fml->update_flickr_post($post);  //TODO: temporary repair of broken posts
@@ -532,7 +534,7 @@ class FMLAdmin
 			case 'new_media_from_flickr_id':
 				// This nonce is created in the page.flickr-upload-form.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
-				$this->_require_ajax_post('flickr_id');
+				$this->_require_ajax_post( 'flickr_id' );
 				$post = $this->_fml->add_flickr($_POST['flickr_id']);
 				$update = array();
 				if ( !empty( $_POST['caption'] ) ) {
@@ -554,27 +556,116 @@ class FMLAdmin
 					'post'      => $this->_fml->wp_prepare_attachment_for_js($post),
 				);
 				break;
+			case 'send_attachment_to_editor':
+				// emulate wp_ajax_send_attachment_to_editor() as 'attachment'
+				// post type is hard coded
+				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
+				$this->_require_ajax_post( 'attachment', array('id',) );
+				$attachment = $_POST['attachment']; //wp_unslash is outdated
+				$id = intval( $attachment['id'] );
+				if ( ! $post = get_post( $id ) ) {
+					$this->_send_json_fail( -100, sprintf(
+						__('Incorrect parameter %s=%s', FML::SLUG ),
+						'attachment[id]',
+						$id
+					) );
+				}
+				if ( $post->post_type != FML::POST_TYPE ) {
+					$this->_send_json_fail( -101, sprintf(
+						__('Incorrect parameter %s=%s', FML::SLUG ),
+						'attachment[id]',
+						$id
+					) );
+				}
+				// TODO: don't attach unnattached attachment for flickr media
+				// TODO: we don't support custom URLs because of flickr TOS
+				$url = '';
+				$rel = false;
+				if ( !empty( $attachment['link'] ) ) {
+					switch ( $attachment['link'] ) {
+						case 'file':
+						//$url = get_attached_file( $id );
+						//Flickr community guidelines: link the download page
+						$url = $this->_fml->get_flickr_link( $id ).'sizes/';
+						break;
+						case 'post':
+						$url = get_permalink( $id );
+						$rel = true;
+						break;
+						case 'custom':
+						$url = $this->_fml->get_flickr_link( $id );
+						break;
+						default:
+						$url = '';
+						// no link
+					}
+					// consume attachment link
+					/*
+					if ( empty( $url ) ) {
+						unset( $attachment['link'] );
+					}
+					*/
+				}
+				//https://developer.wordpress.org/reference/functions/get_image_send_to_editor/
+				remove_filter( 'media_send_to_editor', 'image_media_send_to_editor' );
+				$html = '';
+				if ( wp_attachment_is_image( $id ) ) {
+					$html = get_image_send_to_editor(
+						$id,
+						( isset( $attachment['post_excerpt'] ) ) ? $attachment['post_excerpt'] : '', //caption
+						$post->title, //insert title as it is NOT redundant
+						isset( $attachment['align'] ) ? $attachment['align'] : 'none',
+						$url,
+						$rel,
+						( isset( $attachment['image-size'] ) ) ? $attachment['image-size'] : 'Medium',
+						( isset( $attachment['image_alt'] ) ) ? $attachment['image_alt'] : ''
+					);
+				} //TODO: add support for video
+				// https://developer.wordpress.org/reference/hooks/media_send_to_editor/
+				$html = apply_filters( 'media_send_to_editor', $html, $id, $attachment );
+				$return = array(
+					'status'    => 'ok',
+					'html'      => $html,
+					'image'     => wp_attachment_is_image( $id ),
+				);
+				if ( !empty( $_POST['post_id'] ) ) {
+					$return['post_id'] = $_POST['post_id'];
+				}
+				break;
+			default:
+				$this->_send_json_fail( 406, sprintf( //HTTP Method Not Allowed
+					__('Incorrect parameter %s=%s', FML::SLUG ),
+					'method',
+					$_POST['method']
+				) );
+				//dies
 		}
 		wp_send_json( $return );
 	}
 	/**
 	 * If a parameter is missing, AJAX return a 400 Fail
 	 * 
-	 * @param  string $post_key a post variable that must be set (and not zero).
-	 *                          This should be html-safe
+	 * @param  string      $post_key a post variable that must be set (and not
+	 *                               zero). This should be html-safe
+	 * @param  array|false $keys     provide if form has subkeys to be checked
 	 * @return void|die
 	 */
-	private function _require_ajax_post( $post_key ) {
+	private function _require_ajax_post( $post_key, $keys=false ) {
 		if ( empty ( $_POST[$post_key] ) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 400, //HTTP code bad request
-				'reason' => sprintf(
+			$this->_send_json_fail( 400, sprintf( //HTTP Bad Request
 					__('Missing parameter: %s',FML::SLUG),
 					$post_key
-				),
-			));
-			//dies
+			) );
+			// dies
+		}
+		if ( !is_array($keys) ) { return; }
+		foreach ( $keys as $key ) {
+			if ( !empty( $_POST[$post_key][$key] ) ) { continue; }
+			$this->_send_json_fail( 400, sprintf( //HTTP Bad Request
+					__('Missing parameter: %s',FML::SLUG),
+					$post_key.'['.$key.']'
+			) );
+			// dies
 		}
 	}
 	/**
@@ -586,16 +677,26 @@ class FMLAdmin
 	 */
 	private function _verify_ajax_nonce( $action, $query_arg ) {
 		if ( !check_ajax_referer( $action , $query_arg, false) ) {
-			wp_send_json( array(
-				'status' => 'fail',
-				'code'   => 401, // HTTP CODE for unauthorized
-				'reason' => sprintf(
-					__('Missing or incorrect nonce %s=%s',FML::SLUG),
-					$query_arg,
-					( empty($_POST[$query_arg]) ) ? '' : $_POST[$query_arg]
-				),
+			$this->_send_json_fail( 401, sprintf( //HTTP Unauthorized
+				__('Missing or incorrect nonce %s=%s',FML::SLUG),
+				$query_arg,
+				( empty($_POST[$query_arg]) ) ? '' : $_POST[$query_arg]
 			) );
 		}
+	}
+	/**
+	 * Shortcut to wp_send_json a failure
+	 * 
+	 * @param  int    $code machine readable failure code
+	 * @param  string $text "human" readable localized error string
+	 * @return die
+	 */
+	private function _send_json_fail( $code, $text ) {
+		wp_send_json( array(
+			'status' => 'fail',
+			'code'   => $code,
+			'reason' => $text,
+		) );
 	}
 	/**
 	 * Filter to inject my media tab to the media uploads iframe
@@ -603,19 +704,17 @@ class FMLAdmin
 	 * @return array tabs + ours
 	 * @todo  remove this and replace with the new backbonejs/underscoresjs model
 	 */
-	public function filter_media_upload_tabs( $tabs )
-	{
+	public function filter_media_upload_tabs( $tabs ) {
 		$tabs[$this->_fml_upload_id] = __('Insert from Flickr', FML::SLUG);
 		return $tabs;
 	}
 	/**
-	 * Returns the ipframe that the upload form will be returned in.
+	 * Returns the iframe that the upload form will be returned in.
 	 * 
 	 * @return string
 	 * @todo  remove this and replace with the new backbonejs/underscoresjs model
 	 */
-	public function get_media_upload_iframe()
-	{
+	public function get_media_upload_iframe() {
 		/*
 		if ( empty($_GET['post_id']) ) {
 			wp_enqueue_media();
@@ -755,11 +854,15 @@ class FMLAdmin
 		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
 		return wp_iframe(array($this,'show_media_upload_form'));
 	}
-	public function show_media_upload_form()
-	{
+	/**
+	 * render the iframe content for upload form
+	 * 
+	 * @return void
+	 */
+	public function show_media_upload_form() {
 
 		$settings = $this->_fml->settings;
-		$admin_img_dir_url = admin_url('images/');
+		$admin_img_dir_url = admin_url( 'images/' );
 
 		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
 	}

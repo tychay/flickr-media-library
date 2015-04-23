@@ -363,7 +363,6 @@ class FML implements FMLConstants
 
 		$flickr_data = $this->get_flickr_data( $id );
 		$img_sizes = $flickr_data['sizes']['size'];
-		$count_img_sizes = count($img_sizes);
 
 		if ( is_string($size) ) {
 			switch ( $size ) {
@@ -389,16 +388,79 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'full':
-					// return original image if possible, if not return the
-					// largest one available.
-					
-					// Take advantage of the fact that they're ordered by size
-					// from the flickr api
-					$img = $sizes[ $count_img_sizes-1 ];
-					if ( ( $flickr_data['rotation'] != 0 ) && ( $img['label'] == 'Original' ) ) {
-						$img = $sizes[ $count_img_sizes-2 ];
-					}
+					$img = $this->_get_largest_image( $flickr_data );
 					return array( $img['source'], $img['width'], $img['height'], false );
+				// Flickr built-in types
+				case 'Square':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 75 ),
+						'height' => get_option( 'large_size_h', 75 ),
+						'crop'  => true,
+					);
+					break;
+				case 'Large Square':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 150 ),
+						'height' => get_option( 'large_size_h', 150 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Thumbnail':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 150 ),
+						'height' => get_option( 'large_size_h', 150 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Small':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 240 ),
+						'height' => get_option( 'large_size_h', 240 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Small 320':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 320 ),
+						'height' => get_option( 'large_size_h', 320 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Medium':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 500 ),
+						'height' => get_option( 'large_size_h', 500 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Medium 640':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 640 ),
+						'height' => get_option( 'large_size_h', 640 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Large':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 1024 ),
+						'height' => get_option( 'large_size_h', 1024 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Large 1600':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 1600 ),
+						'height' => get_option( 'large_size_h', 1600 ),
+						'crop'  => false,
+					);
+					break;
+				case 'Large 2048':
+					$size = array(
+						'width'  => get_option( 'large_size_w', 2048 ),
+						'height' => get_option( 'large_size_h', 2048 ),
+						'crop'  => false,
+					);
+					break;
 				default:
 					$size = $_wp_additional_image_sizes[$size];
 			}
@@ -438,15 +500,7 @@ class FML implements FMLConstants
 				}
 			}
 		}
-		// if we got here, then we need to return the largest practical size
-		// scaled up to the dimensions
-		// 
-		// Take advantage of the fact that they're ordered by size
-		// from the flickr api
-		$img = $sizes[ $count_img_sizes-1 ];
-		if ( ( $flickr_data['rotation'] != 0 ) && ( $img['label'] == 'Original' ) ) {
-			$img = $sizes[ $count_img_sizes-2 ];
-		}
+		$img = $this->_get_largest_image( $flickr_data );
 		$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
 	}
@@ -534,20 +588,6 @@ class FML implements FMLConstants
 		return false;
 	}
 	/**
-	 * Get the Flickr API data from post meta
-	 * 
-	 * @param  int|WP_Post $post [description]
-	 * @return [type]       [description]
-	 */
-	public function get_flickr_data( $post ) {
-		if ( is_object($post) ) {
-			$post_id = $post->ID;
-		} else {
-			$post_id = $post;
-		}
-		return get_post_meta( $post->ID, $this->_post_metas['api_data'], true );
-	}
-	/**
 	 * Generates a new post from the flickr data given
 	 * @param  [type] $data [description]
 	 * @return [type]       [description]
@@ -585,6 +625,31 @@ class FML implements FMLConstants
 	private function _update_flickr_post_meta( $post_id, $flickr_data) {
 		update_post_meta( $post_id, $this->_post_metas['api_data'], $flickr_data );
 		update_post_meta( $post_id, $this->_post_metas['flickr_id'], $flickr_data['id'] );
+		$img = $this->_get_largest_image( $flickr_data );
+		update_post_meta( $post_id, '_wp_attached_file', $img['source'] );
+	}
+	/**
+	 * Get the Flickr API data from post meta
+	 * 
+	 * @param  int|WP_Post $post id or post of a flickr media library attachment
+	 * @return array       cached output from flickr API
+	 */
+	public function get_flickr_data( $post ) {
+		if ( is_object($post) ) {
+			$post_id = $post->ID;
+		} else {
+			$post_id = $post;
+		}
+		return get_post_meta( $post_id, $this->_post_metas['api_data'], true );
+	}
+	/**
+	 * Get the flickr link to the photo page
+	 *
+	 * @todo  could add better checking and verify it's the photopage
+	 */
+	public function get_flickr_link( $post ) {
+		$flickr_data = $this->get_flickr_data( $post );
+		return $flickr_data['urls']['url'][0]['_content'];
 	}
 	/**
 	 * Grab photo information from flickr API using flickr ID of photo
@@ -731,6 +796,36 @@ class FML implements FMLConstants
 			$post_data['post_title'] = $data['id'];
 		}
 		return $post_data;
+	}
+	/**
+	 * Get the largest usable flickr image.
+	 *
+	 * Return original image if possible, if not return the largest one
+	 * available. This takes advantage of the fact that the flickr API orders
+	 * its sizes.
+	 * 
+	 * @param  int|array $flickr_data if integer, its the post_id of flickr media,
+	 *                                else it's the flickr_data
+	 * @return array     the sizes array element of the largest size
+	 */
+	private function _get_largest_image( $flickr_data ) {
+		if ( !is_array( $flickr_data ) ) {
+			$post = get_post( $flickr_data );
+			// Only operate on flickr media images
+			if ( $post->post_type != self::POST_TYPE ) {
+				return false;
+			}
+			$flickr_data = $this->get_flickr_data( $id );
+		}
+		$sizes = $flickr_data['sizes']['size'];
+		$count_img_sizes = count($sizes);
+
+		$img = $sizes[ $count_img_sizes-1 ];
+		if ( ( $flickr_data['rotation'] != 0 ) && ( $img['label'] == 'Original' ) ) {
+			return $sizes[ $count_img_sizes-2 ];
+		} else {
+			return $img;
+		}
 	}
 	/**
 	 * Turn a flickr photo into an image tag.

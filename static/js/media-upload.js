@@ -467,8 +467,36 @@
           photo_data = self.photo_data[id];
 
       if ( photo_data.id ) {
-        //It's already in library
-        console.log('TODO: INJECTION CODE HERE');
+        //It's already in library: API get the HTML to inject
+        var params = {
+          'attachment[id]': photo_data.id,
+          'attachment[image_alt]': $('label[data-setting=alt] input').val(),
+          'attachment[post_excerpt]': $('label[data-setting=caption] textarea').val(),
+          'attachment[align]': $('select[data-setting=align]').val(),
+          'attachment[size]': $('select[data-setting=size]').val(),
+          'attachment[link]': $('select[data-setting=link]').val()
+        };
+        if ( constants.post_id ) { params.post_id = post_id; }
+        //console.log(params);
+        self.callApi(
+          'send_attachment_to_editor',
+          params,
+          function(data) {
+            if ( data.status != 'ok') {
+              self.handle_fml_error(data);
+              self.guessRenderAddButton(0);
+              return true; //cancel spinner
+            }
+            self.guessRenderAddButton(0);
+            // Inject code into parent frame
+            var win = window.dialogArguments || opener || parent || top;
+            win.send_to_editor(data.html);
+          },
+          function(XHR, status, errorThrown) {
+            self.guessRenderAddButton(0);
+            return true; //do default action
+          }
+        );
         // disable button and rename
         self.renderAddButton(constants.msgs_add_btn.adding, true, id);
 
