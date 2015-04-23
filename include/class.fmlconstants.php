@@ -17,6 +17,10 @@ interface FMLConstants
      * The name of the post type this registeres
      */
     const POST_TYPE = 'fml_photo';
+    /**
+     * Shortcode
+     */
+    const SHORTCODE = 'fmlmedia';
 
     /**
      * The default flickr API key of this plugin. This can be changed at runtime.

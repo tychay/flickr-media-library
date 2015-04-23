@@ -139,6 +139,7 @@ class FML implements FMLConstants
 			//'can_export'          => true, // can be exported
 		));
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
+		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
 	}
 
 	//
@@ -344,13 +345,13 @@ class FML implements FMLConstants
 	/**
 	 * Inject Flickr image downsize code if image is Flickr Media
 	 * 
-	 * @see https://developer.wordpress.org/reference/hooks/image_downsize/
 	 * @param  bool         $downsize current status of filter
 	 * @param  int          $id       attachement ID of image
 	 * @param  array|string $size     size of image (e.g. dimensions, 'medium')
 	 * @return array|bool             do not short-circuit downsizing
 	 *                                or array with url, width, height, is_intermediate
 	 * @todo  untested
+	 * @see https://developer.wordpress.org/reference/hooks/image_downsize/
 	 */
 	public function filter_image_downsize($downsize, $id, $size) {
 		global $_wp_additional_image_sizes;
@@ -511,6 +512,26 @@ class FML implements FMLConstants
 		$img = $this->_get_largest_image( $flickr_data );
 		$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+	}
+	/**
+	 * Modify HTML attachment to add shortcode for flickr media when inserting
+	 *
+	 * @param  string $html       HTML to send to editor
+	 * @param  int    $id         post id of attachment
+	 * @param  array  $attachment array of attachment attributes
+	 * @return string             Filtered HTML
+	 * @see https://developer.wordpress.org/reference/hooks/media_send_to_editor/
+	 */
+	public function filter_media_send_to_editor($html, $id, $attachment) {
+		$post = get_post ( $id );
+		if ( $post->post_type != self::POST_TYPE ) {
+			return $html;
+		}
+		$attr_string = '';
+		foreach ( $attachment as $key=>$value ) {
+			$attr_string .=  sprintf(' %s="%s"', $key, esc_attr($value));
+		}
+		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
 	}
 	/**
 	 * Just like wp_prepare_attachment_for_js() but for media images.
