@@ -147,10 +147,10 @@ class FML implements FMLConstants
 			'has_archive'         => true, // can have archive template
 			//'permalink_epmask'    => // endpoint bitmask?
 			'rewrite'             => array(
-				'slug' => $this->permalink_slug
-				//'with_front'
-				//'feeds'
-				//'pages'
+				'slug' => $this->permalink_slug,
+				'with_front' => false, //make it a root level, just like categories & tags
+				//'feeds' //defaults to 'has_archive' value
+				//'pages' //allow pagination?
 				////ep_mask
 			),
 			//'query_var'           => '', default query var
