@@ -65,7 +65,7 @@ class FMLAdmin
 	 *
 	 * - Register init() on admin_init
 	 * - Add various menu pages (e.g. Settings) to admin menu 
-	 * - Add set permalink form to Permalink page 
+	 * - Add handling of permalink form to Permalink page 
 	 * - Add link to Settings page to Plugin Page
 	 * - If in Settings page, register plugin Settings page as Flickr callback for Auth
 	 * - Add various ajax servers
@@ -147,6 +147,9 @@ class FMLAdmin
 	 * This is due to a bug in the Settings.api where options-permalink.php uses
 	 * the API for hooks but the URL goes to {@see options-permalink.php}
 	 * instead of {@see options.php} which has the settings stuff.
+	 *
+	 * Note that things like settings-updated=true will be handled by the
+	 * default things itself.
 	 */
 	public function handle_permalink_form()
 	{

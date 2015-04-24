@@ -169,7 +169,9 @@ class FML implements FMLConstants
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
 
 		// TODO make this optional depending on the style of handling shortcode injection
-		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
+		if ( false ) {
+			add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
+		}
 	}
 
 	//
@@ -376,6 +378,33 @@ class FML implements FMLConstants
 	// SHORTCODE HANDLING
 	//
 	/**
+	 * Modify HTML attachment to add shortcode for flickr media when inserting
+	 *
+	 * Note that shortcode attribute names cannot have dashes, so we replace
+	 * them with _
+	 * 
+	 * @param  string $html       HTML to send to editor
+	 * @param  int    $id         post id of attachment
+	 * @param  array  $attachment array of attachment attributes
+	 * @return string             Filtered HTML
+	 * @see https://developer.wordpress.org/reference/hooks/media_send_to_editor/
+	 */
+	public function filter_media_send_to_editor($html, $id, $attachment) {
+		$post = get_post ( $id );
+		if ( $post->post_type != self::POST_TYPE ) {
+			return $html;
+		}
+		$attr_string = '';
+		foreach ( $attachment as $key=>$value ) {
+			$attr_string .=  sprintf(
+				' %s="%s"',
+				str_replace( '-', '_', $key ),
+				esc_attr( $value )
+			);
+		}
+		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
+	}
+	/**
 	 * Process the [fmlmedia] shortcode earlier.
 	 *
 	 * This works the same way as the [embed] shortcode.
@@ -399,47 +428,6 @@ class FML implements FMLConstants
 		$shortcode_tags = $orig_shortcode_tags;
 
 		return $content;
-	}
-	/**
-	 * Extract HTML attributes.
-	 *
-	 * @see  https://gist.github.com/tovic/b3b683f28d899e19f830
-	 * @param  string $input HTML tag to extract from
-	 * @return array         hash with the element (tag name), content, and
-	 *                       attributes as key/value pairs
-	 */
-	static public function extract_html_attributes($input) {
-	    if( ! preg_match('#^(<)([a-z0-9\-._:]+)((\s)+(.*?))?((>)([\s\S]*?)((<)\/\2(>))|(\s)*\/?(>))$#im', $input, $matches)) return false;
-	    $matches[5] = preg_replace('#(^|(\s)+)([a-z0-9\-]+)(=)(")(")#i', '$1$2$3$4$5<attr:value>$6', $matches[5]);
-	    $results = array(
-	        'element' => $matches[2],
-	        'attributes' => null,
-	        'content' => isset($matches[8]) && $matches[9] == '</' . $matches[2] . '>' ? $matches[8] : null
-	    );
-	    if(preg_match_all('#([a-z0-9\-]+)((=)(")(.*?)("))?(?:(\s)|$)#i', $matches[5], $attrs)) {
-	        $results['attributes'] = array();
-	        foreach($attrs[1] as $i => $attr) {
-	            $results['attributes'][$attr] = isset($attrs[5][$i]) && ! empty($attrs[5][$i]) ? ($attrs[5][$i] != '<attr:value>' ? $attrs[5][$i] : "") : $attr;
-	        }
-	    }
-	    return $results;
-	}
-	/**
-	 * Reverse extract_html_attributes()
-	 * 
-	 * @param  array  $extract output (or equiv) from extract_html_attributes()
-	 * @return string          the tag rebuilt
-	 */
-	static public function build_html_attributes( $extract ) {
-		$return = '<'.$extract['element'];
-		foreach ( $extract['attributes'] as $key=>$value ) {
-			$return .= ' '.$key.'="'.$value.'"';
-		}
-		if ( $extract['content'] ) {
-			return $return . '>' . $extract['content'] . '</' . $extract['element'] . '>';
-		} else {
-			return $return . ' />';
-		}
 	}
 	/**
 	 * Process shortcode for $content
@@ -653,6 +641,47 @@ class FML implements FMLConstants
 		return $return;	
 		/* */
 	}
+	/**
+	 * Extract HTML attributes.
+	 *
+	 * @see  https://gist.github.com/tovic/b3b683f28d899e19f830
+	 * @param  string $input HTML tag to extract from
+	 * @return array         hash with the element (tag name), content, and
+	 *                       attributes as key/value pairs
+	 */
+	static public function extract_html_attributes($input) {
+	    if( ! preg_match('#^(<)([a-z0-9\-._:]+)((\s)+(.*?))?((>)([\s\S]*?)((<)\/\2(>))|(\s)*\/?(>))$#im', $input, $matches)) return false;
+	    $matches[5] = preg_replace('#(^|(\s)+)([a-z0-9\-]+)(=)(")(")#i', '$1$2$3$4$5<attr:value>$6', $matches[5]);
+	    $results = array(
+	        'element' => $matches[2],
+	        'attributes' => null,
+	        'content' => isset($matches[8]) && $matches[9] == '</' . $matches[2] . '>' ? $matches[8] : null
+	    );
+	    if(preg_match_all('#([a-z0-9\-]+)((=)(")(.*?)("))?(?:(\s)|$)#i', $matches[5], $attrs)) {
+	        $results['attributes'] = array();
+	        foreach($attrs[1] as $i => $attr) {
+	            $results['attributes'][$attr] = isset($attrs[5][$i]) && ! empty($attrs[5][$i]) ? ($attrs[5][$i] != '<attr:value>' ? $attrs[5][$i] : "") : $attr;
+	        }
+	    }
+	    return $results;
+	}
+	/**
+	 * Reverse extract_html_attributes()
+	 * 
+	 * @param  array  $extract output (or equiv) from extract_html_attributes()
+	 * @return string          the tag rebuilt
+	 */
+	static public function build_html_attributes( $extract ) {
+		$return = '<'.$extract['element'];
+		foreach ( $extract['attributes'] as $key=>$value ) {
+			$return .= ' '.$key.'="'.$value.'"';
+		}
+		if ( $extract['content'] ) {
+			return $return . '>' . $extract['content'] . '</' . $extract['element'] . '>';
+		} else {
+			return $return . ' />';
+		}
+	}
 	//
 	// ATTACHEMENT EMULATIONS
 	// 
@@ -828,33 +857,6 @@ class FML implements FMLConstants
 		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
 	}
 	/**
-	 * Modify HTML attachment to add shortcode for flickr media when inserting
-	 *
-	 * Note that shortcode attribute names cannot have dashes, so we replace
-	 * them with _
-	 * 
-	 * @param  string $html       HTML to send to editor
-	 * @param  int    $id         post id of attachment
-	 * @param  array  $attachment array of attachment attributes
-	 * @return string             Filtered HTML
-	 * @see https://developer.wordpress.org/reference/hooks/media_send_to_editor/
-	 */
-	public function filter_media_send_to_editor($html, $id, $attachment) {
-		$post = get_post ( $id );
-		if ( $post->post_type != self::POST_TYPE ) {
-			return $html;
-		}
-		$attr_string = '';
-		foreach ( $attachment as $key=>$value ) {
-			$attr_string .=  sprintf(
-				' %s="%s"',
-				str_replace( '-', '_', $key ),
-				esc_attr( $value )
-			);
-		}
-		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
-	}
-	/**
 	 * Just like wp_prepare_attachment_for_js() but for media images.
 	 * 
 	 * @param  WP_Post $post 
@@ -985,7 +987,7 @@ class FML implements FMLConstants
 	 *
 	 * @todo  could add better checking and verify it's the photopage
 	 */
-	public function get_flickr_link( $post ) {
+	static public function get_flickr_link( $post ) {
 		$flickr_data = self::get_flickr_data( $post );
 		return $flickr_data['urls']['url'][0]['_content'];
 	}
@@ -1061,7 +1063,7 @@ class FML implements FMLConstants
 	 * @return array                 array of various raw flickr data merged, empty if no data to add
 	 */
 	static private function _get_data_from_flickr_id( $flickr_id, $last_updated=0 ) {
-		$self == self::get_instance();
+		$self = self::get_instance();
 		$flickr_api = $self->flickr;
 
 		$return = array();
