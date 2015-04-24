@@ -425,12 +425,35 @@ class FML implements FMLConstants
 	    return $results;
 	}
 	/**
+	 * Reverse extract_html_attributes()
+	 * 
+	 * @param  array  $extract output (or equiv) from extract_html_attributes()
+	 * @return string          the tag rebuilt
+	 */
+	static public function build_html_attributes( $extract ) {
+		$return = '<'.$extract['element'];
+		foreach ( $extract['attributes'] as $key=>$value ) {
+			$return .= ' '.$key.'="'.$value.'"';
+		}
+		if ( $extract['content'] ) {
+			return $return . '>' . $extract['content'] . '</' . $extract['element'] . '>';
+		} else {
+			return $return . ' />';
+		}
+	}
+	/**
 	 * Process shortcode for $content
 	 *
 	 * In order for this to work as expected, this shortcode handler is loaded
 	 * using the pattern used by embed and syntaxhighlighter to run before
 	 * `wpautop()`, so this can be nested inside a caption shortcode (for
 	 * instance).
+	 *
+	 * This will allow you to preseerve unsupported attributes in image and
+	 * the hyperlink. It does this by overwriting the content attributes with
+	 * the generated output (while appending to img.class). The assumption is
+	 * the first valid tag is either the img or the a>img. It does this through
+	 * regex to avoid having to use an expensive DOM parser (and transients).
 	 * 
 	 * Modify caption is not support because we don't want to be injecting
 	 * content willy nilly at runtime. Note that if you want to deal with the
@@ -476,11 +499,11 @@ class FML implements FMLConstants
 		// 3. Process other attributes
 		//    Inject title if missing/not provided
 		if ( !$atts['image_title'] ) {
-			$atts['image_title'] = $post->post_title;
+			$atts['image_title'] = trim( $post->post_title );
 		}
 		//    Inject alt if missing/not provided
 		if ( !$atts['image_alt'] ) {
-			$atts['image_alt'] = get_post_meta( $post->ID, '_wp_attachment_image_alt', true );
+			$atts['image_alt'] = trim( get_post_meta( $post->ID, '_wp_attachment_image_alt', true ) );
 		}
 		//    Find url to link if any
 		$rel = '';
@@ -553,19 +576,82 @@ class FML implements FMLConstants
 
 		// 4. If there is content, merge unique things from that into our 
 		//    processed output.
-		//    a. run DOM processing on content
-		//    b. run DOM processing on output
-		//    c. iterate through DOM content looking for stuff to put into
-		//       output
-		//       i. first image is the image
-		//       ii. look for enclosing link
-		return $html;
+		//    a. run regex processing on output
+		if ( $atts['url'] ) {
+			$a_gen = self::extract_html_attributes( $html );
+			$img_gen = self::extract_html_attributes( $a_gen['content'] );
+		} else {
+			$a_gen = false;
+			$img_gen = self::extract_html_attributes( $content );
+		}
+		//    b. run regex processing on content (save the match). First tag
+		//       found must be the image or the enclosing <a> tag.
+		if ( !preg_match( '!<([a-z0-9\-._:]+).*?>[\s\S]*?(<\/\1>)|\s*\/?>!im', $content, $matches ) ) {
+			// no html in content so just prepend shortcode injection
+			return $html.$content;
+		}
+		$needle = $matches[0]; //save for later
+		$extract = self::extract_html_attributes( $needle );
+		if ( $extract['element'] == 'a' ) {
+			$img = self::extract_html_attributes ( $extract['content'] );
+			if ( $img['element'] != 'img' ) {
+				// bare a tag in content? Prepend injection
+				return  $html.$content;
+			}
+			$a = $extract;
+		} elseif ( $extract['element'] == 'img' ) {
+			$a = false;
+			$img = $extract;
+		} else {
+			// first tag is not media, just prepend shortcode injection
+			return $html.$content;
+		}
+		//    c. iterate through img tag of content injecting the generated attrs
+		foreach ( $img_gen['attributes'] as $key=>$value ) {
+			// special case, class should be merged, not overwritten
+			if ( $key == 'class' ) {
+				$img['attributes'][$key] = implode( ' ', array_unique( array_merge(
+					explode( ' ', $value ),
+					explode( ' ', $img['attributes'][$key] )
+				) ) );
+				continue;
+			}
+			// overwrite
+			$img['attributes'][$key] = $value;
+		}
+		$replace = self::build_html_attributes( $img );
 
+		//    d. iterate through a tag (if so) injecting that stuff inside
+		if ( $a && $a_gen ) {
+			// nothing special, just merge
+			$a['attributes'] = array_merge( $a['attributes'], $a_gen['attributes'] );
+			// and then insert img content above
+			$a['content'] = $replace;
+			$replace = self::build_html_attributes( $a );
+		} elseif ( $a ) {
+			// just the a tag in content
+			$a['content'] = $replace;
+			$replace = self::build_html_attributes( $a );
+		} elseif ( $a_gen ) {
+			// just the a tag in generated injection
+			$a_gen['content'] = $replace;
+			$replace = self::build_html_attributes( $a_gen );
+		}// else $replace has been set properly if just img tag
+		
+		//    e. restore and return
+		$start = strpos( $content, $needle );
+		$end   = $start + strlen( $needle );
+		return substr( $content, 0, $start ) . $replace . substr( $content, $end );
+		/*
+		$return = substr( $content, 0, $start ) . $replace . substr( $content, $end );
+
+		
 		ob_start();
-		echo $html;
-		var_dump($atts,$html,$content);
-		$html = ob_get_clean();
-		return $html;
+		echo $return;
+		var_dump($atts,$html,$content,$return);die;
+		$return = ob_get_clean();
+		return $return;	
+		/* */
 	}
 	//
 	// ATTACHEMENT EMULATIONS
