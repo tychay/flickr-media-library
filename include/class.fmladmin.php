@@ -613,7 +613,7 @@ class FMLAdmin
 					$html = get_image_send_to_editor(
 						$id,
 						( isset( $attachment['post_excerpt'] ) ) ? $attachment['post_excerpt'] : '', //caption
-						$post->title, //insert title as it is NOT redundant
+						$post->post_title, //insert title as it is NOT redundant (but will be smashed anyway)
 						isset( $attachment['align'] ) ? $attachment['align'] : 'none',
 						$url,
 						$rel,

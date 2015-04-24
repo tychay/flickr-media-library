@@ -30,6 +30,10 @@ class FML implements FMLConstants
 	 * @var string the option name for the permalink base (access through _get)
 	 */
 	private $_permalink_slug_id;
+	/**
+	 * @var array store the post_meta names of FML-specific metadata. This is
+	 * accessible publicly (but not writeable).
+	 */
 	private $_post_metas = array();
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
@@ -82,7 +86,12 @@ class FML implements FMLConstants
 	 */
 	public function run() {
 		add_action( 'init', array( $this, 'init' ) );
-		add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
+
+		// run [fmlmedia] shortcode before wpautop (and other shortcodes)
+		add_filter( 'the_content', array( $this, 'run_shortcode' ), 8);
+		// placeholder for strip_shortcodes() to work
+		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
+		add_shortcode( self::SHORTCODE, '__return_false' );
 	}
 	/**
 	 * Stuff to run on `init`
@@ -156,7 +165,10 @@ class FML implements FMLConstants
 			//'query_var'           => '', default query var
 			//'can_export'          => true, // can be exported
 		));
+
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
+
+		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
 	}
 
@@ -316,7 +328,7 @@ class FML implements FMLConstants
 	 */
 	private $_flickr_callback = null;
 	//
-	// PUBLIC METHODS
+	// FLICKR API PUBLIC METHODS
 	// 
 	/**
 	 * Return whether we are authenticated with flickr
@@ -364,15 +376,196 @@ class FML implements FMLConstants
 	// SHORTCODE HANDLING
 	//
 	/**
-	 * Process shortcode for $content
+	 * Process the [fmlmedia] shortcode earlier.
+	 *
+	 * This works the same way as the [embed] shortcode.
 	 * 
-	 * @param  [type] $attrs   [description]
-	 * @param  string $content [description]
-	 * @return [type]          [description]
+	 * 1. Remove existing shortcodes
+	 * 2. Register the real [fmlmedia] shortcode
+	 * 3. Run do_shortcode() on content
+	 * 4. Restore existing shortcodes
 	 */
-	public function shortcode( $attrs, $content='' ) {
-		//TODO
-		return $content;	
+	public function run_shortcode( $content ) {
+		global $shortcode_tags;
+
+		$orig_shortcode_tags = $shortcode_tags;
+		remove_all_shortcodes();
+
+		add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
+
+		$content = do_shortcode( $content );
+
+		// Put the original shortcodes back in
+		$shortcode_tags = $orig_shortcode_tags;
+
+		return $content;
+	}
+	/**
+	 * Extract HTML attributes.
+	 *
+	 * @see  https://gist.github.com/tovic/b3b683f28d899e19f830
+	 * @param  string $input HTML tag to extract from
+	 * @return array         hash with the element (tag name), content, and
+	 *                       attributes as key/value pairs
+	 */
+	static public function extract_html_attributes($input) {
+	    if( ! preg_match('#^(<)([a-z0-9\-._:]+)((\s)+(.*?))?((>)([\s\S]*?)((<)\/\2(>))|(\s)*\/?(>))$#im', $input, $matches)) return false;
+	    $matches[5] = preg_replace('#(^|(\s)+)([a-z0-9\-]+)(=)(")(")#i', '$1$2$3$4$5<attr:value>$6', $matches[5]);
+	    $results = array(
+	        'element' => $matches[2],
+	        'attributes' => null,
+	        'content' => isset($matches[8]) && $matches[9] == '</' . $matches[2] . '>' ? $matches[8] : null
+	    );
+	    if(preg_match_all('#([a-z0-9\-]+)((=)(")(.*?)("))?(?:(\s)|$)#i', $matches[5], $attrs)) {
+	        $results['attributes'] = array();
+	        foreach($attrs[1] as $i => $attr) {
+	            $results['attributes'][$attr] = isset($attrs[5][$i]) && ! empty($attrs[5][$i]) ? ($attrs[5][$i] != '<attr:value>' ? $attrs[5][$i] : "") : $attr;
+	        }
+	    }
+	    return $results;
+	}
+	/**
+	 * Process shortcode for $content
+	 *
+	 * In order for this to work as expected, this shortcode handler is loaded
+	 * using the pattern used by embed and syntaxhighlighter to run before
+	 * `wpautop()`, so this can be nested inside a caption shortcode (for
+	 * instance).
+	 * 
+	 * Modify caption is not support because we don't want to be injecting
+	 * content willy nilly at runtime. Note that if you want to deal with the
+	 * fact that caption width attributes are not responsive (which they are
+	 * not), rip that stuff out in caption using the `img_caption_shortcode`
+	 * filter.
+	 * 
+	 * @param  array  $atts    raw shortcode attributes
+	 * @param  string $content content shortcode wrapss
+	 * @return string          HTML output corrected to embed FML asset correctly
+	 * @todo   move code to run earlier
+	 */
+	public function shortcode( $atts, $content='' ) {
+		// 1. Process shortcode attributes against defaults
+		// TODO: inject plugin defaults here.
+		$atts = shortcode_atts( array(
+			'id'           => 0,
+			'flickr_id'    => 0,
+			'image_alt'    => '',
+			'image_title'  => '',
+			'image_size'   => 'Medium', // transformed from image-size
+			'align'        => '',       // editor default may be none, but ours
+			                            // is no attribute/class
+			'link'         => 'flickr', // because of TOS
+			'url'          => '',
+			//'post_excerpt' => '', // caption
+		), $atts);
+		// 2. Verify post is FML media first.
+		//    To do this, we must have either the id or flickr_id set, prefering
+		//    id
+		if ( $atts['id'] == 0 ) {
+			if ( $atts['flickr_id'] == 0 ) {
+				return $content;
+			}
+			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
+			// TODO: add option to generate FML media automatically
+		} else {
+			$post = get_post( $atts['id'] );
+		}
+		if ( !$post ) {
+			return do_shortcode( $content );
+		}
+		// 3. Process other attributes
+		//    Inject title if missing/not provided
+		if ( !$atts['image_title'] ) {
+			$atts['image_title'] = $post->post_title;
+		}
+		//    Inject alt if missing/not provided
+		if ( !$atts['image_alt'] ) {
+			$atts['image_alt'] = get_post_meta( $post->ID, '_wp_attachment_image_alt', true );
+		}
+		//    Find url to link if any
+		$rel = '';
+		if ( $atts['link'] ) {
+			switch ( $atts['link'] ) {
+				case 'file':
+				//$url = get_attached_file( $id );
+				//Flickr community guidelines: link the download page
+				$atts['url'] = self::get_flickr_link( $post ).'sizes/';
+				$rel = 'flickr';
+				break;
+				case 'post':
+				$atts['url'] = get_permalink( $post );
+				$rel = 'attachment-flickr wp-att-'.$post->ID;
+				break;
+				case 'flickr':
+				$atts['url'] = self::get_flickr_link( $post );
+				$rel = 'flickr';
+				break;
+				case 'custom': //if 'custom' with no URL, then it means flickr link
+				if ( !$atts['url'] ) {
+					$atts['url'] = self::get_flickr_link( $post );
+					//$atts['link'] = 'flickr';
+					$rel = 'flickr';
+				}
+				default: // unknown
+				$atts['link'] = '';
+			}
+		}
+
+		// 3. Run attachment processing on the code.
+		$id    = $post->ID;
+		$alt   = $atts['image_alt'];
+		$title = $atts['image_title'];
+		$align = $atts['align'];
+		$size  = $atts['image_size'];
+		//     This is basically the corrected get_image_send_to_editor()
+		//     without any caption content (which would trigger caption handling)
+		//     Remember the real get_image_send_to_editor and it's hooks are
+		//     not available.
+		/* // DO NOT RUN IT THIS WAY: Reason: this does not trigger wp_get_attachment_image_attributes which is needed for things like post thumbnails, etc.
+		$html = get_image_tag($id, $alt, $title, $align, $size);
+		*/
+		//    Emulate the output of get_image_tag() in wp_get_attachment_image()
+		// TODO: Add support for configuring which of these classes get written
+		// by default (and how). For instance, size-Large instead of attachment-Large
+		// or map sizes to internal strings.
+		$iatts = array(
+			'class' => 'attachment-'.$size.' wp-image-'.$id,
+		);
+		// This seems weird but is correct (WordPress is wrong). Title should be
+		// the title of the image, and alt should be a description provided for
+		// accessibility (screen readers). You can/should have both.
+		if ( $alt )   { $iatts['alt']   = $alt; }
+		if ( $title ) { $iatts['title'] = $title; }
+		if ( $align ) { $iatts['class'] = 'align'.$align.' '.$iatts['class']; }
+		$html = wp_get_attachment_image( $id, $size, false, $iatts);
+		// TODO: Add code to strip out image_hwstring if running with scissors (picturefill.wp)
+		if ( $atts['url'] ) {
+			$html = sprintf(
+				'<a href="%s"%s>%s</a>',
+				esc_attr( $atts['url'] ),
+				( $rel ) ? ' rel="'.esc_attr($rel).'"' : '',
+				$html
+			);
+		}
+		if ( !$content ) {
+			return $html;
+		}
+
+		// 4. If there is content, merge unique things from that into our 
+		//    processed output.
+		//    a. run DOM processing on content
+		//    b. run DOM processing on output
+		//    c. iterate through DOM content looking for stuff to put into
+		//       output
+		//       i. first image is the image
+		//       ii. look for enclosing link
+		return $html;
+
+		ob_start();
+		echo $html;
+		var_dump($atts,$html,$content);
+		$html = ob_get_clean();
+		return $html;
 	}
 	//
 	// ATTACHEMENT EMULATIONS
@@ -551,6 +744,9 @@ class FML implements FMLConstants
 	/**
 	 * Modify HTML attachment to add shortcode for flickr media when inserting
 	 *
+	 * Note that shortcode attribute names cannot have dashes, so we replace
+	 * them with _
+	 * 
 	 * @param  string $html       HTML to send to editor
 	 * @param  int    $id         post id of attachment
 	 * @param  array  $attachment array of attachment attributes
@@ -564,7 +760,11 @@ class FML implements FMLConstants
 		}
 		$attr_string = '';
 		foreach ( $attachment as $key=>$value ) {
-			$attr_string .=  sprintf(' %s="%s"', $key, esc_attr($value));
+			$attr_string .=  sprintf(
+				' %s="%s"',
+				str_replace( '-', '_', $key ),
+				esc_attr( $value )
+			);
 		}
 		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
 	}
@@ -633,6 +833,7 @@ class FML implements FMLConstants
 	}
 	/**
 	 * Attempts to get post stored by flickr_id
+	 * 
 	 * @param  string $flickr_id the flickr ID of the image
 	 * @return WP_Post|false     the post found (or false if not)
 	 * @todo   consider doing extra work
