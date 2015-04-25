@@ -124,15 +124,15 @@ class FML implements FMLConstants
 				'singular_name'      => _x( 'Flickr Media', 'singular', self::SLUG ),
 				//'menu_name'          => __( 'menu_name', self::SLUG ), //name that appears in custom menu and listing
 				//'name_admin_bar'     => __( 'name_admin_bar', self::SLUG ), //as post appears in the + New part of the admin bar
-				'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
+				//'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
 				'add_new'            => __( 'Import Flickr', self::SLUG ), // name for "add new" menu and button using lang space, so no need to use context
-				'add_new_item'       => __( 'add_new_item', self::SLUG ),
-				'edit_item'          => __( 'edit_item', self::SLUG ),
-				'new_items'          => __( 'new_items', self::SLUG ),
-				'search_items'       => __( 'search_items', self::SLUG ),
-				'not_found'          => __( 'not_found', self::SLUG ),
-				'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
-				'parent_item_colon'  => __( 'parent_item_colon', self::SLUG ),
+				//'add_new_item'       => __( 'add_new_item', self::SLUG ),
+				//'edit_item'          => __( 'edit_item', self::SLUG ),
+				//'new_items'          => __( 'new_items', self::SLUG ),
+				//'search_items'       => __( 'search_items', self::SLUG ),
+				//'not_found'          => __( 'not_found', self::SLUG ),
+				//'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
+				//'parent_item_colon'  => __( 'parent_item_colon', self::SLUG ),
 			),
 			'description'         => __( 'A mirror of media on Flickr', self::SLUG ),
 			'public'              => true, // shortcut for show_in_nav_menus, show_ui, exclude_from_search, publicly_queryable

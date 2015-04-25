@@ -33,7 +33,7 @@ interface FMLConstants
     /**
      * The default "base" (permalink slug) for the custom post type
      */
-    const _DEFAULT_BASE = 'flickr_photo';
+    const _DEFAULT_BASE = 'flickr_media';
 
 
 /*
