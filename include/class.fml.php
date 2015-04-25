@@ -167,6 +167,7 @@ class FML implements FMLConstants
 		));
 
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
+		add_filter( 'get_attached_file', array( $this, 'filter_get_attached_file'), 10, 2 );
 
 		// TODO make this optional depending on the style of handling shortcode injection
 		if ( false ) {
@@ -696,14 +697,12 @@ class FML implements FMLConstants
 	 * @todo  untested
 	 * @see https://developer.wordpress.org/reference/hooks/image_downsize/
 	 */
-	public function filter_image_downsize($downsize, $id, $size) {
+	public function filter_image_downsize( $downsize, $id, $size ) {
 		global $_wp_additional_image_sizes;
 
 		$post = get_post( $id );
 		// Only operate on flickr media images
-		if ( $post->post_type != self::POST_TYPE ) {
-			return $downsize;
-		}
+		if ( $post->post_type != self::POST_TYPE ) { return $downsize; }
 
 		$flickr_data = self::get_flickr_data( $id );
 		$img_sizes = $flickr_data['sizes']['size'];
@@ -857,6 +856,22 @@ class FML implements FMLConstants
 		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
 	}
 	/**
+	 * This will strip the upload_dir() from the path by re-running the same
+	 * work to find the file as used when saving the meta info
+	 * 
+	 * @param  string $file          the value of get_attached_file()
+	 * @param  int    $attachment_id post id of attachment
+	 * @return string
+	 */
+	public function filter_get_attached_file( $file, $attachment_id ) {
+		$post = get_post( $attachment_id );
+		// Only operate on flickr media images
+		if ( $post->post_type != self::POST_TYPE ) { return $file; }
+		$flickr_data = self::get_flickr_data( $attachment_id );
+		$img = self::_get_largest_image( $flickr_data );
+		return $img['source'];
+	}
+	/**
 	 * Just like wp_prepare_attachment_for_js() but for media images.
 	 * 
 	 * @param  WP_Post $post 
@@ -894,6 +909,7 @@ class FML implements FMLConstants
 		// FML-specific
 		$response['flickrId'] = get_post_meta( $post->ID, $self->post_metas['flickr_id'], true );
 		$response['_flickrData'] = $flickr_data;
+		//$response['_file'] = get_attached_file( $post->ID );
 
 		return $response;
 	}
@@ -1158,15 +1174,17 @@ class FML implements FMLConstants
 	/**
 	 * Get the largest usable flickr image.
 	 *
-	 * Return original image if possible, if not return the largest one
-	 * available. This takes advantage of the fact that the flickr API orders
-	 * its sizes.
+	 * Return original image if possible, if not practical (rotated, a tiff),
+	 * return the largest one available. This takes advantage of the fact that
+	 * the flickr API orders its sizes.
 	 * 
-	 * @param  int|array $flickr_data if integer, its the post_id of flickr media,
-	 *                                else it's the flickr_data
+	 * @param  int|array $flickr_data if integer, its the post_id of flickr
+	 *         media, else it's the flickr_data
+	 * @param  bool      $force_original whether to get original even if
+	 *         WordPress doesn't recognize it as an image or can't rotate it.
 	 * @return array     the sizes array element of the largest size
 	 */
-	static private function _get_largest_image( $flickr_data ) {
+	static private function _get_largest_image( $flickr_data, $force_original = false ) {
 		if ( !is_array( $flickr_data ) ) {
 			$post = get_post( $flickr_data );
 			// Only operate on flickr media images
@@ -1179,11 +1197,20 @@ class FML implements FMLConstants
 		$count_img_sizes = count($sizes);
 
 		$img = $sizes[ $count_img_sizes-1 ];
-		if ( ( $flickr_data['rotation'] != 0 ) && ( $img['label'] == 'Original' ) ) {
-			return $sizes[ $count_img_sizes-2 ];
-		} else {
+		if ( !$force_original ) {
 			return $img;
 		}
+		if ( $img['label'] != 'Original' ) {
+			return $img;
+		}
+		// see https://developer.wordpress.org/reference/functions/wp_attachment_is/
+		$check = wp_check_filetype( $img['source']);
+		$image_exts = array( 'jpg', 'jpeg', 'jpe', 'gif', 'png' );
+		if ( ( $flickr_data['rotation'] == 0 ) && in_array( $check['ext'], $image_exts ) ) {
+			return $img;
+		}
+		// original is invalid
+		return $sizes[ $count_img_sizes-2 ];
 	}
 	/**
 	 * Turn a flickr photo into an image tag.
