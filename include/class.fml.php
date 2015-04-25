@@ -971,7 +971,7 @@ class FML implements FMLConstants
 	 * 1. Make flickr data sane
 	 * 2. Set default meta + cache flickr xform
 	 * 3. Handle more complex default meta
-	 * 4. TODO: Handle compatibility with exifography
+	 * 4. Handle compatibility with exifography
 	 * 5. TODO: Handle FML-specific meta
 	 * 6. Make fields post safe
 	 * 
@@ -999,7 +999,7 @@ class FML implements FMLConstants
 	        '_flickr'           => $exif
 	    );
 
-	    // 4. Handle more complex default meta
+	    // 3. Handle more complex default meta
 	    if ( !empty( $exif['Credit'] ) )        { // IPTC credit
 	    	$meta['credit'] = $exif['Credit']['raw'];
 	    } elseif ( !empty( $exif['Creator'] ) ) { // ? IPTC legacy byline
@@ -1033,28 +1033,65 @@ class FML implements FMLConstants
 	    	$meta['title'] = $exif['Title']['raw'];
 	    }                                           // Do not support trimming captions
 
-	    // 5. Handle compatibility with exifography
-	    // 6. Handle FML-specific meta
-	    // Focal Length (35mm format)
-	    // Aperture clean
-	    // Lens
-	    // Metering Mode
-	    // Exposure Program
-	    // Exposure clean
-	    // City, Provice- State, Country- Primary Location Name
+	    // 4. Handle compatibility with exifography
+	    // GPS stuff
+	    if ( !empty( $exif['GPS Latitude'] ) )      { // exif GPSLatitude
+	    	$meta['latitude']      = $exif['GPS Latitude']['raw'];
+	    }
+	    if ( !empty( $exif['GPS Latitude Ref'] ) )  { // exif GPSLatitudeRef
+	    	$meta['latitude_ref']  = $exif['GPS Latitude Ref']['raw'];
+	    }
+	    if ( !empty( $exif['GPS Longitude'] ) )     { //exif GPSLongitude
+	    	$meta['longitude']     = $exif['GPS Longitude']['raw'];
+	    }
+	    if ( !empty( $exif['GPS Longitude Ref'] ) ) { //exif GPSLongitudeRef
+	    	$meta['longitude_ref'] = $exif['GPS Longitude Ref']['raw'];
+	    }
+	    // Exposure Bias
+	    if ( !empty( $exif['Exposure Bias'] ) )     { //exif ExposureBiasValue
+	    	$meta['exposure_bias'] = $exif['Exposure Bias']['raw'];
+	    }
+	    // Flash
+	    if ( !empty( $exif['Flash'] ) )             { //exif Flash
+	    	$meta['flash']         = $exif['Flash']['raw'];
+	    }
+	    // Lens was commented out
+
+	    // 5. Handle FML-specific meta
+	    //    focal_length_35 = Focal Length (35mm format)
+	    if ( !empty( $exif['Focal Length (35mm format)'] ) ) {
+	    	$meta['focal_length_35'] = $exif['Focal Length (35mm format)']['raw'];
+	    }
+		//     lens = Lens Make
+	    if ( !empty( $exif['Lens Make'] ) ) {
+	    	$meta['lens'] = $exif['Lens Make']['raw'];
+	    }
+		//     lens .= Lens Model
+	    if ( !empty( $exif['Lens Model'] ) ) {
+	    	if ( !empty( $meta['lens'] ) ) {
+	    		$meta['lens'] .= ' ';
+	    	} else {
+	    		$meta['lens'] = '';
+	    	}
+	    	$meta['lens'] .= $exif['Lens Model']['raw'];
+	    }
+		//     lens_info = Lens Info
+	    if ( !empty( $exif['Lens Info'] ) ) {
+	    	$meta['lens_info'] = $exif['Lens Info']['raw'];
+	    }
 	    // GPS Altitiude
 		// GPS Altitude Ref
 		// GPS Date Stamp
-		// GPS Latitude
-		// GPS Latitude Ref
-		// GPS Logitude
-		// GPS Logitude Ref
 		// GPS Speed
 		// GPS SPeed Ref
 		// GPS TIme Stamp
-		// Lens Info
-		// Lens Make
-		// Lens Model
+	    // Aperture clean
+	    // Metering Mode
+	    // ExposureMode
+	    // Exposure Program
+	    // Exposure Bias Clean
+	    // Exposure clean
+	    // City, Provice- State, Country- Primary Location Name
 
 	    // 6. Make all fields post safe (esp description)
 	    foreach ( $meta as $key=>$value ) {
@@ -1062,6 +1099,7 @@ class FML implements FMLConstants
 	    		$meta[$key] = wp_kses_post($value);
 	    	}
 	    }
+
 	    // DO NOT trigger wp_read_image_metadata as the image is unlikely to be
 	    // readable
 	    return $meta;
