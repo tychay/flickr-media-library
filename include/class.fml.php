@@ -81,6 +81,12 @@ class FML implements FMLConstants
 	 *
 	 * - register `init` handler
 	 * - add shortcode handler
+	 * - register filter_image_downsize to add fmlmedia image_downsize() support
+	 * - register filter_get_attached_file to make get_attached_file() return
+	 *   proper url for flickr media
+	 * - register filter_wp_get_attachment_metadata to inject metadata results
+	 *   without having to clutter up post_meta with more stuff
+	 * - register filter media_send_to_editor to wrap shortcode around fmlmedia
 	 *
 	 * @return void
 	 */
@@ -92,6 +98,13 @@ class FML implements FMLConstants
 		// placeholder for strip_shortcodes() to work
 		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
 		add_shortcode( self::SHORTCODE, '__return_false' );
+
+
+		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
+		add_filter( 'get_attached_file', array( $this, 'filter_get_attached_file'), 10, 2 );
+		add_filter( 'wp_get_attachment_metadata', array( $this, 'filter_wp_get_attachment_metadata'), 10, 2 );
+		// TODO make this optional depending on the style of handling shortcode injection
+		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
 	}
 	/**
 	 * Stuff to run on `init`
@@ -99,8 +112,6 @@ class FML implements FMLConstants
 	 * - Register the custom post type used for storing flickr photos. If the
 	 *   register is called earlier, it won't trigger due to missing object on
 	 *   rewrite rule. {@see https://codex.wordpress.org/Function_Reference/register_post_type}
-	 * - register filter image_downsize to add fmlmedia image_downsize() support
-	 * - register filter media_send_to_editor to wrap shortcode around fmlmedia
 	 * 
 	 * @return void
 	 */
@@ -165,14 +176,6 @@ class FML implements FMLConstants
 			//'query_var'           => '', default query var
 			//'can_export'          => true, // can be exported
 		));
-
-		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
-		add_filter( 'get_attached_file', array( $this, 'filter_get_attached_file'), 10, 2 );
-
-		// TODO make this optional depending on the style of handling shortcode injection
-		if ( false ) {
-			add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
-		}
 	}
 
 	//
@@ -860,16 +863,50 @@ class FML implements FMLConstants
 	 * work to find the file as used when saving the meta info
 	 * 
 	 * @param  string $file          the value of get_attached_file()
-	 * @param  int    $attachment_id post id of attachment
+	 * @param  int    $post_id       post id of attachment
 	 * @return string
 	 */
-	public function filter_get_attached_file( $file, $attachment_id ) {
-		$post = get_post( $attachment_id );
+	public function filter_get_attached_file( $file, $post_id ) {
+		$post = get_post( $post_id );
 		// Only operate on flickr media images
 		if ( $post->post_type != self::POST_TYPE ) { return $file; }
-		$flickr_data = self::get_flickr_data( $attachment_id );
+		$flickr_data = self::get_flickr_data( $post_id );
 		$img = self::_get_largest_image( $flickr_data );
 		return $img['source'];
+	}
+	/**
+	 * Inject response of wp_get_attachment_metadata() with emulated data
+	 * so that we don't need to save in _wp_attachment_metadata post meta.
+	 * 
+	 * @param  array  $metadata metadata to return (empty array for fml media)
+	 * @param  int    $post_id  post id of attachment
+	 * @return array
+	 */
+	public function filter_wp_get_attachment_metadata( $metadata, $post_id) {
+		$post = get_post( $post_id );
+		// Only operate on flickr media images
+		if ( $post->post_type != self::POST_TYPE ) { return $metadata; }
+		$flickr_data = self::get_flickr_data( $post_id );
+
+		$sizes = array();
+		$full = self::_get_largest_image($flickr_data);
+		$is_square = ( $full['width'] == $full['height'] );
+		$metadata['width']  = intval( $full['width'] );
+		$metadata['height'] = intval( $full['height'] );
+		$metadata['file']   = $full['source'];
+		foreach ( $flickr_data['sizes']['size'] as $size_data ) {
+			// we'll use _get_largest_image() to get the original if possible
+			$label = $size_data['label'];
+			if ( $label == 'Original' ) { continue; }
+			$sizes[$label] = array(
+				'width'  => intval( $size_data['width'] ),
+				'height' => intval( $size_data['height'] ),
+				'crop'   => ( strpos($label, 'Square') !== false && !$is_square ),
+			);
+		}
+		$metadata['sizes']      = $sizes;
+		$metadata['image_meta'] = self::_wp_read_image_metadata($flickr_data);
+		return $metadata;
 	}
 	/**
 	 * Just like wp_prepare_attachment_for_js() but for media images.
@@ -891,10 +928,11 @@ class FML implements FMLConstants
 		$flickr_data = self::get_flickr_data( $post );
 
 		// other emulated things
+		$response[ 'authorName' ] = $flickr_data['owner']['realname'];
+		$sizes = array();
 		foreach ( $flickr_data['sizes']['size'] as $size_data ) {
-			if ( ( $size_data['label'] == 'Original' )  && ( $flickr_data['rotation'] != 0 ) ) {
-				continue;
-			}
+			// use self::_get_largest_image() side effect to get this one
+			if ( $size_data['label'] == 'Original' ) { continue; }
 			$sizes[$size_data['label']] = array(
 				'url'         => $size_data['source'],
 				'width'       => intval($size_data['width']),
@@ -904,14 +942,158 @@ class FML implements FMLConstants
 			$response['width']  = intval($size_data['width']);
 			$response['height'] = intval($size_data['height']);
 		}
+		// worst case scenario, it overwrites the largest image
+		$full = self::_get_largest_image( $flickr_data );
+		$sizes[$full['label']] = array(
+			'url'         => $full['source'],
+			'width'       => intval($full['width']),
+			'height'      => intval($full['height']),
+			'orientation' => ( $full['height'] > $full['width'] ) ? 'portrait' : 'landscape',
+		);
 		$response['sizes'] = $sizes;
 		
 		// FML-specific
 		$response['flickrId'] = get_post_meta( $post->ID, $self->post_metas['flickr_id'], true );
 		$response['_flickrData'] = $flickr_data;
+		// testing
 		//$response['_file'] = get_attached_file( $post->ID );
+		//$response['_metadata'] = wp_get_attachment_metadata( $post->ID );
 
 		return $response;
+	}
+	/**
+	 * Emulate wp_read_image_metadata() but for extracting from flickr API data
+	 * instead of exif_read_data() etc.
+	 *
+	 * The way that the actual function does it is too involved, While this
+	 * emulation isn't identical, it's probably good enough.
+	 *
+	 * 1. Make flickr data sane
+	 * 2. Set default meta + cache flickr xform
+	 * 3. Handle more complex default meta
+	 * 4. TODO: Handle compatibility with exifography
+	 * 5. TODO: Handle FML-specific meta
+	 * 6. Make fields post safe
+	 * 
+	 * @param  array  $flickr_data flickr API data stored in meta
+	 * @return array               image meta from EXIF
+	 * @todo  think of moving this into the metadata field
+	 */
+	static private function _wp_read_image_metadata( $flickr_data ) {
+		// 1. Make flickr data sane
+	    $exif = self::_xform_flickr_exif($flickr_data['exif']);
+
+	    // 2. Set default meta + cache flickr xform
+	    $meta = array(
+	        'aperture'          => ( empty( $exif['Aperture']) ) ? 0 : wp_exif_frac2dec( $exif['Aperture']['raw'] ),
+	        'credit'            => '',
+	        'camera'            => ( empty( $exif['Model']) ) ? '' : $exif['Model']['raw'],
+	        'caption'           => '',
+	        'created_timestamp' => 0,
+	        'copyright'         => '',
+	        'focal_length'      => ( empty( $exif['Focal Length'] ) ) ? 0 : $exif['Focal Length']['raw'],
+	        'iso'               => ( empty( $exif['ISO Speed'] ) ) ? 0 : intval($exif['ISO Speed']['raw']),
+	        'shutter_speed'     => ( empty( $exif['Exposure'] ) ) ? 0 : wp_exif_frac2dec( $exif['Exposure']['raw'] ),
+	        'title'             => '',
+	        'orientation'       => ( empty( $exif['Orientation'] ) ) ? 0 : $exif['Orientation']['raw'],
+	        '_flickr'           => $exif
+	    );
+
+	    // 4. Handle more complex default meta
+	    if ( !empty( $exif['Credit'] ) )        { // IPTC credit
+	    	$meta['credit'] = $exif['Credit']['raw'];
+	    } elseif ( !empty( $exif['Creator'] ) ) { // ? IPTC legacy byline
+	    	$meta['credit'] = $exif['Creator']['raw'];
+	    } elseif ( !empty( $exif['Artist'] ) )  { // ? EXIF Artist
+	    	$meta['credit'] = $exif['Artist']['raw'];
+	    } elseif ( !empty( $exif['Author'] ) )  { // ? EXIF Author
+	    	$meta['credit'] = $exif['Author']['raw'];
+	    }
+	    if ( !empty( $exif['Caption- Abstract'] ) ) { // IPTC Caption-Abstract
+	    	$meta['caption'] = $exif['Caption- Abstract']['raw'];
+	    } elseif ( !empty( $exif['Description'] ) ) { // ? IPTC legacy caption
+	    	$meta['caption'] = $exif['Description']['raw'];
+	    	                                          // ?? EXIF COMPUTED user comment
+	    } elseif ( !empty( $exif['Image Description'] ) ) { // ? EXIF ImageDescription
+	    	$meta['caption'] = $exif['Image Description']['raw'];
+	    } elseif ( !empty( $exif['Comments'] ) )     { // ? EXIF Comments
+	    	$meta['caption'] = $exif['Comments']['raw'];
+	    }
+	                                                          // ?? IPTC date and time
+	    if ( !empty( $exif['Date and Time (Digitized)'] ) ) { // EXIF CreateDate
+	    	$meta['created_timestamp'] = wp_exif_date2ts( $exif['Date and Time (Digitized)']['raw'] );
+	    }
+	    if ( !empty( $exif['Copyright Notice'] ) ) { // IPTC CopyrightNotice
+	    	$meta['copyright'] = $exif['Copyright Notice']['raw'];
+	    }                                            // ?? EXIF Copyright
+
+	    if ( !empty( $exif['Headline'] ) )        { // ? IPTC Headline
+	    	$meta['title'] = $exif['Headline']['raw'];
+	    } elseif ( !empty( $exif['Title'] ) )     { // ? IPTC Title
+	    	$meta['title'] = $exif['Title']['raw'];
+	    }                                           // Do not support trimming captions
+
+	    // 5. Handle compatibility with exifography
+	    // 6. Handle FML-specific meta
+	    // Focal Length (35mm format)
+	    // Aperture clean
+	    // Lens
+	    // Metering Mode
+	    // Exposure Program
+	    // Exposure clean
+	    // City, Provice- State, Country- Primary Location Name
+	    // GPS Altitiude
+		// GPS Altitude Ref
+		// GPS Date Stamp
+		// GPS Latitude
+		// GPS Latitude Ref
+		// GPS Logitude
+		// GPS Logitude Ref
+		// GPS Speed
+		// GPS SPeed Ref
+		// GPS TIme Stamp
+		// Lens Info
+		// Lens Make
+		// Lens Model
+
+	    // 6. Make all fields post safe (esp description)
+	    foreach ( $meta as $key=>$value ) {
+	    	if ( is_string( $value ) ) {
+	    		$meta[$key] = wp_kses_post($value);
+	    	}
+	    }
+	    // DO NOT trigger wp_read_image_metadata as the image is unlikely to be
+	    // readable
+	    return $meta;
+	}
+	/**
+	 * Turn EXIF data into a hash that's more accessible
+	 * 
+	 * @param  array  $exif_array Output from Flickr's EXIF API
+	 * @return array  a hash
+	 */
+	static private function _xform_flickr_exif( $exif_array ) {
+		$return = array();
+		foreach ( $exif_array as $data ) {
+			$exif_data = array(
+				'tag'      => $data['tag'],
+				'raw'      => $data['raw']['_content'],
+				'tagspace' => $data['tagspace'],
+				'label'    => $data['label'],
+			);
+			if ( !empty($data['clean'] ) ) {
+				$exif_data['clean'] = $data['clean']['_content'];
+			}
+			$return[$data['label']] = $exif_data;
+			/*
+			if ( !array_key_exists( $data['tagspace'], $return ) ) {
+				$return[$data['tagspace']] = array();
+			}
+			$return[$data['tagspace']][$data['tag']] = $exif_data;
+			*/
+		}
+		return $return;
+
 	}
 	//
 	// FLICKR MEDIA POSTTYPE
