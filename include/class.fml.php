@@ -80,6 +80,7 @@ class FML implements FMLConstants
 	 * Stuff to run on `plugins_loaded`
 	 *
 	 * - register `init` handler
+	 * - register prepend_media to the_content to trigger shortcode processing on attachment page
 	 * - add shortcode handler
 	 * - register filter_image_downsize to add fmlmedia image_downsize() support
 	 * - register filter_get_attached_file to make get_attached_file() return
@@ -94,6 +95,7 @@ class FML implements FMLConstants
 		add_action( 'init', array( $this, 'init' ) );
 
 		// run [fmlmedia] shortcode before wpautop (and other shortcodes)
+		add_filter( 'the_content', array( $this, 'prepend_media') ); //can run anytime
 		add_filter( 'the_content', array( $this, 'run_shortcode' ), 8);
 		// placeholder for strip_shortcodes() to work
 		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
@@ -122,16 +124,15 @@ class FML implements FMLConstants
 				// name of post type in plural and singualr form
 				'name'               => _x( 'Flickr Media', 'plural', self::SLUG ),
 				'singular_name'      => _x( 'Flickr Media', 'singular', self::SLUG ),
-				//'menu_name'          => __( 'menu_name', self::SLUG ), //name that appears in custom menu and listing
+				//'menu_name'          => __( 'menu_name', self::SLUG ), //name that appears in custom menu and listing (there is none so not needed)
 				//'name_admin_bar'     => __( 'name_admin_bar', self::SLUG ), //as post appears in the + New part of the admin bar
-				//'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
-				'add_new'            => __( 'Import Flickr', self::SLUG ), // name for "add new" menu and button using lang space, so no need to use context
-				//'add_new_item'       => __( 'add_new_item', self::SLUG ),
+				'add_new'            => __( 'Import New', self::SLUG ), // name for "add new" menu and button using lang space, so no need to use context
+				'add_new_item'       => __( 'Add New Flickr Media', self::SLUG ),
 				//'edit_item'          => __( 'edit_item', self::SLUG ),
 				//'new_items'          => __( 'new_items', self::SLUG ),
-				//'search_items'       => __( 'search_items', self::SLUG ),
-				//'not_found'          => __( 'not_found', self::SLUG ),
-				//'not_found_in_trash' => __( 'not_found_in_trash', self::SLUG ),
+				'search_items'       => __( 'Search Flickr Media', self::SLUG ),
+				'not_found'          => __( 'No Flickr media found', self::SLUG ),
+				'not_found_in_trash' => __( 'No Flickr media found in trash', self::SLUG ),
 				//'parent_item_colon'  => __( 'parent_item_colon', self::SLUG ),
 			),
 			'description'         => __( 'A mirror of media on Flickr', self::SLUG ),
@@ -151,16 +152,16 @@ class FML implements FMLConstants
 			'hierarchical'        => true, //post type can have parent, support'page-attributes'
 			'supports'            => array(
 				'title',
-				'editor',
-				//'author', //can have author
-				'thumbnail', // TODO: can have featured image?
-				'excerpt', //caption text
-				//'trackbacks',
+				//'editor',          // not editable
+				//'author',          // change author
+				//'thumbnail',       // assign featured image
+				'excerpt',           // caption text
+				'trackbacks',      
 				//'custom-fields',
-				'comments',
-				//'revisions', //TODO
-				//'page-attributes', //menu order if hierarchical is true
-				//'post-formats', //TODO
+				//'comments',        // TODO
+				//'revisions',       // TODO
+				//'page-attributes', // assign parent if hierarchical is true, sets menu order
+				//'post-formats',    // TODO
 			),
 			//'register_meta_box_cb'=> //TODO: callback function when setting up metaboxes
 			'taxonomies'          => array( 'post_tag' ), // support post tags taxonom
@@ -242,9 +243,7 @@ class FML implements FMLConstants
 	 * @var array Plugin blog options
 	 */
 	private $_settings = array();
-	//
 	// PROPERTIES: Settings
-	// 
 	/**
 	 * Load options array into settings variable
 	 * 
@@ -295,9 +294,7 @@ class FML implements FMLConstants
 		}
 		update_option(self::SLUG, $this->_settings);
 	}
-	//
 	// PROPERTES: Flickr
-	// 
 	/**
 	 * @var \FML\Flickr Flickr API object
 	 */
@@ -317,16 +314,16 @@ class FML implements FMLConstants
 			$settings['flickr_api_secret'],
 			$this->_flickr_callback
 		);
-        // are we authenticated with flickr? if so then set up 1auth param
-        if ( $this->is_flickr_authenticated() ) {
-            $this->_flickr->useOAuthAccessCredentials(array(
-                Flickr::USER_FULL_NAME            => $settings[Flickr::USER_FULL_NAME],
-                Flickr::USER_NAME                 => $settings[Flickr::USER_NAME],
-                Flickr::USER_NSID                 => $settings[Flickr::USER_NSID],
-                Flickr::OAUTH_ACCESS_TOKEN        => $settings[Flickr::OAUTH_ACCESS_TOKEN],
-                Flickr::OAUTH_ACCESS_TOKEN_SECRET => $settings[Flickr::OAUTH_ACCESS_TOKEN_SECRET],
-            ));
-        }
+		// are we authenticated with flickr? if so then set up 1auth param
+		if ( $this->is_flickr_authenticated() ) {
+		    $this->_flickr->useOAuthAccessCredentials(array(
+		        Flickr::USER_FULL_NAME            => $settings[Flickr::USER_FULL_NAME],
+		        Flickr::USER_NAME                 => $settings[Flickr::USER_NAME],
+		        Flickr::USER_NSID                 => $settings[Flickr::USER_NSID],
+		        Flickr::OAUTH_ACCESS_TOKEN        => $settings[Flickr::OAUTH_ACCESS_TOKEN],
+		        Flickr::OAUTH_ACCESS_TOKEN_SECRET => $settings[Flickr::OAUTH_ACCESS_TOKEN_SECRET],
+		    ));
+		}
 		return $this->_flickr;
 	}
 	/**
@@ -381,6 +378,48 @@ class FML implements FMLConstants
 	//
 	// SHORTCODE HANDLING
 	//
+	/**
+	 * Filter duplicates behavior of prepend_attachment but for flickr media.
+	 *
+	 * This can run anytime as it directly calls the shortcode.
+	 * 
+	 * @param  string $content the_content
+	 * @return string          the_content with fml shortcode prepend (if get_post() is flickr media)
+	 */
+	public function prepend_media( $content ) {
+		$post = get_post();
+		if ( empty($post->post_type) || $post->post_type != self::POST_TYPE ) { return $content; }
+
+		/**
+		 * Filter shortcode content for processing in prepend_media()
+		 *
+		 * Use this to inject parameters not handled by fml_prepend_media_shortcode_attrs.
+		 * @since 1.0
+		 * @see prepend_media()
+		 * @param string $content shortcode content
+		 */
+		$shortcode_content = apply_filters('fml_prepend_media_shortcode_content', '' );
+		/**
+		 * Filter shortcode attributes for shortcode processing in prepend_media()
+		 *
+		 * @since 1.0
+		 * @see prepend_media()
+		 * @param array $attrs shortcode attributes
+		 */
+		$shortcode_attrs = apply_filters('fml_prepend_media_shortcode_attrs', array(
+			'id'       => $post->ID,
+			'img_size' => 'Medium',
+			'link'     => 'flickr',
+		) );
+		$p = '<p class="attachment">';
+		// show the medium sized image representation of the attachment if available, and link to the raw file
+		//$p .= wp_get_attachment_link(0, 'medium', false);
+		$p .= $this->shortcode( $shortcode_attrs, $shortcode_content );
+		$p .= '</p>';
+		$p = apply_filters( 'prepend_attachment', $p );
+
+		return "$p\n$content";
+	}
 	/**
 	 * Modify HTML attachment to add shortcode for flickr media when inserting
 	 *
@@ -525,7 +564,6 @@ class FML implements FMLConstants
 				$atts['link'] = '';
 			}
 		}
-
 		// 3. Run attachment processing on the code.
 		$id    = $post->ID;
 		$alt   = $atts['image_alt'];
@@ -1350,7 +1388,8 @@ class FML implements FMLConstants
 			//'post_author'    => 0,//userid
 			'post_date'      => $data['dates']['taken'], //TODO: consider varying date
 			//'post_date_gmt'  => above in GMT
-			'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
+			//'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
+			'post_content'   => $data['description']['_content'],
 			'post_title'     => $data['title']['_content'],
 			//'post_excerpt'   => //ALT TEXT
 			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 

@@ -64,12 +64,12 @@ class FMLAdmin
 	 * Stuff to do on plugins_loaded
 	 *
 	 * - Register init() on admin_init
-	 * - Add various menu pages (e.g. Settings) to admin menu 
-	 * - Add handling of permalink form to Permalink page 
-	 * - Add link to Settings page to Plugin Page
-	 * - If in Settings page, register plugin Settings page as Flickr callback for Auth
-	 * - Add various ajax servers
-	 * - Add tab to media upload button
+	 * - Add menu pages (e.g. Settings) to admin menu 
+	 * - Plugins: Add link to Settings page to Plugin Page
+	 * - Settings > Permalink: Add handling of permalink form to Permalink page 
+	 * - Settings: If in Settings page, register plugin Settings page as Flickr callback for Auth
+	 * - AJAX: Add various ajax servers
+	 * - Media Upload: Add tab to media upload button
 	 * 
 	 * @return void
 	 */
@@ -78,10 +78,10 @@ class FMLAdmin
 		add_action( 'admin_init', array( $this, 'init') );
 		// Add various menu pages (e.g. Settings) to admin menu 
 		add_action( 'admin_menu', array( $this, 'create_admin_menus' ) );
-		// Add set permalink form to Permalink page 
-		add_action( 'load-options-permalink.php', array( $this, 'handle_permalink_form') );
 		// Add link to Settings page to Plugin page
 		add_filter( 'plugin_action_links_'.$this->_fml->plugin_basename, array($this, 'filter_plugin_settings_links'), 10, 2 );
+		// Add set permalink form to Permalink page 
+		add_action( 'load-options-permalink.php', array( $this, 'handle_permalink_form') );
 		// If in Settings page register plugin Settings page as Flickr callback
 		// for auth
 		if ( $this->_in_options_page() ) {
@@ -96,10 +96,10 @@ class FMLAdmin
 		// - for handling ajax api options
 		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
 		// Add tab to Media upload button
-		add_filter( 'media_upload_tabs', array($this, 'filter_media_upload_tabs') );
-		add_action( 'media_upload_'.$this->_fml_upload_id, array($this, 'get_media_upload_iframe') );
+		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
+		add_action( 'media_upload_'.$this->_fml_upload_id, array( $this, 'get_media_upload_iframe' ) );
+		add_action( 'load-post.php', array( $this, 'loading_edit') );
 	}
-
 	/**
 	 * Admin init.
 	 *
@@ -224,6 +224,9 @@ class FMLAdmin
 				//echo '<plaintext>'; var_dump($flickr); die('Whoops!');
 			}
 		}
+		// Handle form posts that are not otherwise supported
+		// - authorize: oAuth with Flickr
+		// - deauthorize: remove oAuth settings
 		if ( !empty($_POST['action']) ) {
 			switch ($_POST['action']) {
 				// Handle form action = authorize (_flickr_auth_form_id) [Steps 1-3]
@@ -406,6 +409,65 @@ class FMLAdmin
 			__('Settings')
 			);
 		return $actions;
+	}
+	// 
+	// EDIT CUSTOM POST PAGE
+	// 
+	/**
+	 * Triggers on editing a custom post's edit screen
+	 * 
+	 * @return [type] [description]
+	 */
+	public function loading_edit() {
+		$screen = get_current_screen();
+		// ONLY OPERATE ON FLICKR MEDIA
+		if ( $screen->post_type != FML::POST_TYPE ) { return; }
+		// "ADD NEW" POST
+		if ( $screen->action == 'add' ) {
+			//TODO: add-new, redirect to another sceen most likely
+			wp_die('TODO: Need to add flickr importer');
+		}
+
+		// EDITING EXISTING POST…
+		
+		// Enqueue Settings-specific Javascript (controls screenoptions)
+		wp_enqueue_script(
+			FML::SLUG.'-hack-post', //handle
+			$this->_fml->static_url.'/js/admin-post.js', //src
+			array('jquery'), //dependencies ajax
+			FML::VERSION, //version
+			true //in footer?
+		);
+		add_action( 'edit_form_after_title', array( $this, 'edit_insert_post_content' ), 10, 1 );
+		//add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
+	}
+	/**
+	 * Show the_content for the post in a box that is normally for TinyMCE
+	 *
+	 * @param  WP_Post $post The post to display
+	 * @return void
+	 */
+	public function edit_insert_post_content($post) {
+		echo '<div id="postdivrich" class="postarea wp-editor-expand">';
+		//$post = $GLOBALS['post'];
+		// Because the_content filters (like prepend_media) may need access to
+		// get_post(), we need to be a bit clever else we depend on the global
+		// being set properly by accident (which it is in this case, but who
+		// knows).
+		/*
+		$temp_post = $GLOBALS['post'];
+		$GLOBALS['post'] = $post;
+		the_content();
+		$GLOBALS['post'] = $temp_post;
+		*/
+		$content = apply_filters('the_content', $post->post_content);
+		$content = str_replace(']]>', ']]&gt;', $content);
+		echo $content;
+		echo '</div>';
+	}
+	public function adding_edit_meta_boxes() {
+		//global $wp_meta_boxes;
+		//var_dump(get_current_screen(), $wp_meta_boxes);die;
 	}
 	//
 	// MEDIA UPLOAD IFRAME
