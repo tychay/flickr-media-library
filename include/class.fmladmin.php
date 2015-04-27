@@ -70,6 +70,7 @@ class FMLAdmin
 	 * - Settings > Permalink: Add handling of permalink form to Permalink page 
 	 * - Settings: If in Settings page, register plugin Settings page as Flickr callback for Auth
 	 * - AJAX: Add various ajax servers
+	 * - Media Library: Add init handlers for custom post pages
 	 * - Media Upload: Add tab to media upload button
 	 * 
 	 * @return void
@@ -96,11 +97,13 @@ class FMLAdmin
 		add_action( 'wp_ajax_'.$this->_action_api, array($this, 'handle_ajax') );
 		// - for handling ajax api options
 		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
+		// Add init handlers for custom post pages
+		add_action( 'load-edit.php', array( $this, 'loading_edit') );
+		add_action( 'load-post.php', array( $this, 'loading_post') );
+		add_action( 'load-post-new.php', array( $this, 'loading_post_new') );
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
 		add_action( 'media_upload_'.$this->_fml_upload_id, array( $this, 'get_media_upload_iframe' ) );
-		add_action( 'load-post.php', array( $this, 'loading_post') );
-		add_action( 'load-post-new.php', array( $this, 'loading_post_new') );
 	}
 	/**
 	 * Admin init.
@@ -405,9 +408,73 @@ class FMLAdmin
 	// 
 	// CUSTOM POST PAGES
 	// 
+	// LIST (edit.php)
+	/**
+	 * Injects custom post-specific stuff for edit.php
+	 * 
+	 * Triggers on displaying custom post list view screen (edit.php).
+	 *
+	 * - add filter to manage which columns exists
+	 * - add filter for rendering new column
+	 * - no need to add sortable columns list
+	 * @return [type] [description]
+	 */
+	public function loading_edit() {
+		$screen = get_current_screen();
+		// ONLY OPERATE ON FLICKR MEDIA
+		if ( $screen->post_type != FML::POST_TYPE ) { return; }
+
+		add_filter( 'manage_'.FML::POST_TYPE.'_posts_columns', array( $this, 'filter_manage_post_columns' ) );
+		add_action( 'manage_'.FML::POST_TYPE.'_posts_custom_column', array( $this, 'manage_posts_custom_column' ), 10, 2 );
+		//add_filter( 'manage_edit-'.FML::POST_TYPE.'_sortable_columns', array( $this, 'filter_manage_sortable_colu,ms' ) );
+
+	}
+	/**
+	 * Control which columns exist/are displayed
+	 *
+	 * By default the $cols array looks like:
+	 * - cb: <input type="checkbox" />
+	 * - title: Title
+	 * - tags: Tags
+	 * - date: Date
+	 * 
+	 * @param  array $cols  Hash of column ids and their title name
+	 * @return array        filtered
+	 */
+	public function filter_manage_post_columns( $cols ) {
+		$return = array(
+			'cb' => $cols['cb'],
+			'icon' => '', // core has already this to be 80px wide
+			'title' => $cols['title'],
+			'tags' => $cols['tags'],
+			'date' => $cols['date'],
+		);
+		return $return;
+
+	}
+	/**
+	 * Inject column content for a post
+	 *
+	 * @param  string $column  column id
+	 * @param  int    $post_id post_id of flickr media
+	 * @return string          HTML content
+	 * @todo  consider making it easier to get Large Square and sizing it down
+	 */
+	public function manage_posts_custom_column( $column, $post_id ) {
+		switch ( $column ) {
+			case 'icon':
+			// no need to get alt or title as there are other columns
+			//echo get_image_tag( $post_id, '', '', 'center', 'Square');
+			list( $img_src, $width, $height ) = image_downsize( $post_id, 'Large Square' );
+			printf('<img src="%s" alt="" width="75" height="75" />', $img_src );
+			break;
+		}
+	}
 	// EDIT (post.php)
 	/**
-	 * Triggers on editing a custom post's edit screen (post.php)
+	 * Injects custom post-specific stuff for post.php
+	 * 
+	 * Triggers on display of post's edit screen (post.php)
 	 *
 	 * - handle user clicking on refresh button
 	 * - enqueue script that modifies edit form functionality
@@ -512,7 +579,11 @@ class FMLAdmin
 	public function post_excerpt_meta_box( $post ) {
 		include $this->_fml->template_dir.'/metabox.post_excerpt.php';
 	}
-
+	/**
+	 * Handle saving of image alt text meta box
+	 * @param  int   $post_id the post id of the flickr media
+	 * @return void
+	 */
 	public function handle_alt_meta_box_form( $post_id ) {
 		if ( isset( $_POST['image_alt_text'] ) ) {
 			update_post_meta( $post_id, '_wp_attachment_image_alt', $_POST['image_alt_text'] );

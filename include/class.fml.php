@@ -739,7 +739,7 @@ class FML implements FMLConstants
 	 * Inject Flickr image downsize code if image is Flickr Media
 	 * 
 	 * @param  bool         $downsize current status of filter
-	 * @param  int          $id       attachement ID of image
+	 * @param  int          $id       post ID of fml media ("attachment ID")
 	 * @param  array|string $size     size of image (e.g. dimensions, 'medium')
 	 * @return array|bool             do not short-circuit downsizing
 	 *                                or array with url, width, height, is_intermediate
