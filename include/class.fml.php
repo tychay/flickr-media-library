@@ -1213,16 +1213,22 @@ class FML implements FMLConstants
 		return false;
 	}
 	/**
-	 *
-	 * @param  WP_Post|integer $post The post or its post ID.
-	 * @return WP_Post               Updated content
+	 * Update a post from either flickr cache or through API calls to flickr.
+	 * 
+	 * @param  WP_Post|integer $post      The post or its post ID.
+	 * @param  bool            $force_api whether or force API call or use the
+	 *                                    cache
+	 * @return WP_Post|false              Updated content
 	 */
-	static function update_flickr_post( $post ) {
+	static function update_flickr_post( $post, $force_api=false ) {
 		if ( !is_object( $post ) ) {
 			$post = get_post( $post );
 		}
+		if ( $post->post_type !== self::POST_TYPE ) { return false; }
 		$flickr_data = self::get_flickr_data( $post );
-		$flickr_data = self::_update_data_from_flickr( $flickr_data );
+		if ( $force_api ) {
+			$flickr_data = self::_update_data_from_flickr( $flickr_data );
+		}
 		$post_data = self::_post_data_from_flickr_data( $flickr_data );
 		$post_data['ID'] = $post->ID;
 

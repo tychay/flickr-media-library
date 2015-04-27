@@ -126,8 +126,7 @@ class FMLAdmin
 	/**
 	 * Add the admin menus for FML to /wp_admin
 	 */
-	public function create_admin_menus()
-	{
+	public function create_admin_menus() {
 		$this->_options_suffix = add_options_page(
 			__( 'Flickr Media Library Settings', FML::SLUG ),
 			__( 'Flickr Media Library', FML::SLUG ),
@@ -152,11 +151,10 @@ class FMLAdmin
 	 * Note that things like settings-updated=true will be handled by the
 	 * default things itself.
 	 */
-	public function handle_permalink_form()
-	{
-		if ( !empty($_POST[$this->_fml->permalink_slug_id]) ) {
+	public function handle_permalink_form() {
+		if ( !empty( $_POST[$this->_fml->permalink_slug_id] ) ) {
 			check_admin_referer('update-permalink');
-			$this->_fml->permalink_slug = urlencode($_POST[$this->_fml->permalink_slug_id]);
+			$this->_fml->permalink_slug = urlencode( $_POST[$this->_fml->permalink_slug_id] );
 		}
 		// pass through
 	}
@@ -165,8 +163,7 @@ class FMLAdmin
 	 * @param  [type] $args [description]
 	 * @return [type]       [description]
 	 */
-	public function render_permalink_field($args)
-	{
+	public function render_permalink_field($args) {
 		$slug = $this->_fml->permalink_slug;
 		printf(
 			'<input name="%1$s" id="%1$s" type="text" value="%2$s" class="regular-text code" />',
@@ -422,6 +419,25 @@ class FMLAdmin
 		// ONLY OPERATE ON FLICKR MEDIA
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
 
+		if ( isset( $_GET['post'] ) )
+		 	$post_id = $post_ID = (int) $_GET['post'];
+		elseif ( isset( $_POST['post_ID'] ) )
+		 	$post_id = $post_ID = (int) $_POST['post_ID'];
+		else
+		 	$post_id = $post_ID = 0;
+		// handle refresh
+		if ( !empty( $_POST['action'] ) && ( $_POST['action'] == 'refreshpost') && !empty($_POST['post_ID'] ) ) {
+			$post_id = (int) $_POST['post_ID'];
+			// verify nonce
+			check_admin_referer( 'update-post_' . $post_id );
+			// call API and update post from flickr data
+			FML::update_flickr_post( $post_id, true );
+			// update status: Don't get all fancy with the different messages,
+			// just say "updated"
+			$location = add_query_arg( 'message', 1, get_edit_post_link( $post_id, 'url' ) );
+			wp_redirect( apply_filters( 'redirect_post_location', $location, $post_id ) );
+			exit;
+		}
 		// EDITING EXISTING POST…
 		// Enqueue Settings-specific Javascript (controls screenoptions)
 		wp_enqueue_script(
@@ -562,7 +578,7 @@ class FMLAdmin
 				$this->_require_ajax_post( 'flickr_id' );
 				$post = FML::get_media_by_flickr_id( $_POST['flickr_id'] );
 				if ( $post ) {
-					FML::update_flickr_post($post);  //TODO: temporary repair of broken posts
+					//FML::update_flickr_post($post, true);  // uncomment to repair broken posts
 					$return = array(
 						'status'    => 'ok',
 						'flickr_id' => $_POST['flickr_id'],
