@@ -18,6 +18,9 @@
     display: none;
 }
 /* style tags tighter and more like flickr */
+.tagchecklist {
+    margin: 14px 0 0 0;
+}
 .tagchecklist span {
     margin-right: 0px;
     background-color: #cfd6d9;

@@ -455,7 +455,7 @@ class FMLAdmin
 			// media
 		);
 		add_action( 'edit_form_after_title', array( $this, 'edit_insert_post_content' ), 10, 1 );
-		//add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
+		add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
 	}
 	/**
 	 * Show the_content for the post in a box that is normally for TinyMCE
@@ -470,9 +470,15 @@ class FMLAdmin
 		//var_dump( wp_get_attachment_metadata( $post->ID ) );
 		include $this->_fml->template_dir.'/metabox.post_content.php';
 	}
+	/**
+	 * For some reason the slug metabox is showable. Make sure it isn't.
+	 * 
+	 * @return [type] [description]
+	 */
 	public function adding_edit_meta_boxes() {
-		//global $wp_meta_boxes;
-		//var_dump(get_current_screen(), $wp_meta_boxes);die;
+		global $wp_meta_boxes;
+		remove_meta_box( 'slugdiv', FML::POST_TYPE, 'normal' );
+		//var_dump($wp_meta_boxes);die;
 	}
 	// ADD NEW (post_new.php)
 	/**
