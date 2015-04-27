@@ -1420,7 +1420,7 @@ class FML implements FMLConstants
 			//'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
 			'post_content'   => $data['description']['_content'],
 			'post_title'     => $data['title']['_content'],
-			//'post_excerpt'   => //ALT TEXT
+			//'post_excerpt'   => // CAPTION
 			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
 			'comment_status' => 'closed', //comments should be on flickr page only
 			'ping_status'    => 'closed', //no pingbacks

@@ -409,8 +409,12 @@ class FMLAdmin
 	/**
 	 * Triggers on editing a custom post's edit screen (post.php)
 	 *
+	 * - handle user clicking on refresh button
 	 * - enqueue script that modifies edit form functionality
+	 * - enqueue css that modifies edit form look and functionality
 	 * - inject content in place of rich editor
+	 * - add action for handling alt text metabox
+	 * - queue in handler for adding and removing metaboxes
 	 * 
 	 * @return void
 	 */
@@ -419,12 +423,6 @@ class FMLAdmin
 		// ONLY OPERATE ON FLICKR MEDIA
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
 
-		if ( isset( $_GET['post'] ) )
-		 	$post_id = $post_ID = (int) $_GET['post'];
-		elseif ( isset( $_POST['post_ID'] ) )
-		 	$post_id = $post_ID = (int) $_POST['post_ID'];
-		else
-		 	$post_id = $post_ID = 0;
 		// handle refresh
 		if ( !empty( $_POST['action'] ) && ( $_POST['action'] == 'refreshpost') && !empty($_POST['post_ID'] ) ) {
 			$post_id = (int) $_POST['post_ID'];
@@ -438,6 +436,7 @@ class FMLAdmin
 			wp_redirect( apply_filters( 'redirect_post_location', $location, $post_id ) );
 			exit;
 		}
+
 		// EDITING EXISTING POST…
 		// Enqueue Settings-specific Javascript (controls screenoptions)
 		wp_enqueue_script(
@@ -455,7 +454,10 @@ class FMLAdmin
 			// media
 		);
 		add_action( 'edit_form_after_title', array( $this, 'edit_insert_post_content' ), 10, 1 );
+
 		add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
+		// register alt_text meta box handler
+		add_action( 'save_post', array( $this, 'handle_alt_meta_box_form' ) );
 	}
 	/**
 	 * Show the_content for the post in a box that is normally for TinyMCE
@@ -471,9 +473,11 @@ class FMLAdmin
 		include $this->_fml->template_dir.'/metabox.post_content.php';
 	}
 	/**
-	 * For some reason the slug metabox is showable. Make sure it isn't.
+	 * Change the metaboxes for the FML edit post page
 	 * 
-	 * @return [type] [description]
+	 * For some reason the slug metabox is on by default. Make sure it isn't.
+	 * 
+	 * @return void
 	 */
 	public function adding_edit_meta_boxes() {
 		global $wp_meta_boxes;
@@ -481,12 +485,20 @@ class FMLAdmin
 		// tweak post excerpt meta box as a "Caption" meta box
 		remove_meta_box( 'postexcerpt', FML::POST_TYPE, 'normal' );
 		add_meta_box(
-			'postexcerpt-caption',           // id attribute
-			__('Caption'),           // title in edit screen
+			'postexcerpt-caption',                   // id attribute
+			__( 'Caption' ),                         // title in edit screen
 			array( $this, 'post_excerpt_meta_box' ), // callback
-			FML::POST_TYPE,          // screen
-			'normal',                // context (part of page)
-			'core'                   // priority (within context)
+			FML::POST_TYPE,                          // screen
+			'normal',                                // context (part of page)
+			'core'                                   // priority (within context)
+		);
+		add_meta_box(
+			'attachment-image-alt',
+			__( 'Alt Text', FML::SLUG ),
+			array( $this, 'alt_meta_box' ),
+			FML::POST_TYPE,
+			'normal',
+			'core'
 		);
 		//var_dump($wp_meta_boxes);die;
 	}
@@ -498,10 +510,23 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function post_excerpt_meta_box( $post ) {
-?>
-<label class="screen-reader-text" for="excerpt"><?php _e('Caption') ?></label><textarea rows="1" cols="40" name="excerpt" id="excerpt"><?php echo $post->post_excerpt; // textarea_escaped ?></textarea>
-<p><?php _e( 'The default caption for this media, and the caption that shows on the the attachment page.', FML::SLUG ); ?></p>
-<?php
+		include $this->_fml->template_dir.'/metabox.post_excerpt.php';
+	}
+
+	public function handle_alt_meta_box_form( $post_id ) {
+		if ( isset( $_POST['image_alt_text'] ) ) {
+			update_post_meta( $post_id, '_wp_attachment_image_alt', $_POST['image_alt_text'] );
+		}
+	}
+	/**
+	 * Create a meta box for saving alt text.
+	 * 
+	 * @param  WP_Post $post post object
+	 * @return void
+	 */
+	public function alt_meta_box( $post ) {
+		$alt_text = get_post_meta( $post->ID, '_wp_attachment_image_alt', true );
+		include $this->_fml->template_dir.'/metabox.alt_text.php';
 	}
 	// ADD NEW (post_new.php)
 	/**
