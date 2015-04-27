@@ -943,7 +943,7 @@ class FML implements FMLConstants
 			);
 		}
 		$metadata['sizes']      = $sizes;
-		$metadata['image_meta'] = self::_wp_read_image_metadata($flickr_data);
+		//$metadata['image_meta'] = self::_wp_read_image_metadata( $flickr_data );
 		return $metadata;
 	}
 	/**
@@ -1238,13 +1238,28 @@ class FML implements FMLConstants
 
 		return get_post( $post->ID );
 	}
+	/**
+	 * Update post_meta fields managed by flickr (or emulated for attachments)
+	 * from flickr data
+	 * @param  int    $post_id     Flickr Media post id
+	 * @param  array  $flickr_data The flickr data to extract and write
+	 * @return void
+	 */
 	static private function _update_flickr_post_meta( $post_id, $flickr_data) {
 		$self = self::get_instance();
 
+		// flickr post metas
 		update_post_meta( $post_id, $self->post_metas['api_data'], $flickr_data );
 		update_post_meta( $post_id, $self->post_metas['flickr_id'], $flickr_data['id'] );
+
+		// emulated post metas
 		$img = self::_get_largest_image( $flickr_data );
 		update_post_meta( $post_id, '_wp_attached_file', $img['source'] );
+		// Let's store these because it is mildly "expensive" to compute
+		$meta = array(
+			'image_meta' => self::_wp_read_image_metadata( $flickr_data )
+		);
+		update_post_meta( $post_id, '_wp_attachment_metadata', $meta );
 	}
 	/**
 	 * Get the Flickr API data from post meta
