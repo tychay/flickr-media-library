@@ -1,0 +1,35 @@
+/* Don't allow editing of slug */
+#edit-slug-buttons {
+    display: none;
+}
+/* float refresh button to the right side */
+#refresh-action {
+    display: inline-block;
+    float: right;
+}
+/* Disable Tag editing */
+#post_tag .jaxtag {
+    display: none;
+}
+#post_tag .ntdelbutton {
+    display: none;
+}
+#link-post_tag {
+    display: none;
+}
+/* style tags tighter and more like flickr */
+.tagchecklist span {
+    margin-right: 0px;
+    background-color: #cfd6d9;
+    border-radius: 5px;
+    margin: 0 3px 3px 0;
+    padding: 0 3px;
+}
+/*
+.tagchecklist span:after{
+    content: ", ";
+}
+.tagchecklist span:last-child:after {
+    content: "",;
+}
+*/

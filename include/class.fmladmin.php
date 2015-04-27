@@ -447,6 +447,13 @@ class FMLAdmin
 			FML::VERSION, //version
 			true //in footer?
 		);
+		wp_enqueue_style(
+			FML::SLUG.'-hack-post',
+			$this->_fml->static_url.'/css/admin-post.css'//,
+			// deps
+			// ver
+			// media
+		);
 		add_action( 'edit_form_after_title', array( $this, 'edit_insert_post_content' ), 10, 1 );
 		//add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
 	}
@@ -460,6 +467,7 @@ class FMLAdmin
 		// use the side effect that we know $post is also the global
 		$content = apply_filters('the_content', $post->post_content);
 		$content = str_replace(']]>', ']]&gt;', $content);
+		//var_dump( wp_get_attachment_metadata( $post->ID ) );
 		include $this->_fml->template_dir.'/metabox.post_content.php';
 	}
 	public function adding_edit_meta_boxes() {
