@@ -128,7 +128,7 @@ class FML implements FMLConstants
 				//'name_admin_bar'     => __( 'name_admin_bar', self::SLUG ), //as post appears in the + New part of the admin bar
 				'add_new'            => __( 'Import New', self::SLUG ), // name for "add new" menu and button using lang space, so no need to use context
 				'add_new_item'       => __( 'Add New Flickr Media', self::SLUG ),
-				//'edit_item'          => __( 'edit_item', self::SLUG ),
+				'edit_item'          => __( 'Edit Flickr Media', self::SLUG ),
 				//'new_items'          => __( 'new_items', self::SLUG ),
 				'search_items'       => __( 'Search Flickr Media', self::SLUG ),
 				'not_found'          => __( 'No Flickr media found', self::SLUG ),
@@ -390,6 +390,8 @@ class FML implements FMLConstants
 		$post = get_post();
 		if ( empty($post->post_type) || $post->post_type != self::POST_TYPE ) { return $content; }
 
+		// show the medium sized image representation of the attachment if available, and link to the raw file
+		//$p .= wp_get_attachment_link(0, 'medium', false);
 		/**
 		 * Filter shortcode content for processing in prepend_media()
 		 *
@@ -411,11 +413,17 @@ class FML implements FMLConstants
 			'img_size' => 'Medium',
 			'link'     => 'flickr',
 		) );
-		$p = '<p class="attachment">';
-		// show the medium sized image representation of the attachment if available, and link to the raw file
-		//$p .= wp_get_attachment_link(0, 'medium', false);
-		$p .= $this->shortcode( $shortcode_attrs, $shortcode_content );
-		$p .= '</p>';
+		$p = $this->shortcode( $shortcode_attrs, $shortcode_content );
+		// append caption if available
+		if ( $caption_text = $post->post_excerpt ) {
+			$attr = array(
+				'id'      => self::SLUG.'-attachment',
+				'width'   => self::_get_width_from_flickr_size( $shortcode_attrs['img_size'] ),
+				'caption' => $caption_text,
+				//'align'   => 'aligncenter',
+			);
+			$p = img_caption_shortcode( $attr, $p );
+		}
 		$p = apply_filters( 'prepend_attachment', $p );
 
 		return "$p\n$content";
@@ -1492,6 +1500,23 @@ class FML implements FMLConstants
 		// original is invalid
 		return $sizes[ $count_img_sizes-2 ];
 	}
+	static private function _get_width_from_flickr_size( $size_string ) {
+		switch ( strtolower($size_string) ) {
+			case 'square': return 75;
+			case 'large square': return 150;
+			case 'thumbnail': return 100;
+			case 'small': return 240;
+			case 'small 320': return 320;
+			case 'medium': return 500;
+			case 'medium 640': return 640;
+			case 'medium 800': return 800;
+			case 'large': return 1024;
+			case 'large 1600': return 1600;
+			case 'large 2048': return 2048;
+			default: return 500;
+		}
+	}
+
 	/**
 	 * Turn a flickr photo into an image tag.
 	 *
@@ -1504,20 +1529,7 @@ class FML implements FMLConstants
 		$src = '';
 		$size_offset = 1000000;
 		if ( !is_numeric( $default_size ) ) {
-			switch ( strtolower($default_size) ) {
-				case 'square': $default_size=75; break;
-				case 'large square': $default_size=150;break;
-				case 'thumbnail': $default_size=100; break;
-				case 'small': $default_size=240; break;
-				case 'small 320': $default_size=320; break;
-				case 'medium': $default_size=500; break;
-				case 'medium 640': $default_size=640; break;
-				case 'medium 800': $default_size=800; break;
-				case 'large': $default_size=1024; break;
-				case 'large 1600': $default_size=1600; break;
-				case 'large 2048': $default_size=2048; break;
-				default: $default_size=500; break;
-			}
+			$default_size = self::_get_width_from_flickr_size( $default_size );
 		}
 		foreach ( $sizes as $size ) {
 			// handle original
