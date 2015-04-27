@@ -478,7 +478,30 @@ class FMLAdmin
 	public function adding_edit_meta_boxes() {
 		global $wp_meta_boxes;
 		remove_meta_box( 'slugdiv', FML::POST_TYPE, 'normal' );
+		// tweak post excerpt meta box as a "Caption" meta box
+		remove_meta_box( 'postexcerpt', FML::POST_TYPE, 'normal' );
+		add_meta_box(
+			'postexcerpt-caption',           // id attribute
+			__('Caption'),           // title in edit screen
+			array( $this, 'post_excerpt_meta_box' ), // callback
+			FML::POST_TYPE,          // screen
+			'normal',                // context (part of page)
+			'core'                   // priority (within context)
+		);
 		//var_dump($wp_meta_boxes);die;
+	}
+	/**
+	 * Just like the normal post excerpt meta box, except they're called
+	 * Captions and set the default caption text
+	 * 
+	 * @param  WP_Post $post post object
+	 * @return void
+	 */
+	public function post_excerpt_meta_box( $post ) {
+?>
+<label class="screen-reader-text" for="excerpt"><?php _e('Caption') ?></label><textarea rows="1" cols="40" name="excerpt" id="excerpt"><?php echo $post->post_excerpt; // textarea_escaped ?></textarea>
+<p><?php _e( 'The default caption for this media, and the caption that shows on the the attachment page.', FML::SLUG ); ?></p>
+<?php
 	}
 	// ADD NEW (post_new.php)
 	/**
