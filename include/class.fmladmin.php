@@ -48,6 +48,7 @@ class FMLAdmin
 	private $_fml_upload_id = '';
 	/**
 	 * Plugin Admin function initialization 
+	 * 
 	 * @param \FML\FML $fml the FML plugin object
 	 */
 	public function __construct($fml) {
@@ -98,7 +99,8 @@ class FMLAdmin
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
 		add_action( 'media_upload_'.$this->_fml_upload_id, array( $this, 'get_media_upload_iframe' ) );
-		add_action( 'load-post.php', array( $this, 'loading_edit') );
+		add_action( 'load-post.php', array( $this, 'loading_post') );
+		add_action( 'load-post-new.php', array( $this, 'loading_post_new') );
 	}
 	/**
 	 * Admin init.
@@ -107,14 +109,13 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function init()
-	{
+	public function init() {
 		// "As of WordPress 4.1, this function does not save settings if added to the permalink page."
 		//register_setting( 'permalink', $this->_fml->permalink_slug_id, 'urlencode');
 		add_settings_field(
 			$this->_fml->permalink_slug_id,
-			__('Flickr Media base', FML::SLUG), //title
-			array($this, 'render_permalink_field'), //form render callback
+			__( 'Flickr Media base', FML::SLUG ), //title
+			array( $this, 'render_permalink_field' ), //form render callback
 			'permalink', //page
 			'optional', // section
 			array( //args
@@ -128,14 +129,14 @@ class FMLAdmin
 	public function create_admin_menus()
 	{
 		$this->_options_suffix = add_options_page(
-			__('Flickr Media Library Settings', FML::SLUG),
-			__('Flickr Media Library', FML::SLUG),
+			__( 'Flickr Media Library Settings', FML::SLUG ),
+			__( 'Flickr Media Library', FML::SLUG ),
 			'manage_options',
 			$this->_options_page_id,
 			array( $this, 'show_settings_page' )
 		);
 		if ( $this->_options_suffix ) {
-			add_action( 'load-'.$this->_options_suffix, array($this, 'loading_settings') );
+			add_action( 'load-'.$this->_options_suffix, array( $this, 'loading_settings' ) );
 		}
 	}
 	//
@@ -198,18 +199,17 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function loading_settings()
-	{
+	public function loading_settings() {
 	 	// Handle an oAuth callback to the options page [Steps 5-7]
-		if ( !empty($_GET['oauth_verifier']) ) {
-			if ( $this->_fml->flickr->authenticate('read') ) {
+		if ( !empty( $_GET['oauth_verifier'] ) ) {
+			if ( $this->_fml->flickr->authenticate( 'read' ) ) {
 				// save flickr authentication
 				$this->_fml->save_flickr_authentication();
 				// Note auth succeeded
 				add_settings_error(
 					FML::SLUG, //setting name
 					FML::SLUG.'-flickr-auth', //id
-					__('Flickr authorization successful.', FML::SLUG),
+					__( 'Flickr authorization successful.', FML::SLUG ),
 					'updated fade'
 					);
 				//echo '<plaintext>'; var_dump($flickr); die('Yah!');
@@ -218,7 +218,7 @@ class FMLAdmin
 				add_settings_error(
 					FML::SLUG, //setting name
 					FML::SLUG.'-flickr-auth', //id
-					__('Oops, something went wrong whilst trying to authorize access to Flickr.', FML::SLUG)
+					__( 'Oops, something went wrong whilst trying to authorize access to Flickr.', FML::SLUG )
 					);
 				// TODO: note auth failed
 				//echo '<plaintext>'; var_dump($flickr); die('Whoops!');
@@ -227,23 +227,23 @@ class FMLAdmin
 		// Handle form posts that are not otherwise supported
 		// - authorize: oAuth with Flickr
 		// - deauthorize: remove oAuth settings
-		if ( !empty($_POST['action']) ) {
-			switch ($_POST['action']) {
+		if ( !empty( $_POST['action'] ) ) {
+			switch ( $_POST['action'] ) {
 				// Handle form action = authorize (_flickr_auth_form_id) [Steps 1-3]
 				case $this->_flickr_auth_form_id:
 					check_admin_referer( $this->_flickr_auth_form_id . '-verify' );
 					$this->_fml->clear_flickr_authentication();
-					if ( array_key_exists('flickr_apikey', $_POST) ) {
+					if ( array_key_exists( 'flickr_apikey', $_POST ) ) {
 						if ( $_POST['flickr_apikey'] ) {
-							$settings = array('flickr_api_key' => $_POST['flickr_apikey']);
+							$settings = array( 'flickr_api_key' => $_POST['flickr_apikey'] );
 						} else {
 							// empty api field = reset to default
-							$settings = array('flickr_api_key' => FML::_FLICKR_API_KEY);
+							$settings = array( 'flickr_api_key' => FML::_FLICKR_API_KEY );
 						}
 						// If API key is default, keep correct secret no matter what
 						if ( $_POST['flickr_apikey'] == FML::_FLICKR_API_KEY ) {
 							$settings['flickr_api_secret'] = FML::_FLICKR_SECRET;
-						} elseif ( !empty($_POST['flickr_apisecret']) ) {
+						} elseif ( !empty( $_POST['flickr_apisecret'] ) ) {
 							$settings['flickr_api_secret'] = $_POST['flickr_apisecret'];
 						}
 						$this->_fml->update_settings($settings);
@@ -253,12 +253,12 @@ class FMLAdmin
 					// sign out and re-auth
 					$flickr = $this->_fml->flickr;
 					$flickr->signOut();
-					if ( !$flickr->authenticate('read') ) {
+					if ( !$flickr->authenticate( 'read' ) ) {
 						// Note auth failed (during request)
 						add_settings_error(
 							FML::SLUG, //setting name
 							FML::SLUG.'-flickr-auth', //id
-							__('Oops, something went wrong whilst trying to authorize access to Flickr.', FML::SLUG)
+							__( 'Oops, something went wrong whilst trying to authorize access to Flickr.', FML::SLUG )
 							);
 						//echo '<plaintext>'; var_dump($flickr); die('Shit!');
 					}
@@ -286,16 +286,16 @@ class FMLAdmin
 			'id'       => FML::SLUG.'-flickrauth',
 			'title'    => __('Flickr authorization', FML::SLUG),
 			'content'  => '',
-			'callback' => array($this,'show_settings_help_flickrauth')
+			'callback' => array( $this, 'show_settings_help_flickrauth' ),
 		));
-		$screen->set_help_sidebar($this->_get_settings_help_sidebar());
+		$screen->set_help_sidebar( $this->_get_settings_help_sidebar() );
 		// Add Settings custom control to screen options tab
-		add_filter('screen_settings',array($this,'filter_settings_screen_options'),10,2);
+		add_filter('screen_settings',array( $this, 'filter_settings_screen_options' ), 10, 2 );
 		// Enqueue Settings-specific Javascript (controls screenoptions)
 		wp_enqueue_script(
 			FML::SLUG.'-screen-settings', //handle
 			$this->_fml->static_url.'/js/admin-settings.js', //src
-			array('jquery'), //dependencies ajax
+			array( 'jquery' ), //dependencies ajax
 			FML::VERSION, //version
 			true //in footer?
 		);
@@ -306,24 +306,21 @@ class FMLAdmin
 	 * Render the default help tab for settings
 	 * @return void
 	 */
-	public function show_settings_help_default()
-	{
+	public function show_settings_help_default() {
 		include $this->_fml->template_dir.'/help.settings-overview.php';
 	}
 	/**
 	 * Render the "Flickr Authorization" help tab for plugin settings page.
 	 * @return void
 	 */
-	public function show_settings_help_flickrauth()
-	{
+	public function show_settings_help_flickrauth() {
 		include $this->_fml->template_dir.'/help.settings-flickrauth.php';
 	}
 	/**
 	 * Return contents of the help sidebar in the plugin settings page
 	 * @return string
 	 */
-	private function _get_settings_help_sidebar()
-	{
+	private function _get_settings_help_sidebar() {
 		ob_start();
 		include $this->_fml->template_dir.'/help.settings-sidebar.php';
 		return ob_get_clean();
@@ -335,8 +332,7 @@ class FMLAdmin
 	 * @param WP_SCREEN $screen the screen object that triggered this
 	 * @return  string form element html to tack to the end of screen options
 	 */
-	public function filter_settings_screen_options($screen_settings, $screen)
-	{
+	public function filter_settings_screen_options($screen_settings, $screen) {
 		// We should only be triggered if in the right screen already
 		$form_html = sprintf(
 			'<div class="%1$s %4$s"><label for="%1$s-toggle"><input type="checkbox" id="%1$s-toggle"%2$s/>%3$s</label></div>',
@@ -355,9 +351,8 @@ class FMLAdmin
 	 * @return mixed the value to set the screen option to (if false, don't save at all)
 	 */
 	/*
-	public function filter_settings_set_screen_options($status, $option, $value)
-	{
-		if ($option == $this->_flickr_apikey_option_name) {
+	public function filter_settings_set_screen_options($status, $option, $value) {
+		if ( $option == $this->_flickr_apikey_option_name ) {
 			return $value;
 		}
 		// pass through filter
@@ -366,13 +361,15 @@ class FMLAdmin
 	*/
 	/**
 	 * hide/show API key + secret screen option settings coming via ajax
+	 *
+	 * @todo  probably needs moving somewhere else
 	 */
 	public function handle_ajax_option_setapi() {
 		// we are pirating the nonce created in screen for screen options :-)
-		check_ajax_referer('screen-options-nonce','screenoptionnonce');
+		check_ajax_referer( 'screen-options-nonce', 'screenoptionnonce' );
 		//var_dump($_POST);
-		if ( !empty($_POST[$this->_flickr_apikey_option_name]) ) {
-			set_user_setting($this->_flickr_apikey_option_name, $_POST[$this->_flickr_apikey_option_name]);
+		if ( !empty( $_POST[$this->_flickr_apikey_option_name] ) ) {
+			set_user_setting( $this->_flickr_apikey_option_name, $_POST[$this->_flickr_apikey_option_name] );
 			//die('here :-)');
 		}
 		//die('there :-(');
@@ -380,12 +377,11 @@ class FMLAdmin
 	/**
 	 * Show the Settings (Options) page which allows you to do Flickr oAuth.
 	 */
-	public function show_settings_page()
-	{
+	public function show_settings_page() {
 		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 		//$flickr = $this->_fml->flickr;
 		$settings = $this->_fml->settings;
-		$this_page_url = 'options-general.php?page=' . urlencode($this->_options_page_id);
+		$this_page_url = 'options-general.php?page=' . urlencode( $this->_options_page_id );
 		$api_form_slug = FML::SLUG.'-apiform';
 		$api_secret_attr = ( $settings['flickr_api_secret'] == FML::_FLICKR_SECRET )
 		                 ? ''
@@ -401,35 +397,32 @@ class FMLAdmin
 	 * @param  array $actions object to be filtered
 	 * @return array the $actions array with the link injected into it
 	 */
-	public function filter_plugin_settings_links( $actions, $plugin_file )
-	{
+	public function filter_plugin_settings_links( $actions, $plugin_file ) {
 		$actions[] = sprintf(
 			'<a href="%s">%s</a>',
-			admin_url('options-general.php?page='.FML::SLUG.'-settings'),
+			esc_attr( admin_url( 'options-general.php?page='.FML::SLUG.'-settings' ) ),
 			__('Settings')
 			);
 		return $actions;
 	}
 	// 
-	// EDIT CUSTOM POST PAGE
+	// CUSTOM POST PAGES
 	// 
+	// EDIT (post.php)
 	/**
-	 * Triggers on editing a custom post's edit screen
+	 * Triggers on editing a custom post's edit screen (post.php)
+	 *
+	 * - enqueue script that modifies edit form functionality
+	 * - inject content in place of rich editor
 	 * 
-	 * @return [type] [description]
+	 * @return void
 	 */
-	public function loading_edit() {
+	public function loading_post() {
 		$screen = get_current_screen();
 		// ONLY OPERATE ON FLICKR MEDIA
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
-		// "ADD NEW" POST
-		if ( $screen->action == 'add' ) {
-			//TODO: add-new, redirect to another sceen most likely
-			wp_die('TODO: Need to add flickr importer');
-		}
 
 		// EDITING EXISTING POST…
-		
 		// Enqueue Settings-specific Javascript (controls screenoptions)
 		wp_enqueue_script(
 			FML::SLUG.'-hack-post', //handle
@@ -469,59 +462,60 @@ class FMLAdmin
 		//global $wp_meta_boxes;
 		//var_dump(get_current_screen(), $wp_meta_boxes);die;
 	}
+	// ADD NEW (post_new.php)
+	/**
+	 * Triggers on clicking "add new" for custom post
+	 * 
+	 * @return void
+	 */
+	public function loading_post_new() {
+		$screen = get_current_screen();
+		// ONLY OPERATE ON FLICKR MEDIA
+		if ( $screen->post_type != FML::POST_TYPE ) { return; }
+		wp_die('TODO: Need to add flickr importer');
+
+		// Adding to current post
+	}
 	//
 	// MEDIA UPLOAD IFRAME
 	// 
 	/**
 	 * Client side flickr request signing service (via ajax)
 	 */
-	public function handle_ajax_sign_request()
-	{
+	public function handle_ajax_sign_request() {
 		// This nonce is created in the page.flickr-upload-form.php template
 		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 401, //HTTP code for unauthorized
-				'reason' => sprintf(
-					__('Missing or incorrect nonce %s=%s',FML::SLUG),
-					'_ajax_nonce',
-					( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
-				),
-			));
+			$this->_send_json_fail( 401, sprintf(
+				__( 'Missing or incorrect nonce %s=%s', FML::SLUG ),
+				'_ajax_nonce',
+				( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
+			) );
 			//dies
 		}
 		if ( empty( $_POST['request_data']) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 400, //HTTP code bad request
-				'reason' => sprintf(
-					__('Missing parameter: %s',FML::SLUG),
-					'request_data'
-				),
-			));
+			$this->_send_json_fail( 400, sprintf( //HTTP code bad request
+				__( 'Missing parameter: %s', FML::SLUG ),
+				'request_data'
+			) );
 			//dies
 		}
-		$json = @json_decode(stripslashes($_POST['request_data']));
-		if ( empty($json) || !is_object($json) ) {
-			wp_send_json(array(
-				'status' => 'fail',
-				'code'   => 400, //HTTP code bad request
-				'reason' => sprintf(
-					__('Invalid JSON input: %s',FML::SLUG),
-					$_POST['request_data']
-				),
-			));
+		$json = @json_decode( stripslashes( $_POST['request_data'] ) );
+		if ( empty( $json ) || !is_object( $json ) ) {
+			$this->_send_json_fail( 400, sprintf( //HTTP code bad request
+				__( 'Invalid JSON input: %s', FML::SLUG ),
+				$_POST['request_data']
+			) );
 			//dies
 		}
 
 		$json->api_key = $this->_fml->settings['flickr_api_key'];
-		wp_send_json(array(
+		wp_send_json( array(
 			'status' => 'ok',
 			'signed' => $this->_fml->flickr->getSignedUrlParams(
 				$json->method,
 				get_object_vars($json)
 			),
-		));
+		) );
 		//header('Content-type: application/json');
 		//echo json_encode($return);
 		//die();
@@ -546,8 +540,7 @@ class FMLAdmin
 	 * - send_attachment_to_editor: emulates wp_send_atttachment_to_editor()
 	 *   for flickr media library posts
 	 */
-	public function handle_ajax()
-	{
+	public function handle_ajax() {
 		//print_r($_POST);
 		$this->_require_ajax_post( 'method' );
 		switch ( $_POST['method'] ) {
@@ -936,10 +929,10 @@ class FMLAdmin
 	/**
 	 * Are we viewing the plugin settings page?
 	 * @return boolean true if viewing optiosn page
+	 * @todo  replace this with init hook
 	 */
-	private function _in_options_page()
-	{
-		return $this->_in_page('options-general.php', $this->_options_page_id);
+	private function _in_options_page() {
+		return $this->_in_page( 'options-general.php', $this->_options_page_id );
 	}
 	/**
 	 * What admin page are we in?
@@ -947,8 +940,7 @@ class FMLAdmin
 	 * @param  string $submenu submenu name
 	 * @return boolean
 	 */
-	private function _in_page($menu, $submenu)
-	{
+	private function _in_page($menu, $submenu) {
 		if ( strpos(basename($_SERVER['PHP_SELF']), $menu) !== 0 ) {return false; }
 		if ( empty($submenu) ) { return true; }
 		if ( !isset($_GET['page']) ) { return false; }
