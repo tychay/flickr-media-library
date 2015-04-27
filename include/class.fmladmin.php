@@ -441,22 +441,10 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function edit_insert_post_content($post) {
-		echo '<div id="postdivrich" class="postarea wp-editor-expand">';
-		//$post = $GLOBALS['post'];
-		// Because the_content filters (like prepend_media) may need access to
-		// get_post(), we need to be a bit clever else we depend on the global
-		// being set properly by accident (which it is in this case, but who
-		// knows).
-		/*
-		$temp_post = $GLOBALS['post'];
-		$GLOBALS['post'] = $post;
-		the_content();
-		$GLOBALS['post'] = $temp_post;
-		*/
+		// use the side effect that we know $post is also the global
 		$content = apply_filters('the_content', $post->post_content);
 		$content = str_replace(']]>', ']]&gt;', $content);
-		echo $content;
-		echo '</div>';
+		include $this->_fml->template_dir.'/metabox.post_content.php';
 	}
 	public function adding_edit_meta_boxes() {
 		//global $wp_meta_boxes;
