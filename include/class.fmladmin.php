@@ -58,7 +58,6 @@ class FMLAdmin
 	 * - Add menu pages (e.g. Settings) to admin menu 
 	 * - Plugins: Add link to Settings page to Plugin Page
 	 * - Settings > Permalink: Add handling of permalink form to Permalink page 
-	 * - Settings: If in Settings page, register plugin Settings page as Flickr callback for Auth
 	 * - AJAX: Add various ajax servers
 	 * - Media Library: Add init handlers for custom post pages
 	 * - Media Upload: Add tab to media upload button
@@ -74,15 +73,6 @@ class FMLAdmin
 		add_filter( 'plugin_action_links_'.$this->_fml->plugin_basename, array($this, 'filter_plugin_settings_links'), 10, 2 );
 		// Add set permalink form to Permalink page 
 		add_action( 'load-options-permalink.php', array( $this, 'handle_permalink_form') );
-		// If in Settings page register plugin Settings page as Flickr callback
-		// for auth
-		if ( $this->_in_options_page() ) {
-			$this->_fml->flickr_callback = admin_url(sprintf(
-				'options-general.php?page=%s',
-				urlencode($this->_ids['page_options'])
-				// do i need more parameters to detect flickr callback?
-			));
-		}
 		// Add ajax servers
 		add_action( 'wp_ajax_'.$this->_ids['ajax_action'], array($this, 'handle_ajax') );
 		// - for handling ajax api options
@@ -180,6 +170,7 @@ class FMLAdmin
 	/**
 	 * Loading the settings page:
 	 *
+	 * - Register this page as Flickr callback for Auth
 	 * - Handle an oAuth callback to the options page
 	 * - Handle form action = authorize (_ids[form_flickr_auth])
 	 * - Handle form action = deauthorize (_ids[form_flickr_deauth])
@@ -200,6 +191,12 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function loading_settings() {
+		// Register this page as the Flickr callback for oAuth
+		$this->_fml->flickr_callback = admin_url(sprintf(
+			'options-general.php?page=%s',
+			urlencode($this->_ids['page_options'])
+			// do i need more parameters to detect flickr callback?
+		));
 	 	// Handle an oAuth callback to the options page [Steps 5-7]
 		if ( !empty( $_GET['oauth_verifier'] ) ) {
 			if ( $this->_fml->flickr->authenticate( 'read' ) ) {
@@ -627,47 +624,6 @@ class FMLAdmin
 	// MEDIA UPLOAD IFRAME
 	// 
 	/**
-	 * Client side flickr request signing service (via ajax)
-	 */
-	public function handle_ajax_sign_request() {
-		// This nonce is created in the page.flickr-upload-form.php template
-		if ( !check_ajax_referer(FML::SLUG.'-flickr-search-verify','_ajax_nonce',false) ) {
-			$this->_send_json_fail( 401, sprintf(
-				__( 'Missing or incorrect nonce %s=%s', FML::SLUG ),
-				'_ajax_nonce',
-				( empty($_POST['_ajax_nonce']) ) ? '' : $_POST['_ajax_nonce']
-			) );
-			//dies
-		}
-		if ( empty( $_POST['request_data']) ) {
-			$this->_send_json_fail( 400, sprintf( //HTTP code bad request
-				__( 'Missing parameter: %s', FML::SLUG ),
-				'request_data'
-			) );
-			//dies
-		}
-		$json = @json_decode( stripslashes( $_POST['request_data'] ) );
-		if ( empty( $json ) || !is_object( $json ) ) {
-			$this->_send_json_fail( 400, sprintf( //HTTP code bad request
-				__( 'Invalid JSON input: %s', FML::SLUG ),
-				$_POST['request_data']
-			) );
-			//dies
-		}
-
-		$json->api_key = $this->_fml->settings['flickr_api_key'];
-		wp_send_json( array(
-			'status' => 'ok',
-			'signed' => $this->_fml->flickr->getSignedUrlParams(
-				$json->method,
-				get_object_vars($json)
-			),
-		) );
-		//header('Content-type: application/json');
-		//echo json_encode($return);
-		//die();
-	}
-	/**
 	 * Process all client side ajax requests
 	 *
 	 * The following parameters are required in $_POST
@@ -1077,26 +1033,5 @@ class FMLAdmin
 			$constants['msgs_add_btn']['insert'] = ( $hier ) ? __( 'Insert into page' ) : __( 'Insert into post' );
 		}
 		return $constants;
-	}
-	/**
-	 * Are we viewing the plugin settings page?
-	 * @return boolean true if viewing optiosn page
-	 * @todo  replace this with init hook
-	 */
-	private function _in_options_page() {
-		return $this->_in_page( 'options-general.php', $this->_ids['page_options'] );
-	}
-	/**
-	 * What admin page are we in?
-	 * @param  string $menu    menu page url or part of the url
-	 * @param  string $submenu submenu name
-	 * @return boolean
-	 */
-	private function _in_page($menu, $submenu) {
-		if ( strpos(basename($_SERVER['PHP_SELF']), $menu) !== 0 ) {return false; }
-		if ( empty($submenu) ) { return true; }
-		if ( !isset($_GET['page']) ) { return false; }
-		if ( strpos($_GET['page'], $submenu) !== 0 ) { return false; }
-		return true;
 	}
 }
