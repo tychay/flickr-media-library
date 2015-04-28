@@ -495,18 +495,7 @@ class FMLAdmin
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
 
 		// handle refresh
-		if ( !empty( $_POST['action'] ) && ( $_POST['action'] == 'refreshpost') && !empty($_POST['post_ID'] ) ) {
-			$post_id = (int) $_POST['post_ID'];
-			// verify nonce
-			check_admin_referer( 'update-post_' . $post_id );
-			// call API and update post from flickr data
-			FML::update_flickr_post( $post_id, true );
-			// update status: Don't get all fancy with the different messages,
-			// just say "updated"
-			$location = add_query_arg( 'message', 1, get_edit_post_link( $post_id, 'url' ) );
-			wp_redirect( apply_filters( 'redirect_post_location', $location, $post_id ) );
-			exit;
-		}
+		add_action( 'admin_action_refreshpost', array( $this, 'handle_refresh_post' ) );
 
 		// EDITING EXISTING POST…
 		// Enqueue Settings-specific Javascript (controls screenoptions)
@@ -529,6 +518,24 @@ class FMLAdmin
 		add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
 		// register alt_text meta box handler
 		add_action( 'save_post', array( $this, 'handle_alt_meta_box_form' ) );
+	}
+	/**
+	 * Handle form request to refresh flickr media custom post from flickr
+	 * @return void
+	 */
+	public function handle_refresh_post() {
+		if ( empty( $_POST['post_ID'] ) ) { return; }
+		$post_id = (int) $_POST['post_ID'];
+
+		// verify nonce
+		check_admin_referer( 'update-post_' . $post_id );
+		// call API and update post from flickr data
+		FML::update_flickr_post( $post_id, true );
+		// update status: Don't get all fancy with the different messages,
+		// just say "updated"
+		$location = add_query_arg( 'message', 1, get_edit_post_link( $post_id, 'url' ) );
+		wp_redirect( apply_filters( 'redirect_post_location', $location, $post_id ) );
+		exit; // for some reason the wp_redirect() doesn't actually exit. :-(
 	}
 	/**
 	 * Show the_content for the post in a box that is normally for TinyMCE
