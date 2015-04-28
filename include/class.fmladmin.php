@@ -84,7 +84,10 @@ class FMLAdmin
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
 		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array( $this, 'get_media_upload_iframe' ) );
-		add_action( 'wp_enqueue_media', array( $this, 'wp_enqueue_media') );
+		//add_action( 'wp_enqueue_media', array( $this, 'wp_enqueue_media') );
+		// This is called in three places (post.php, post-new.php and ajax), so
+		// let's do it here
+		add_action( 'admin_post_thumbnail_html', array( $this, 'filter_admin_post_thumbnail_html' ), 10, 2 );
 	}
 	/**
 	 * Admin init.
@@ -961,6 +964,44 @@ class FMLAdmin
 		$admin_img_dir_url = admin_url( 'images/' );
 
 		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
+	}
+	//
+	// POST THUMBNAIL STUFF
+	//
+	/**
+	 * The way we support post thumbnails (currently) is by injecting a thickbox
+	 * link to a FML chooser into the post_thumbnail metabox (and ajax
+	 * generation of metabox).
+	 *
+	 * This hook, in its (non-infinite) wisdom doesn't realize that $post_id is
+	 * theoretically useless without the thumbnail id as this hook could be
+	 * called before the set_post_thumbnail(). Luckily, it currently isn't so
+	 * instead of doing some regex parsing of $html, let's assume that the
+	 * $thumbnail_id is going to be the get_post_thumbnail_id().
+	 * 
+	 * @param  string  $html    The metabox html
+	 * @param  integer $post_id the post_id to inject it to
+	 * @return string           The metabox html with (possible) link to FML importer
+	 */
+	function filter_admin_post_thumbnail_html( $html, $post_id ) {
+		$thumbnail_id = get_post_thumbnail_id( $post_id );
+		// A remove link is a remove link is a remove link
+		if ( $thumbnail_id ) { return $html; }
+		$url = admin_url( sprintf(
+			// media upload iframe: http://terrychay.dev/wp-admin/media-upload.php?chromeless=1&post_id=6209&tab=flickr_media_library_insert_flickr
+			// set post thumbnail tb: http://terrychay.dev/wp-admin/media-upload.php?post_id=6209&amp;type=image&amp;TB_iframe=1
+			'media-upload.php?chromeless=1&post_id=%d&tab=flickr_media_library_insert_flickr&for=post_thumbnail',
+			$post_id
+		) );
+		$html .= sprintf(
+			'<a class="thickbox" id="%s-set-post-thumbnail" href="%s" title="%s">%s</a>',
+			FML::SLUG,
+			esc_attr($url),
+			esc_attr__( 'Set featured image from flickr', FML::SLUG ),
+			esc_html__( 'Set featured image from flickr', FML::SLUG )
+		);
+		//<a class="thickbox" id="set-post-thumbnail" href="http://terrychay.dev/wp-admin/media-upload.php?post_id=6209&amp;type=image&amp;TB_iframe=1" title="Set featured image">Set featured image</a>
+		return $html;
 	}
 	//
 	// UTILITY FUNCTIONS

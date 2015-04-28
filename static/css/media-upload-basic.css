@@ -34,7 +34,7 @@
 .media-upload-form {
     margin-top: 40px; /* for some reason the form output is too close to the media items */
 }
-li.attachment {
+.wp-core-ui .attachment, li.attachment {
     width: 100px; /* used fixed widths for flickr sq thumbnails */
 }
 .attachment-info .thumbnail, .attachment-info .thumbnail img {
