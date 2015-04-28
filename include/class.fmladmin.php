@@ -223,49 +223,9 @@ class FMLAdmin
 		}
 		// Handle form posts that are not otherwise supported
 		// - authorize: oAuth with Flickr
+		add_action( 'admin_action_'.$this->_ids['form_flickr_auth'], array( $this, 'handle_auth_form') );
 		// - deauthorize: remove oAuth settings
-		if ( !empty( $_POST['action'] ) ) {
-			switch ( $_POST['action'] ) {
-				// Handle form action = authorize (_ids[form_flickr_auth]) [Steps 1-3]
-				case $this->_ids['form_flickr_auth']:
-					check_admin_referer( $this->_ids['form_flickr_auth'] . '-verify' );
-					$this->_fml->clear_flickr_authentication();
-					if ( array_key_exists( 'flickr_apikey', $_POST ) ) {
-						if ( $_POST['flickr_apikey'] ) {
-							$settings = array( 'flickr_api_key' => $_POST['flickr_apikey'] );
-						} else {
-							// empty api field = reset to default
-							$settings = array( 'flickr_api_key' => FML::_FLICKR_API_KEY );
-						}
-						// If API key is default, keep correct secret no matter what
-						if ( $_POST['flickr_apikey'] == FML::_FLICKR_API_KEY ) {
-							$settings['flickr_api_secret'] = FML::_FLICKR_SECRET;
-						} elseif ( !empty( $_POST['flickr_apisecret'] ) ) {
-							$settings['flickr_api_secret'] = $_POST['flickr_apisecret'];
-						}
-						$this->_fml->update_settings($settings);
-						// Just in case the flickr object has already been initialized....
-						$this->_fml->reset_flickr();
-					}
-					// sign out and re-auth
-					$flickr = $this->_fml->flickr;
-					$flickr->signOut();
-					if ( !$flickr->authenticate( 'read' ) ) {
-						// Note auth failed (during request)
-						add_settings_error(
-							FML::SLUG, //setting name
-							FML::SLUG.'-flickr-auth', //id
-							__( 'Oops, something went wrong whilst trying to authorize access to Flickr.', FML::SLUG )
-							);
-						//echo '<plaintext>'; var_dump($flickr); die('Shit!');
-					}
-					break;
-				// Handle form action = deauthorize (_ids[form_flickr_deauth])
-				case $this->_ids['form_flickr_deauth']:
-					check_admin_referer( $this->_ids['form_flickr_deauth'] . '-verify' );
-					$this->_fml->clear_flickr_authentication();
-			}
-		}
+		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'handle_deauth_form') );
 
 		// Add Settings contextual help tabs
 		//add_filter('contextual_help', array($this,'filter_settings_help'), 10, 3);
@@ -298,6 +258,53 @@ class FMLAdmin
 		);
 		// Save Settings screen options tab
 		//add_filter('set-screen-option', array($this,'filter_settings_set_screen_options'), 11, 3);
+	}
+	/**
+	 * Form request to (start) Flickr oAuth.
+	 * 
+	 * @return void
+	 */
+	public function handle_auth_form() {
+		check_admin_referer( $this->_ids['form_flickr_auth'] . '-verify' );
+		$this->_fml->clear_flickr_authentication();
+		if ( array_key_exists( 'flickr_apikey', $_POST ) ) {
+			if ( $_POST['flickr_apikey'] ) {
+				$settings = array( 'flickr_api_key' => $_POST['flickr_apikey'] );
+			} else {
+				// empty api field = reset to default
+				$settings = array( 'flickr_api_key' => FML::_FLICKR_API_KEY );
+			}
+			// If API key is default, keep correct secret no matter what
+			if ( $_POST['flickr_apikey'] == FML::_FLICKR_API_KEY ) {
+				$settings['flickr_api_secret'] = FML::_FLICKR_SECRET;
+			} elseif ( !empty( $_POST['flickr_apisecret'] ) ) {
+				$settings['flickr_api_secret'] = $_POST['flickr_apisecret'];
+			}
+			$this->_fml->update_settings($settings);
+			// Just in case the flickr object has already been initialized....
+			$this->_fml->reset_flickr();
+		}
+		// sign out and re-auth
+		$flickr = $this->_fml->flickr;
+		$flickr->signOut();
+		if ( !$flickr->authenticate( 'read' ) ) {
+			// Note auth failed (during request)
+			add_settings_error(
+				FML::SLUG, //setting name
+				FML::SLUG.'-flickr-auth', //id
+				__( 'Oops, something went wrong whilst trying to authorize access to Flickr.', FML::SLUG )
+				);
+			//echo '<plaintext>'; var_dump($flickr); die('Shit!');
+		}
+	}
+	/**
+	 * Form request to remove Flickr oAuth settings
+	 * 
+	 * @return void
+	 */
+	public function handle_deauth_form() {
+		check_admin_referer( $this->_ids['form_flickr_deauth'] . '-verify' );
+		$this->_fml->clear_flickr_authentication();
 	}
 	/**
 	 * Render the default help tab for settings
@@ -426,7 +433,6 @@ class FMLAdmin
 		add_filter( 'manage_'.FML::POST_TYPE.'_posts_columns', array( $this, 'filter_manage_post_columns' ) );
 		add_action( 'manage_'.FML::POST_TYPE.'_posts_custom_column', array( $this, 'manage_posts_custom_column' ), 10, 2 );
 		//add_filter( 'manage_edit-'.FML::POST_TYPE.'_sortable_columns', array( $this, 'filter_manage_sortable_colu,ms' ) );
-
 	}
 	/**
 	 * Control which columns exist/are displayed
@@ -449,7 +455,6 @@ class FMLAdmin
 			'date' => $cols['date'],
 		);
 		return $return;
-
 	}
 	/**
 	 * Inject column content for a post
@@ -621,7 +626,7 @@ class FMLAdmin
 		// Adding to current post
 	}
 	//
-	// MEDIA UPLOAD IFRAME
+	// AJAX
 	// 
 	/**
 	 * Process all client side ajax requests
@@ -858,6 +863,9 @@ class FMLAdmin
 			'reason' => $text,
 		) );
 	}
+	//
+	// MEDIA UPLOAD IFRAME
+	// 
 	/**
 	 * Filter to inject my media tab to the media uploads iframe
 	 * @param  array $tabs the current tabs to show (defaults)
