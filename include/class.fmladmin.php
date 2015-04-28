@@ -612,12 +612,51 @@ class FMLAdmin
 	}
 	// ADD NEW (post-new.php -> upload.php?page=flickr-media-library-add-flickr)
 	public function loading_add_media() {
-
+		// TODO: work?
+		wp_enqueue_style(
+			'media-views',
+			admin_url('css/media-views.css')
+			// deps
+			// ver
+			// media
+		);
+		wp_enqueue_style(
+			FML::SLUG.'-add-flickr-style',
+			$this->_fml->static_url.'/css/add_flickr_media.css',
+			'media-views'
+			// ver
+			// media
+		);
+		wp_register_script(
+			'sprintf.js',
+			$this->_fml->static_url.'/js/sprintf.js',
+			array('jquery'), //dependencies
+			'71d33bf', // version
+			true // in footer?
+		);
+		// for it to queue properly, picturefill.js needs to be patched.
+		// still it's not rendering 1x, 2x properly in firefox
+		if( defined('PICTUREFILL_WP_VERSION') ) {
+			wp_enqueue_script('picturefill');
+		}
+		wp_register_script(
+			FML::SLUG.'-old-media-form-script',
+			$this->_fml->static_url.'/js/media-upload.js',
+			array('jquery','sprintf.js'), //dependencies
+			false, // version
+			true // in footer?
+		);
+		// TODO: Make this configurable
+		// see wp_enqueue_media()
+		$constants = $this->_media_upload_constants( 'admin_menu');
+		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
+		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
 	}
 	public function show_add_media_page() {
 		// set settings
-		//include $this->_fml->template_dir.'/page.add_media.php'
-		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
+		$settings = $this->_fml->settings;
+		$admin_img_dir_url = admin_url( 'images/' );
+		include $this->_fml->template_dir.'/page.add_media.php';
 	}
 	/**
 	 * Triggers on clicking "add new" for custom post -> redirect to real add new page
@@ -936,7 +975,7 @@ class FMLAdmin
 		// TODO: Make this configurable
 		// see wp_enqueue_media()
 		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
-		$constants = $this->_media_upload_constants( $post_id );
+		$constants = $this->_media_upload_constants( 'media_button', $post_id );
 		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
 		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
 		return wp_iframe(array($this,'show_media_upload_form'));
@@ -963,7 +1002,7 @@ class FMLAdmin
 	 *                          post or page, this is the post id
 	 * @return array            constants to be localized into a script
 	 */
-	private function _media_upload_constants( $post_id=0 ) {
+	private function _media_upload_constants( $page_type, $post_id=0 ) {
 		$settings = $this->_fml->settings;
 		$props = array(
 			'link'  => get_option( 'image_default_link_type' ), // db default is 'file'
@@ -973,6 +1012,7 @@ class FMLAdmin
 		);
 		$constants = array(
 			'slug'               => FML::SLUG,
+			'page_type'          => $page_type,
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
 			'ajax_action_call'   => $this->_ids['ajax_action'],
