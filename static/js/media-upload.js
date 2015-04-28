@@ -5,7 +5,7 @@
  */
 (function ($, window, constants) {
   var sprintf = window.sprintf;
-  console.log(constants);
+  //console.log(constants);
 
   /**
    * + Convert HTTPS URL into HTTP.
@@ -445,15 +445,15 @@
     };
 
     /**
-     * + click on add button
+     * + click on add button (for insert media iframe)
      *
-     * $this = "add to media library" button
+     * $this = "add to" button
      *
      * There are two behaviors:
      * - if it is in media library already: inject HTML shortcode into page
      * - if it is not in library: add to media library
      */
-    this.clickAddButton = function(event) {
+    this.clickAddButtonInsertPost = function(event) {
       var $this    = $(this),
           disabled = $this.prop('disabled');
 
@@ -500,7 +500,6 @@
         );
         // disable button and rename
         self.renderAddButton(constants.msgs_add_btn.adding, true, id);
-
       } else {
         // Not in library yet
         // disable button and rename
@@ -512,6 +511,65 @@
             flickr_id: id,
             alt: $('label[data-setting=alt] input').val(),
             caption: $('label[data-setting=caption] textarea').val()
+          },
+          self.callbackFMLPostSuccess, //Return looks exactly like a if exists query on a match
+          function(XHR, status, errorThrown) {
+            self.guessRenderAddButton(0);
+            return true; //do default action
+          }
+        );
+      }
+      // don't go to href
+      event.preventDefault();
+    };
+    /**
+     * + click on add button (for add flickr "overlay" admin menu)
+     *
+     * $this = "add to" button
+     *
+     * There are two behaviors
+     * - if it is media library already: jump to edit page on item
+     * - if it is not in library: add to media library
+     * @param  {[type]} event [description]
+     * @return {[type]}       [description]
+     */
+    this.clickAddButtonMediaLibrary = function(event) {
+      var $this    = $(this),
+          disabled = $this.prop('disabled');
+
+      // don't support click if disabled
+      if ( $this.prop('disabled') ) {
+          event.preventDefault();
+          return;
+      }
+
+      var id         = $this.attr('data-id'),
+          photo_data = self.photo_data[id];
+
+      if ( photo_data.id ) {
+        window.location = sprintf(constants.edit_url_format, photo_data.id);
+      } else {
+        // Not in library yet
+        // disable button and rename
+        self.renderAddButton(constants.msgs_add_btn.adding, true, id);
+        // call api to add it to media library
+        self.callApi(
+          'new_media_from_flickr_id',
+          {
+            flickr_id: id,
+            alt: $('label[data-setting=alt] input').val(),
+            caption: $('label[data-setting=caption] textarea').val()
+          },
+          function(data) {
+            // fml api error
+            if ( data.status != 'ok') {
+              self.handle_fml_error(data);
+              self.guessRenderAddButton(0);
+              return true; //cancel spinner
+            }
+            // jump to edit
+            window.location = sprintf(constants.edit_url_format, data.post_id);
+            return true;
           },
           self.callbackFMLPostSuccess, //Return looks exactly like a if exists query on a match
           function(XHR, status, errorThrown) {
@@ -563,7 +621,6 @@
           }
         }
       });
-
     };
     /**
      * Form and make a Flickr api call
@@ -576,7 +633,6 @@
 
       params.format = 'json';
       params.nojsoncallback = 1;  // don't want give us JSONP response
-
 
       // first let's sign the request
       self.callApi(
@@ -810,7 +866,8 @@
 
     /**
      * Render a photo onto the sidebar
-     * @param  {string} id flickr id of photo (data-id of li element clicked on)
+     * @param {string} id flickr id of photo (data-id of li element clicked on)
+     * @param {bool} showAltCaption whether to show the alt and caption form elements
      * @return null     
      */
     this.renderPhotoInfo = function(id) {
@@ -820,7 +877,7 @@
           msgs = constants.msgs_attachment;
 
       // if ( !photo_data ) { ???; } TODO
-      console.log(photo_data);
+      //console.log(photo_data);
 
       // ATTACHEMENT DETAILS
       var info_box = $('<div>').attr({
@@ -882,15 +939,21 @@
         'title',
         msgs.title
       ) );
+      var disable_form = false;
+      if ( constants.page_type == 'admin_menu' ) {
+        if ( photo_data.id ) {
+          disable_form = true;
+        }
+      }
       // caption
       info_box.append(self._wrapLabelTag(
-        self._makeTextArea(photo_data.caption, false),
+        self._makeTextArea(photo_data.caption, disable_form),
         'caption',
         msgs.caption
       ) );
       // alt text
       info_box.append(self._wrapLabelTag(
-        self._makeTextInput(photo_data.alt, false),
+        self._makeTextInput(photo_data.alt, disable_form),
         'alt',
         msgs.alt
       ) );
@@ -908,7 +971,7 @@
       
       // Only allow injection if it's in the media library 
       // TODO: ATTACHMENT DISPLAY SETTINGS
-      if ( photo_data.id ) {
+      if ( photo_data.id && constants.page_type != 'admin_menu' ) {
         var insert_box = $('<div>').attr({
           'class': 'attachment-display-settings'
         }).append(
@@ -951,7 +1014,6 @@
         ));
         self.$media_sidebar.append(insert_box);
       }
-
 
       if (window.picturefill) { window.picturefill($img); }
     };
@@ -1042,11 +1104,19 @@
         return;
       }
       var photo_data = self.photo_data[flickr_id];
+      var msg;
       if ( photo_data.id ) {
-        self.renderAddButton(constants.msgs_add_btn.insert, false, flickr_id);
+        switch ( constants.page_type ) {
+          case 'admin_menu': // already added to media library
+            msg = constants.msgs_add_btn.already;
+            break;
+          default: //insert into post
+            msg = constants.msgs_add_btn.insert;
+        }
       } else {
-        self.renderAddButton(constants.msgs_add_btn.add_to, false, flickr_id);
+        msg = constants.msgs_add_btn.add_to;
       }
+      self.renderAddButton(msg, false, flickr_id);
     };
 
     // ONREADY
@@ -1066,15 +1136,21 @@
       self.renderFilterMenu('self');
 
       // bind behaviors
-      self.$select_main.on(  'change',self.changeSearchType);
-      self.$select_filter.on('change',self.changeFilterType);
-      self.$search_query.on( 'blur',  self.blurSearchField);
-      self.$add_button.on(   'click', self.clickAddButton);
+      self.$select_main.on(   'change', self.changeSearchType);
+      self.$select_filter.on( 'change', self.changeFilterType);
+      self.$search_query.on(    'blur', self.blurSearchField);
+      switch ( constants.page_type ) {
+        case 'admin_menu': //add flickr (to media library) "overlay"
+          self.$add_button.on( 'click', self.clickAddButtonMediaLibrary);
+          break;
+        default: // insert media iframe
+          self.$add_button.on( 'click', self.clickAddButtonInsertPost);
+      }
     });
   } // of FMLSearchDisplay class
-  //var wpFlickrEmbed = new WpFlickrEmbed();
   fmlSearchDisplay = new FMLSearchDisplay();
 	// on ready function
+
 	$( function() {
     fmlSearchDisplay.searchPhoto(0);
 	});
