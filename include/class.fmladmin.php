@@ -611,15 +611,13 @@ class FMLAdmin
 		include $this->_fml->template_dir.'/metabox.alt_text.php';
 	}
 	// ADD NEW (post-new.php -> upload.php?page=flickr-media-library-add-flickr)
+	/**
+	 * Enqueue styles and scripts needed to handle the add flickr form.
+	 * 
+	 * @return [type] [description]
+	 */
 	public function loading_add_media() {
-		// TODO: work?
-		wp_enqueue_style(
-			'media-views',
-			admin_url('css/media-views.css')
-			// deps
-			// ver
-			// media
-		);
+		$this->_enqueue_media( 'admin_menu' );
 		wp_enqueue_style(
 			FML::SLUG.'-add-flickr-style',
 			$this->_fml->static_url.'/css/add_flickr_media.css',
@@ -627,35 +625,17 @@ class FMLAdmin
 			// ver
 			// media
 		);
-		wp_register_script(
-			'sprintf.js',
-			$this->_fml->static_url.'/js/sprintf.js',
-			array('jquery'), //dependencies
-			'71d33bf', // version
-			true // in footer?
-		);
-		// for it to queue properly, picturefill.js needs to be patched.
-		// still it's not rendering 1x, 2x properly in firefox
-		if( defined('PICTUREFILL_WP_VERSION') ) {
-			wp_enqueue_script('picturefill');
-		}
-		wp_register_script(
-			FML::SLUG.'-old-media-form-script',
-			$this->_fml->static_url.'/js/media-upload.js',
-			array('jquery','sprintf.js'), //dependencies
-			false, // version
-			true // in footer?
-		);
-		// TODO: Make this configurable
-		// see wp_enqueue_media()
-		$constants = $this->_media_upload_constants( 'admin_menu');
-		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
-		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
 	}
+	/**
+	 * Render the add flickr form (as a modal page because of styling difficulty)
+	 * @return [type] [description]
+	 */
 	public function show_add_media_page() {
 		// set settings
 		$settings = $this->_fml->settings;
 		$admin_img_dir_url = admin_url( 'images/' );
+		// set where the close box goes
+		$list_url = admin_url( 'edit.php?post_type='.FML::POST_TYPE );
 		include $this->_fml->template_dir.'/page.add_media.php';
 	}
 	/**
@@ -667,7 +647,7 @@ class FMLAdmin
 		$screen = get_current_screen();
 		// ONLY OPERATE ON FLICKR MEDIA
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
-		wp_redirect( admin_url( 'upload.php?page=' . esc_attr( $this->ids['page_add_media'] ) ) );
+		wp_redirect( admin_url( 'upload.php?page=' . esc_attr( $this->_ids['page_add_media'] ) ) );
 		//wp_die('TODO: Need to add flickr importer');
 		// Adding to current post
 	}
@@ -939,17 +919,38 @@ class FMLAdmin
 		// has some constants to make our lives easier
 		wp_enqueue_script('media-views');
 		*/
-		wp_enqueue_style(
-			'media-views',
-			admin_url('css/media-views.css')
-			// deps
-			// ver
-			// media
-		);
+		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
+		// see wp_enqueue_media()
+		$this->_enqueue_media( 'media_button', $post_id );
 		wp_enqueue_style(
 			FML::SLUG.'-old-media-form-style',
 			$this->_fml->static_url.'/css/media-upload-basic.css',
 			'media-views'
+			// ver
+			// media
+		);
+		return wp_iframe(array($this,'show_media_upload_form'));
+	}
+	/**
+	 * render the iframe content for upload form
+	 * 
+	 * @return void
+	 */
+	public function show_media_upload_form() {
+
+		$settings = $this->_fml->settings;
+		$admin_img_dir_url = admin_url( 'images/' );
+
+		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
+	}
+	//
+	// UTILITY FUNCTIONS
+	//
+	private function _enqueue_media( $page_type, $post_id=0 ) {
+		wp_enqueue_style(
+			'media-views',
+			admin_url('css/media-views.css')
+			// deps
 			// ver
 			// media
 		);
@@ -974,33 +975,17 @@ class FMLAdmin
 		);
 		// TODO: Make this configurable
 		// see wp_enqueue_media()
-		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
-		$constants = $this->_media_upload_constants( 'media_button', $post_id );
+		$constants = $this->_media_upload_constants( $page_type, $post_id );
 		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
 		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
-		return wp_iframe(array($this,'show_media_upload_form'));
 	}
-	/**
-	 * render the iframe content for upload form
-	 * 
-	 * @return void
-	 */
-	public function show_media_upload_form() {
-
-		$settings = $this->_fml->settings;
-		$admin_img_dir_url = admin_url( 'images/' );
-
-		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
-	}
-	//
-	// UTILITY FUNCTIONS
-	// 
 	/**
 	 * Generate javascript constants for insertion into code.
 	 * 
 	 * @param  integer $post_id If the uploaded image should be attached to a
 	 *                          post or page, this is the post id
 	 * @return array            constants to be localized into a script
+	 * @todo  change default props
 	 */
 	private function _media_upload_constants( $page_type, $post_id=0 ) {
 		$settings = $this->_fml->settings;
@@ -1016,6 +1001,7 @@ class FMLAdmin
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
 			'ajax_action_call'   => $this->_ids['ajax_action'],
+			'edit_url_format'    => admin_url( 'post.php?post=%d&action=edit' ),
 			'default_props'      => $props,
 			'msgs_error'         => array(
 				'ajax'       => __('AJAX error %s (%s).', FML::SLUG),
@@ -1050,7 +1036,7 @@ class FMLAdmin
 				'add_to'  => __( 'Add to media library', FML::SLUG ),
 				'adding'  => __( 'Adding…', FML::SLUG ),
 				'query'   => __( 'Querying…', FML::SLUG ),
-				//'already' => __( 'Already added', FML::SLUG ),
+				'already' => __( 'Already added', FML::SLUG ),
 			),
 			'msgs_sort'			 => array(
 				'date-posted-desc'     => __('Date posted (desc)', FML::SLUG),
