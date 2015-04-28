@@ -10,42 +10,29 @@ class FMLAdmin
 	 */
 	private $_fml;
 	/**
-	 * @var string $_options_page_id Settings page slug
+	 * A hash containing ids to html elements, pages, scripts, etc. that are
+	 * used in multiple places in the object.
+	 *
+	 * - page_add_media: the page: Media > Add Flickr
+	 * - page_options: the page: Settings > Flickr Media Library
+	 * - form_flickr_auth: form action for flickr authentication
+	 * - form_flickr_deauth: form action for flickr deauthentication
+	 * - ajax_action: action name for FML ajax API (all ajax apis are merged into
+	 *                this one and "method" is used to disnguish between
+	 *                different API calls into teh FML ajax API)
+	 * - tab_media_upload: the tab id of the "Insert from Flickr" upload tab
+	 * @var array
 	 */
-	private $_options_page_id = '';
-	/**
-	 * @var mixed Settings page hook suffix or false if capabilities not allowed
-	 */
-	private $_options_suffix = false;
-	/**
-	 * @var string The form action for flickr auth
-	 */
-	private $_flickr_auth_form_id = '';
-	/**
-	 * @var string The form action for flickr deauth
-	 */
-	private $_flickr_deauth_form_id = '';
+	private $_ids = array();
 	/**
 	 * User_meta field for if display apikey and secret.
 	 * 
 	 * (Due to future cookie stuff, this can contain only ascii, numbers and underscores.)
 	 * Also used as action for ajax request
 	 * @var string
+	 * @deprecated will be getting rid of this soon
 	 */
 	private $_flickr_apikey_option_name = '';
-	/**
-	 * action name for FML ajax api
-	 * 
-	 * We merge all ajax apis into this and instead use the "method" param to
-	 * distinguish different API calls into the FML ajax API.
-	 * 
-	 * @var  string 
-	 */
-	private $action_api = '';
-	/**
-	 * Tab ID of the "Insert from Flickr" upload tab
-	 */
-	private $_fml_upload_id = '';
 	/**
 	 * Plugin Admin function initialization 
 	 * 
@@ -53,13 +40,16 @@ class FMLAdmin
 	 */
 	public function __construct($fml) {
 		$this->_fml                       = $fml;
-		$this->_options_page_id           = FML::SLUG.'-settings';
-		$this->_flickr_auth_form_id       = FML::SLUG.'-flickr-auth';
-		$this->_flickr_deauth_form_id     = FML::SLUG.'-flickr-deauth';
-		$this->_action_api                = str_replace('-','_',FML::SLUG).'_api';
+		$this->_ids = array(
+			'page_add_media'     => FML::SLUG.'-add-flickr',
+			'page_options'       => FML::SLUG.'-settings',
+			'form_flickr_auth'   => FML::SLUG.'-flickr-auth',
+			'form_flickr_deauth' => FML::SLUG.'-flickr-deauth',
+			'ajax_action'        => str_replace('-','_',FML::SLUG).'_api',
+			'tab_media_upload'   => str_replace('-','_',FML::SLUG).'_insert_flickr',
+		);
 
 		$this->_flickr_apikey_option_name = str_replace('-','_',FML::SLUG).'_show_apikey';
-		$this->_fml_upload_id             = str_replace('-','_',FML::SLUG).'_insert_flickr';
 	}
 	/**
 	 * Stuff to do on plugins_loaded
@@ -89,12 +79,12 @@ class FMLAdmin
 		if ( $this->_in_options_page() ) {
 			$this->_fml->flickr_callback = admin_url(sprintf(
 				'options-general.php?page=%s',
-				urlencode($this->_options_page_id)
+				urlencode($this->_ids['page_options'])
 				// do i need more parameters to detect flickr callback?
 			));
 		}
 		// Add ajax servers
-		add_action( 'wp_ajax_'.$this->_action_api, array($this, 'handle_ajax') );
+		add_action( 'wp_ajax_'.$this->_ids['ajax_action'], array($this, 'handle_ajax') );
 		// - for handling ajax api options
 		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
 		// Add init handlers for custom post pages
@@ -103,7 +93,7 @@ class FMLAdmin
 		add_action( 'load-post-new.php', array( $this, 'loading_post_new') );
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
-		add_action( 'media_upload_'.$this->_fml_upload_id, array( $this, 'get_media_upload_iframe' ) );
+		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array( $this, 'get_media_upload_iframe' ) );
 	}
 	/**
 	 * Admin init.
@@ -130,15 +120,25 @@ class FMLAdmin
 	 * Add the admin menus for FML to /wp_admin
 	 */
 	public function create_admin_menus() {
-		$this->_options_suffix = add_options_page(
+		$_options_suffix = add_options_page(
 			__( 'Flickr Media Library Settings', FML::SLUG ),
 			__( 'Flickr Media Library', FML::SLUG ),
 			'manage_options',
-			$this->_options_page_id,
+			$this->_ids['page_options'],
 			array( $this, 'show_settings_page' )
 		);
-		if ( $this->_options_suffix ) {
-			add_action( 'load-'.$this->_options_suffix, array( $this, 'loading_settings' ) );
+		if ( $_options_suffix ) {
+			add_action( 'load-'.$_options_suffix, array( $this, 'loading_settings' ) );
+		}
+		$_add_media_suffix = add_media_page(
+			__( 'Add New Flickr Media', FML::SLUG ),
+			__( 'Add Flickr', FML::SLUG ),
+			'edit_posts',
+			$this->_ids['page_add_media'],
+			array( $this, 'show_add_media_page' )
+		);
+		if ( $_add_media_suffix ) {
+			add_action( 'load-'.$_add_media_suffix, array( $this, 'loading_add_media' ) );
 		}
 	}
 	//
@@ -181,15 +181,15 @@ class FMLAdmin
 	 * Loading the settings page:
 	 *
 	 * - Handle an oAuth callback to the options page
-	 * - Handle form action = authorize (_flickr_auth_form_id)
-	 * - Handle form action = deauthorize (_flickr_deauth_form_id)
+	 * - Handle form action = authorize (_ids[form_flickr_auth])
+	 * - Handle form action = deauthorize (_ids[form_flickr_deauth])
 	 * - Add Settings contextual help tabs
 	 * - Add Settings custom control to screen options
 	 * - Enqueue Settings-specific Javascript (controls screenoptions)
 	 *
 	 * Here's the auth process:
 	 * 
-	 * 1) user clicks submit button and creates action $_flickr_auth_form_id
+	 * 1) user clicks submit button and creates action $_ids[form_flickr_auth]
 	 * 2) server authenticates and receives request token and secret from flickr
 	 * 3) user gets redirected by flickr object to https://www.flickr.com/services/oauth/authorize
 	 * 4) User clicks authorize
@@ -229,9 +229,9 @@ class FMLAdmin
 		// - deauthorize: remove oAuth settings
 		if ( !empty( $_POST['action'] ) ) {
 			switch ( $_POST['action'] ) {
-				// Handle form action = authorize (_flickr_auth_form_id) [Steps 1-3]
-				case $this->_flickr_auth_form_id:
-					check_admin_referer( $this->_flickr_auth_form_id . '-verify' );
+				// Handle form action = authorize (_ids[form_flickr_auth]) [Steps 1-3]
+				case $this->_ids['form_flickr_auth']:
+					check_admin_referer( $this->_ids['form_flickr_auth'] . '-verify' );
 					$this->_fml->clear_flickr_authentication();
 					if ( array_key_exists( 'flickr_apikey', $_POST ) ) {
 						if ( $_POST['flickr_apikey'] ) {
@@ -263,9 +263,9 @@ class FMLAdmin
 						//echo '<plaintext>'; var_dump($flickr); die('Shit!');
 					}
 					break;
-				// Handle form action = deauthorize (_flickr_deauth_form_id)
-				case $this->_flickr_deauth_form_id:
-					check_admin_referer( $this->_flickr_deauth_form_id . '-verify' );
+				// Handle form action = deauthorize (_ids[form_flickr_deauth])
+				case $this->_ids['form_flickr_deauth']:
+					check_admin_referer( $this->_ids['form_flickr_deauth'] . '-verify' );
 					$this->_fml->clear_flickr_authentication();
 			}
 		}
@@ -380,12 +380,14 @@ class FMLAdmin
 	public function show_settings_page() {
 		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 		//$flickr = $this->_fml->flickr;
-		$settings = $this->_fml->settings;
-		$this_page_url = 'options-general.php?page=' . urlencode( $this->_options_page_id );
-		$api_form_slug = FML::SLUG.'-apiform';
+		$settings        = $this->_fml->settings;
+		$this_page_url   = 'options-general.php?page=' . urlencode( $this->_ids['page_options'] );
+		$api_form_slug   = FML::SLUG.'-apiform';
 		$api_secret_attr = ( $settings['flickr_api_secret'] == FML::_FLICKR_SECRET )
 		                 ? ''
 		                 : $settings['flickr_api_secret'];
+		$auth_form_id    = $this->_ids['form_flickr_auth'];
+		$deauth_form_id  = $this->_ids['form_flickr_deauth'];
 		include $this->_fml->template_dir.'/page.settings.php';
 	}
 	//
@@ -599,9 +601,17 @@ class FMLAdmin
 		$alt_text = get_post_meta( $post->ID, '_wp_attachment_image_alt', true );
 		include $this->_fml->template_dir.'/metabox.alt_text.php';
 	}
-	// ADD NEW (post_new.php)
+	// ADD NEW (post-new.php -> upload.php?page=flickr-media-library-add-flickr)
+	public function loading_add_media() {
+
+	}
+	public function show_add_media_page() {
+		// set settings
+		//include $this->_fml->template_dir.'/page.add_media.php'
+		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
+	}
 	/**
-	 * Triggers on clicking "add new" for custom post
+	 * Triggers on clicking "add new" for custom post -> redirect to real add new page
 	 * 
 	 * @return void
 	 */
@@ -609,8 +619,8 @@ class FMLAdmin
 		$screen = get_current_screen();
 		// ONLY OPERATE ON FLICKR MEDIA
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
-		wp_die('TODO: Need to add flickr importer');
-
+		wp_redirect( admin_url( 'upload.php?page=' . esc_attr( $this->ids['page_add_media'] ) ) );
+		//wp_die('TODO: Need to add flickr importer');
 		// Adding to current post
 	}
 	//
@@ -661,7 +671,7 @@ class FMLAdmin
 	 * Process all client side ajax requests
 	 *
 	 * The following parameters are required in $_POST
-	 * - action: $this->_action_api already used to trigger this
+	 * - action: $this->_ids[action_ajax] already used to trigger this
 	 * - method: which method to call
 	 * - ??: nonce varies based on where form is
 	 * - ??: other parameters vary based on method
@@ -899,7 +909,7 @@ class FMLAdmin
 	 * @todo  remove this and replace with the new backbonejs/underscoresjs model
 	 */
 	public function filter_media_upload_tabs( $tabs ) {
-		$tabs[$this->_fml_upload_id] = __('Insert from Flickr', FML::SLUG);
+		$tabs[$this->_ids['tab_media_upload']] = __('Insert from Flickr', FML::SLUG);
 		return $tabs;
 	}
 	/**
@@ -952,29 +962,49 @@ class FMLAdmin
 			false, // version
 			true // in footer?
 		);
-		$settings = $this->_fml->settings;
 		// TODO: Make this configurable
 		// see wp_enqueue_media()
+		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
+		$constants = $this->_media_upload_constants( $post_id );
+		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
+		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
+		return wp_iframe(array($this,'show_media_upload_form'));
+	}
+	/**
+	 * render the iframe content for upload form
+	 * 
+	 * @return void
+	 */
+	public function show_media_upload_form() {
+
+		$settings = $this->_fml->settings;
+		$admin_img_dir_url = admin_url( 'images/' );
+
+		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
+	}
+	//
+	// UTILITY FUNCTIONS
+	// 
+	/**
+	 * Generate javascript constants for insertion into code.
+	 * 
+	 * @param  integer $post_id If the uploaded image should be attached to a
+	 *                          post or page, this is the post id
+	 * @return array            constants to be localized into a script
+	 */
+	private function _media_upload_constants( $post_id=0 ) {
+		$settings = $this->_fml->settings;
 		$props = array(
 			'link'  => get_option( 'image_default_link_type' ), // db default is 'file'
 			'align' => get_option( 'image_default_align' ), // empty default
 			'size'  => ucfirst(get_option( 'image_default_size' )),  // empty default
 			// capitalize to make it have a chance of matching flickr's sizes if set
 		);
-		if ( !empty( $_GET['post_id'] ) ) {
-			$post_id = (int) $_GET['post_id'];
-			$post = get_post($post_id);
-			$hier = $post && is_post_type_hierarchical( $post->post_type );
-			$insert_msg = ( $hier ) ? __( 'Insert into page' ) : __( 'Insert into post' );
-		} else {
-			$post_id = 0;
-			$insert_msg = __( 'Insert into post' );
-		}
 		$constants = array(
 			'slug'               => FML::SLUG,
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
-			'ajax_action_call'   => $this->_action_api,
+			'ajax_action_call'   => $this->_ids['ajax_action'],
 			'default_props'      => $props,
 			'msgs_error'         => array(
 				'ajax'       => __('AJAX error %s (%s).', FML::SLUG),
@@ -1007,7 +1037,6 @@ class FMLAdmin
 			),
 			'msgs_add_btn'       => array(
 				'add_to'  => __( 'Add to media library', FML::SLUG ),
-				'insert'  => $insert_msg,
 				'adding'  => __( 'Adding…', FML::SLUG ),
 				'query'   => __( 'Querying…', FML::SLUG ),
 				//'already' => __( 'Already added', FML::SLUG ),
@@ -1042,34 +1071,20 @@ class FMLAdmin
 			),
 		);
 		if ( $post_id ) {
-			$constants['post_id'] = $post_id;
+			$post = get_post($post_id);
+			$hier = $post && is_post_type_hierarchical( $post->post_type );
+			$constants['post_id']                = $post_id;
+			$constants['msgs_add_btn']['insert'] = ( $hier ) ? __( 'Insert into page' ) : __( 'Insert into post' );
 		}
-		wp_localize_script(FML::SLUG.'-old-media-form-script', 'FMLConst', $constants);
-		wp_enqueue_script(FML::SLUG.'-old-media-form-script' );
-		return wp_iframe(array($this,'show_media_upload_form'));
+		return $constants;
 	}
-	/**
-	 * render the iframe content for upload form
-	 * 
-	 * @return void
-	 */
-	public function show_media_upload_form() {
-
-		$settings = $this->_fml->settings;
-		$admin_img_dir_url = admin_url( 'images/' );
-
-		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
-	}
-	//
-	// UTILITY FUNCTIONS
-	// 
 	/**
 	 * Are we viewing the plugin settings page?
 	 * @return boolean true if viewing optiosn page
 	 * @todo  replace this with init hook
 	 */
 	private function _in_options_page() {
-		return $this->_in_page( 'options-general.php', $this->_options_page_id );
+		return $this->_in_page( 'options-general.php', $this->_ids['page_options'] );
 	}
 	/**
 	 * What admin page are we in?

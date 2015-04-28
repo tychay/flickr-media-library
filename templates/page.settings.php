@@ -7,6 +7,8 @@
  * - $settings (array): plugin blog options 
  * - $this_page_url (string): relative path back to this page
  * - $api_secret_attr (string): API secret (if not the default)
+ * - $auth_form_id (string)
+ * - $deauth_form_id (string)
  * 
  * @author terry chay <tychay@php.net>
  */
@@ -19,8 +21,8 @@ namespace FML;
 	<h3><?php esc_html_e('Flickr authorization', FML::SLUG); ?></h3>
 	<form action="<?php esc_attr_e($this_page_url); ?>" method="post" id="flickr_auth_form">
 <?php if ($is_auth_with_flickr): ?>
-		<?php wp_nonce_field($this->_flickr_deauth_form_id.'-verify'); ?>
-		<input type="hidden" name="action" value="<?php echo $this->_flickr_deauth_form_id; ?>" />
+		<?php wp_nonce_field($deauth_form_id.'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $deauth_form_id; ?>" />
 		<table class="form-table">
 			<!-- begin api screen options stuff -->
 			<tr class="<?php echo $api_form_slug; ?> hidden">
@@ -54,8 +56,8 @@ namespace FML;
 			</tr>
 		</table>
 		<!-- end api screen options stuff -->
-		<?php wp_nonce_field($this->_flickr_auth_form_id.'-verify'); ?>
-		<input type="hidden" name="action" value="<?php echo $this->_flickr_auth_form_id; ?>" />
+		<?php wp_nonce_field($auth_form_id.'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $auth_form_id; ?>" />
 		<?php submit_button(__('Authorize with Flickr', FML::SLUG)); ?>
 <?php endif; ?>
 	</form>
