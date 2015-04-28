@@ -416,11 +416,12 @@ class FML implements FMLConstants
 		$p = $this->shortcode( $shortcode_attrs, $shortcode_content );
 		// append caption if available
 		if ( $caption_text = $post->post_excerpt ) {
+			list( $img_src, $width, $height ) = image_downsize( $post->ID, $shortcode_attrs['img_size'] );
 			$attr = array(
 				'id'      => self::SLUG.'-attachment',
-				'width'   => self::_get_width_from_flickr_size( $shortcode_attrs['img_size'] ),
+				'width'   => $width,
 				'caption' => $caption_text,
-				//'align'   => 'aligncenter',
+				'align'   => 'aligncenter',
 			);
 			$p = img_caption_shortcode( $attr, $p );
 		}
@@ -1500,6 +1501,11 @@ class FML implements FMLConstants
 		// original is invalid
 		return $sizes[ $count_img_sizes-2 ];
 	}
+	/**
+	 * @deprecated
+	 * @param  [type] $size_string [description]
+	 * @return [type]              [description]
+	 */
 	static private function _get_width_from_flickr_size( $size_string ) {
 		switch ( strtolower($size_string) ) {
 			case 'square': return 75;
@@ -1529,7 +1535,7 @@ class FML implements FMLConstants
 		$src = '';
 		$size_offset = 1000000;
 		if ( !is_numeric( $default_size ) ) {
-			$default_size = self::_get_width_from_flickr_size( $default_size );
+			$default_size = self::_get_width_from_flickr_size( $dwefault_size );
 		}
 		foreach ( $sizes as $size ) {
 			// handle original
