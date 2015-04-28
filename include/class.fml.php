@@ -118,6 +118,15 @@ class FML implements FMLConstants
 	 * @return void
 	 */
 	public function init() {
+		$this->register_post_type();
+	}
+	/**
+	 * Actually register the flickr media custom post type
+	 *
+	 * This is separate from init because it can be called from the activation hook
+	 * @return void
+	 */
+	public function register_post_type() {
 		// https://codex.wordpress.org/Function_Reference/register_post_type
 		register_post_type(self::POST_TYPE, array(
 			'labels'              => array(

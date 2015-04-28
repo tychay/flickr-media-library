@@ -30,14 +30,13 @@ Text Domain:  flickr-media-library
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /**
- * Check the WordPress & PHP version, deactivate plugin if too low.
+ * Check the WordPress & PHP version, deactivate plugin if too low, also refresh rewrite rules
  *
  * Called on plugin activation.
  * 
  * @return void
  */
 function flickr_media_library_activate() {
-
 	global $wp_version;
 
 	if ( version_compare( $wp_version, '3.5', '<' ) ) {
@@ -59,8 +58,11 @@ function flickr_media_library_activate() {
 			'5.4',
 			admin_url()
 		) );
-
 	}
+
+	spl_autoload_register( 'flickr_media_library_class_loader' );
+	$fml_plugin_file = __FILE__;
+	include dirname(__FILE__).'/include/load.flush_rewrite.php';
 }
 register_activation_hook( __FILE__, 'flickr_media_library_activate' );
 
