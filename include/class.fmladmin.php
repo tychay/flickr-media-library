@@ -84,6 +84,7 @@ class FMLAdmin
 		// Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
 		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array( $this, 'get_media_upload_iframe' ) );
+		add_action( 'wp_enqueue_media', array( $this, 'wp_enqueue_media') );
 	}
 	/**
 	 * Admin init.
@@ -888,6 +889,24 @@ class FMLAdmin
 			'code'   => $code,
 			'reason' => $text,
 		) );
+	}
+	//
+	// BACKBONE MEDIA UPLOADER
+	//
+	/**
+	 * Action to add enqueues to 
+	 * @return [type] [description]
+	 */
+	function wp_enqueue_media() {
+		/* // Going to need to know backbone.js and requirejs a hell of a lot better before this will work
+		wp_enqueue_script(
+			FML::SLUG.'-override-query-sync',
+			$this->_fml->static_url.'/js/override-query-sync.js',
+			array('media-models'), //dependencies
+			false, // version
+			true // in footer?
+		);
+		/* */
 	}
 	//
 	// MEDIA UPLOAD IFRAME
