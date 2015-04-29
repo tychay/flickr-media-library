@@ -23,11 +23,14 @@ class FML implements FMLConstants
 	 */
 	public $static_url;
 	/**
+	 * Needed to inject into link in plugins directory.
 	 * @var string Cache the plugin basename
 	 */
 	public $plugin_basename;
 	/**
-	 * @var string the option name for the permalink base (access through _get)
+	 * access through _get() to make it read-only
+	 * 
+	 * @var string the option name for the permalink base
 	 */
 	private $_permalink_slug_id;
 	/**
@@ -100,7 +103,6 @@ class FML implements FMLConstants
 		// placeholder for strip_shortcodes() to work
 		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
 		add_shortcode( self::SHORTCODE, '__return_false' );
-
 
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
 		add_filter( 'get_attached_file', array( get_class($this), 'filter_get_attached_file'), 10, 2 );
@@ -421,9 +423,9 @@ class FML implements FMLConstants
 		 * @param array $attrs shortcode attributes
 		 */
 		$shortcode_attrs = apply_filters('fml_prepend_media_shortcode_attrs', array(
-			'id'       => $post->ID,
-			'img_size' => 'Medium',
-			'link'     => 'flickr',
+			'id'   => $post->ID,
+			'size' => 'Medium',
+			'link' => 'flickr',
 		) );
 		$p = $this->shortcode( $shortcode_attrs, $shortcode_content );
 		// append caption if available
@@ -445,8 +447,9 @@ class FML implements FMLConstants
 	 * Modify HTML attachment to add shortcode for flickr media when inserting
 	 * from editor
 	 *
-	 * Note that shortcode attribute names cannot have dashes, so we replace
-	 * them with _
+	 * This does a transform of the attachment attributes into something
+	 * readable (and processable) by the [fmlmedia] shortcode handler.
+	 * For instance, shortcode attribute names cannot have '-'.
 	 * 
 	 * @param  string $html       HTML to send to editor
 	 * @param  int    $id         post id of attachment
@@ -461,16 +464,30 @@ class FML implements FMLConstants
 		}
 		$attr_string = '';
 		foreach ( $attachment as $key=>$value ) {
+			switch ($key) {
+				// these are the same in both shortcode and form params
+				case 'id':
+				case 'align':
+				case 'link': 
+				case 'url': 
+				break;
+				// these need to be transformed a bit
+				case 'image_alt': $key = 'alt'; break;
+				case 'image-size': $key = 'size'; break;
+				// the rest should be filtered as they're not supported in shortcode
+				default: $key = ''; // continue does not work inside switches
+			}
+			if ( !$key ) { continue; }
 			$attr_string .=  sprintf(
 				' %s="%s"',
-				str_replace( '-', '_', $key ),
+				$key,
 				esc_attr( $value )
 			);
 		}
 		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
 	}
 	/**
-	 * Process the [fmlmedia] shortcode earlier.
+	 * Trigger the process of the [fmlmedia] shortcode earlier.
 	 *
 	 * This works the same way as the [embed] shortcode.
 	 * 
@@ -523,26 +540,34 @@ class FML implements FMLConstants
 	 *
 	 * @see  FML\FML::run_shortcode() Process handler to run shortcode earlier
 	 * @param  array  $atts    raw shortcode attributes
+	 *   - id: The post ID of the flickr Media
+	 *   - flickr_id: if ID is not provided, this is the flickr ID of the image
+	 *   - alt: The alt tag to use in the image
+	 *   - title: image title
+	 *   - size: the size of the image to use
+	 *   - align: alignment (not really used except in class names)
+	 *   - link: the link type (or 'custom')
+	 *   - url: the url to link (if link is custom)
 	 * @param  string $content content shortcode wrapss
 	 * @return string          HTML output corrected to embed FML asset correctly
 	 * @todo   inject plugin defaults for attributes
 	 * @todo  add setting for extraacting content to flickrid
 	 * @todo  add option for auto-adding missing media
 	 */
-	public function shortcode( $atts, $content='' ) {
+	public function shortcode( $raw_atts, $content='' ) {
 		// 1. Process shortcode attributes against defaults
 		$atts = shortcode_atts( array(
-			'id'           => 0,
-			'flickr_id'    => 0,
-			'image_alt'    => '',
-			'image_title'  => '',
-			'image_size'   => 'Medium', // transformed from image-size
-			'align'        => '',       // editor default may be none, but ours
-			                            // is no attribute/class
-			'link'         => 'flickr', // because of TOS
-			'url'          => '',
+			'id'        => 0,
+			'flickr_id' => 0,
+			'alt'       => '',
+			'title'     => '',
+			'size'      => 'Medium', // transformed from image-size
+			'align'     => '',       // editor default may be none, but ours is
+			                         // no attribute/class
+			'link'      => 'flickr', // because of TOS
+			'url'       => '',
 			//'post_excerpt' => '', // caption
-		), $atts);
+		), $raw_atts, 'fmlmedia' );
 		// 2. Verify post is FML media first.
 		//    To do this, we must have either the id or flickr_id set, prefering
 		//    id, optionally this can extract or generate
@@ -568,12 +593,12 @@ class FML implements FMLConstants
 		}
 		// 3. Process other attributes
 		//    Inject title if missing/not provided
-		if ( !$atts['image_title'] ) {
-			$atts['image_title'] = trim( $post->post_title );
+		if ( !$atts['title'] ) {
+			$atts['title'] = trim( $post->post_title );
 		}
 		//    Inject alt if missing/not provided
-		if ( !$atts['image_alt'] ) {
-			$atts['image_alt'] = trim( get_post_meta( $post->ID, '_wp_attachment_image_alt', true ) );
+		if ( !$atts['alt'] ) {
+			$atts['alt'] = trim( get_post_meta( $post->ID, '_wp_attachment_image_alt', true ) );
 		}
 		//    Find url to link if any
 		$rel = '';
@@ -605,10 +630,10 @@ class FML implements FMLConstants
 		}
 		// 3. Run attachment processing on the code.
 		$id    = $post->ID;
-		$alt   = $atts['image_alt'];
-		$title = $atts['image_title'];
+		$alt   = $atts['alt'];
+		$title = $atts['title'];
 		$align = $atts['align'];
-		$size  = $atts['image_size'];
+		$size  = $atts['size'];
 		//     This is basically the corrected get_image_send_to_editor()
 		//     without any caption content (which would trigger caption handling)
 		//     Remember the real get_image_send_to_editor and it's hooks are
