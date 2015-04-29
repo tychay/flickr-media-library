@@ -1146,6 +1146,14 @@
         default: // insert media iframe
           self.$add_button.on( 'click', self.clickAddButtonInsertPost);
       }
+
+      if ( constants.page_type == 'post_thumbnail' ) {
+        $('a.media-modal-close').click( function(event) {
+          var win=window.dialogArguments||opener||parent||top;
+          win.tb_remove();
+          event.preventDefault();
+        });
+      }
     });
   } // of FMLSearchDisplay class
   fmlSearchDisplay = new FMLSearchDisplay();

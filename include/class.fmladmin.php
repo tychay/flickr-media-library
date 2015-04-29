@@ -623,8 +623,8 @@ class FMLAdmin
 	public function loading_add_media() {
 		$this->_enqueue_media( 'admin_menu' );
 		wp_enqueue_style(
-			FML::SLUG.'-add-flickr-style',
-			$this->_fml->static_url.'/css/add_flickr_media.css',
+			FML::SLUG.'-emulate-thickbox',
+			$this->_fml->static_url.'/css/emulate-media-thickbox.css',
 			'media-views'
 			// ver
 			// media
@@ -894,7 +894,7 @@ class FMLAdmin
 		) );
 	}
 	//
-	// BACKBONE MEDIA UPLOADER
+	// (BROKEN) BACKBONE MEDIA UPLOADER
 	//
 	/**
 	 * Action to add enqueues to 
@@ -925,12 +925,19 @@ class FMLAdmin
 		return $tabs;
 	}
 	/**
-	 * Returns the iframe that the upload form will be returned in.
+	 * By default returns the iframe that the upload form will be returned in.
+	 *
+	 * There is another mode. If for=post_thumbnail in the query string, it
+	 * is asking for a thickbox to support flickr media injection into the
+	 * post thumbnail.
 	 * 
 	 * @return string
 	 * @todo  remove this and replace with the new backbonejs/underscoresjs model
 	 */
 	public function get_media_upload_iframe() {
+		if ( !empty( $_GET['for'] ) && ( $_GET['for'] == 'post_thumbnail' ) ) {
+			return $this->get_post_thumbnail_insert_iframe();
+		}
 		/*
 		if ( empty($_GET['post_id']) ) {
 			wp_enqueue_media();
@@ -947,11 +954,11 @@ class FMLAdmin
 		wp_enqueue_style(
 			FML::SLUG.'-old-media-form-style',
 			$this->_fml->static_url.'/css/media-upload-basic.css',
-			'media-views'
-			// ver
+			'media-views',
+			FML::VERSION
 			// media
 		);
-		return wp_iframe(array($this,'show_media_upload_form'));
+		return wp_iframe( array( $this, 'show_media_upload_form' ) );
 	}
 	/**
 	 * render the iframe content for upload form
@@ -959,7 +966,6 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function show_media_upload_form() {
-
 		$settings = $this->_fml->settings;
 		$admin_img_dir_url = admin_url( 'images/' );
 
@@ -969,6 +975,8 @@ class FMLAdmin
 	// POST THUMBNAIL STUFF
 	//
 	/**
+	 * Inject a link to the FML chooser thickbox into the post thumbnail HTML.
+	 * 
 	 * The way we support post thumbnails (currently) is by injecting a thickbox
 	 * link to a FML chooser into the post_thumbnail metabox (and ajax
 	 * generation of metabox).
@@ -1002,6 +1010,34 @@ class FMLAdmin
 		);
 		//<a class="thickbox" id="set-post-thumbnail" href="http://terrychay.dev/wp-admin/media-upload.php?post_id=6209&amp;type=image&amp;TB_iframe=1" title="Set featured image">Set featured image</a>
 		return $html;
+	}
+	/**
+	 * Just like geet_media_upload_iframe() but for post thumbnail injection
+	 * @return [type] [description]
+	 */
+	function get_post_thumbnail_insert_iframe() {
+		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
+		$this->_enqueue_media( 'post_thumbnail', $post_id );
+		// the css from add_flickr seems to work just fine here. :-D
+		wp_enqueue_style(
+			FML::SLUG.'-emulate-thickbox',
+			$this->_fml->static_url.'/css/emulate-media-thickbox.css',
+			'media-views',
+			FML::VERSION
+			// media
+		);
+		return wp_iframe( array($this,'show_post_thumbnail_insert_form') );
+	}
+	/**
+	 * render the thickbox content for post thumbnail insert
+	 * 
+	 * @return void
+	 */
+	public function show_post_thumbnail_insert_form() {
+		$settings = $this->_fml->settings;
+		$admin_img_dir_url = admin_url( 'images/' );
+
+		include $this->_fml->template_dir.'/iframe.post-thumbnail-form.php';
 	}
 	//
 	// UTILITY FUNCTIONS
@@ -1132,6 +1168,9 @@ class FMLAdmin
 			$hier = $post && is_post_type_hierarchical( $post->post_type );
 			$constants['post_id']                = $post_id;
 			$constants['msgs_add_btn']['insert'] = ( $hier ) ? __( 'Insert into page' ) : __( 'Insert into post' );
+		}
+		if ( $page_type == 'post_thumbnail' ) {
+			$constants['msgs_add_btn']['insert'] = _( 'Set featured image' );
 		}
 		return $constants;
 	}
