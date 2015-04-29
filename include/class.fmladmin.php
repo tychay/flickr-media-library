@@ -1060,7 +1060,11 @@ class FMLAdmin
 		// for it to queue properly, picturefill.js needs to be patched.
 		// still it's not rendering 1x, 2x properly in firefox
 		if( defined('PICTUREFILL_WP_VERSION') ) {
-			wp_enqueue_script('picturefill');
+			wp_enqueue_script( 'picturefill' );
+		}
+		// Need the WPSetAsThumbnail script in post thumbnail handling
+		if ( $page_type == 'post_thumbnail' ) {
+			wp_enqueue_script( 'set-post-thumbnail' );
 		}
 		wp_register_script(
 			FML::SLUG.'-old-media-form-script',
@@ -1171,6 +1175,7 @@ class FMLAdmin
 		}
 		if ( $page_type == 'post_thumbnail' ) {
 			$constants['msgs_add_btn']['insert'] = _( 'Set featured image' );
+			$constants['nonce_set_thumbnail'] = wp_create_nonce( 'set_post_thumbnail-'.$post_id );
 		}
 		return $constants;
 	}

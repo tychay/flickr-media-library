@@ -523,6 +523,55 @@
       event.preventDefault();
     };
     /**
+     * + click on add button (for setting featured image)
+     *
+     * $this = "add to" button
+     *
+     * There are two behaviors:
+     * - if it is in media library already: ajax set post thumbnail and clsoe
+     * - if it is not in library: add to media library
+     */
+    this.clickAddButtonSetFeaturedImage = function(event) {
+      var $this    = $(this),
+          disabled = $this.prop('disabled');
+
+      // don't support click if disabled
+      if ( $this.prop('disabled') ) {
+          event.preventDefault();
+          return;
+      }
+
+      var id         = $this.attr('data-id'),
+          photo_data = self.photo_data[id];
+
+      if ( photo_data.id ) {
+        //It's already in library: Call function to set as thumbnail (and get HTML)
+        WPSetAsThumbnail( photo_data.id, constants.nonce_set_thumbnail );
+        tb_close();
+        return true;
+      } else {
+        // Not in library yet
+        // disable button and rename
+        self.renderAddButton(constants.msgs_add_btn.adding, true, id);
+        // call api to add it to media library
+        self.callApi(
+          'new_media_from_flickr_id',
+          {
+            flickr_id: id,
+            alt: $('label[data-setting=alt] input').val(),
+            caption: $('label[data-setting=caption] textarea').val()
+          },
+          self.callbackFMLPostSuccess, //Return looks exactly like a if exists query on a match
+          function(XHR, status, errorThrown) {
+            self.guessRenderAddButton(0);
+            return true; //do default action
+          }
+        );
+      }
+      // don't go to href
+      event.preventDefault();
+    };
+    /**
      * + click on add button (for add flickr "overlay" admin menu)
      *
      * $this = "add to" button
@@ -940,9 +989,11 @@
         msgs.title
       ) );
       var disable_form = false;
-      if ( constants.page_type == 'admin_menu' ) {
+      // if in admin menu and already added to flickr, deactivate form
+      // if it's a psot thumbnail and already added, deactivate form as we can only extract ID
+      if ( constants.page_type == 'admin_menu' || constants.page_type == 'post_thumbnail') {
         if ( photo_data.id ) {
-          disable_form = true;
+          disable_form = 'readonly';
         }
       }
       // caption
@@ -969,9 +1020,9 @@
 
       // TODO: compat-item?
       
-      // Only allow injection if it's in the media library 
-      // TODO: ATTACHMENT DISPLAY SETTINGS
-      if ( photo_data.id && constants.page_type != 'admin_menu' ) {
+      // ATTACHMENT DISPLAY SETTINGS
+      // Only allow injection if it's in the media library and we are injecting html
+      if ( photo_data.id && ( constants.page_type == 'media-button' ) ) {
         var insert_box = $('<div>').attr({
           'class': 'attachment-display-settings'
         }).append(
@@ -1107,7 +1158,7 @@
       var msg;
       if ( photo_data.id ) {
         switch ( constants.page_type ) {
-          case 'admin_menu': // already added to media library
+          case 'admin_menu': // add to media library (from media library)
             msg = constants.msgs_add_btn.already;
             break;
           default: //insert into post
@@ -1136,23 +1187,22 @@
       self.renderFilterMenu('self');
 
       // bind behaviors
-      self.$select_main.on(   'change', self.changeSearchType);
-      self.$select_filter.on( 'change', self.changeFilterType);
-      self.$search_query.on(    'blur', self.blurSearchField);
+      self.$select_main.on(  'change', self.changeSearchType);
+      self.$select_filter.on('change', self.changeFilterType);
+      self.$search_query.on(   'blur', self.blurSearchField);
       switch ( constants.page_type ) {
         case 'admin_menu': //add flickr (to media library) "overlay"
-          self.$add_button.on( 'click', self.clickAddButtonMediaLibrary);
+          self.$add_button.on('click', self.clickAddButtonMediaLibrary);
+          break;
+        case 'post_thumbnail': // set as featured image
+          self.$add_button.on('click', self.clickAddButtonSetFeaturedImage);
           break;
         default: // insert media iframe
-          self.$add_button.on( 'click', self.clickAddButtonInsertPost);
+          self.$add_button.on('click', self.clickAddButtonInsertPost);
       }
 
       if ( constants.page_type == 'post_thumbnail' ) {
-        $('a.media-modal-close').click( function(event) {
-          var win=window.dialogArguments||opener||parent||top;
-          win.tb_remove();
-          event.preventDefault();
-        });
+        $('a.media-modal-close').click( tb_close );
       }
     });
   } // of FMLSearchDisplay class
@@ -1162,5 +1212,11 @@
 	$( function() {
     fmlSearchDisplay.searchPhoto(0);
 	});
+
+  function tb_close(event) {
+    var win=window.dialogArguments||opener||parent||top;
+    win.tb_remove();
+    event.preventDefault(); 
+  }
 
 })(jQuery, window, FMLConst);
