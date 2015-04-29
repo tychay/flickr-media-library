@@ -34,8 +34,13 @@ interface FMLConstants
      * The default "base" (permalink slug) for the custom post type
      */
     const _DEFAULT_BASE = 'flickr_media';
-
-
+    /**
+     * Regex to extract flickr id from photo url
+     * 
+     * e.g. https://www.flickr.com/photos/tychay/16452349917
+     * or https://www.flickr.com/photos/21673573@N06/16526529331/
+     */
+    const REGEX_FLICKR_PHOTO_URL = '!https?://(?:www.)?flickr.com/photos/[a-z0-9_@]+/(\d+)!i';
 /*
     const OPTION_PHOTO_LINK = 'photo_link';
     const OPTION_LINK_REL = 'link_rel';

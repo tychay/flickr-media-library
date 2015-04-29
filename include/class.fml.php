@@ -388,8 +388,11 @@ class FML implements FMLConstants
 	// SHORTCODE HANDLING
 	//
 	/**
-	 * Filter duplicates behavior of prepend_attachment but for flickr media.
+	 * Filter to duplicate behavior of prepend_attachment but for flickr media.
 	 *
+	 * prepend_attachment is a filter run to inject the attachment image to the
+	 * attachment page. This emulates that behavior but for flickr media.
+	 * 
 	 * This can run anytime as it directly calls the shortcode.
 	 * 
 	 * @param  string $content the_content
@@ -440,6 +443,7 @@ class FML implements FMLConstants
 	}
 	/**
 	 * Modify HTML attachment to add shortcode for flickr media when inserting
+	 * from editor
 	 *
 	 * Note that shortcode attribute names cannot have dashes, so we replace
 	 * them with _
@@ -491,7 +495,7 @@ class FML implements FMLConstants
 		return $content;
 	}
 	/**
-	 * Process shortcode for $content
+	 * Process [fmlmedia] shortcode for $content
 	 *
 	 * In order for this to work as expected, this shortcode handler is loaded
 	 * using the pattern used by embed and syntaxhighlighter to run before
@@ -503,21 +507,30 @@ class FML implements FMLConstants
 	 * the generated output (while appending to img.class). The assumption is
 	 * the first valid tag is either the img or the a>img. It does this through
 	 * regex to avoid having to use an expensive DOM parser (and transients).
+	 * Class attributes are treated specially (appended instead of  replaced).
 	 * 
 	 * Modify caption is not support because we don't want to be injecting
 	 * content willy nilly at runtime. Note that if you want to deal with the
 	 * fact that caption width attributes are not responsive (which they are
 	 * not), rip that stuff out in caption using the `img_caption_shortcode`
 	 * filter.
-	 * 
+	 *
+	 * Remember if doing a bare [fmlmedia]…[/fmlmedia], this will still override
+	 * the link href and the size with the defaults for the shortcode. For
+	 * instance, you may have linked a large, but we're substituting
+	 * substituting a medium. If you want to do override the defaults, take the
+	 * time to provide the image_size and link tags.
+	 *
+	 * @see  FML\FML::run_shortcode() Process handler to run shortcode earlier
 	 * @param  array  $atts    raw shortcode attributes
 	 * @param  string $content content shortcode wrapss
 	 * @return string          HTML output corrected to embed FML asset correctly
-	 * @todo   move code to run earlier
+	 * @todo   inject plugin defaults for attributes
+	 * @todo  add setting for extraacting content to flickrid
+	 * @todo  add option for auto-adding missing media
 	 */
 	public function shortcode( $atts, $content='' ) {
 		// 1. Process shortcode attributes against defaults
-		// TODO: inject plugin defaults here.
 		$atts = shortcode_atts( array(
 			'id'           => 0,
 			'flickr_id'    => 0,
@@ -532,18 +545,26 @@ class FML implements FMLConstants
 		), $atts);
 		// 2. Verify post is FML media first.
 		//    To do this, we must have either the id or flickr_id set, prefering
-		//    id
-		if ( $atts['id'] == 0 ) {
-			if ( $atts['flickr_id'] == 0 ) {
-				return $content;
+		//    id, optionally this can extract or generate
+		if ( $atts['id'] == 0 && $atts['flickr_id'] == 0 ) {
+			if (true) {
+				$atts['flickr_id'] = self::extract_flickr_id( $content );
 			}
+		}
+		if ( $atts['id'] == 0 && $atts['flickr_id'] == 0 ) {
+			return $content;
+		}
+		if ( $atts['id'] == 0 ) {
 			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
-			// TODO: add option to generate FML media automatically
+			if ( !$post && true ) {
+				// generate FML media automatically
+				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
+			}
 		} else {
 			$post = get_post( $atts['id'] );
 		}
 		if ( !$post ) {
-			return do_shortcode( $content );
+			return $content;
 		}
 		// 3. Process other attributes
 		//    Inject title if missing/not provided
@@ -632,13 +653,14 @@ class FML implements FMLConstants
 			$a_gen = false;
 			$img_gen = self::extract_html_attributes( $content );
 		}
-		//    b. run regex processing on content (save the match). First tag
-		//       found must be the image or the enclosing <a> tag.
-		if ( !preg_match( '!<([a-z0-9\-._:]+).*?>[\s\S]*?(<\/\1>)|\s*\/?>!im', $content, $matches ) ) {
+		//    b. run regex processing on content (save the match). Must be
+		//       and <img> or a <a><img></a>.
+		/* if ( !preg_match( '!<([a-z0-9\-._:]+).*?>[\s\S]*?(<\/\1>)|\s*\/?>!im', $content, $matches ) ) { */
+		if ( !preg_match( '!(<a\s[^>]*>)?<img\s[^>]*>(</a>)?!im', $content, $matches ) ) {
 			// no html in content so just prepend shortcode injection
 			return $html.$content;
 		}
-		$needle = $matches[0]; //save for later
+		$needle = $matches[0]; //save for later for insertion
 		$extract = self::extract_html_attributes( $needle );
 		if ( $extract['element'] == 'a' ) {
 			$img = self::extract_html_attributes ( $extract['content'] );
@@ -724,6 +746,18 @@ class FML implements FMLConstants
 	        }
 	    }
 	    return $results;
+	}
+	/**
+	 * Attempt to find flickr_id from content (look for photo page)
+	 * @param  string $html content to look for
+	 * @return string|false the flickr id found or false
+	 */
+	static public function extract_flickr_id($html) {
+		//e.g. https://www.flickr.com/photos/tychay/16452349917
+		if ( preg_match( self::REGEX_FLICKR_PHOTO_URL, $html, $matches ) ) {
+			return $matches[1];
+		}
+		return false;
 	}
 	/**
 	 * Reverse extract_html_attributes()
@@ -1036,6 +1070,9 @@ class FML implements FMLConstants
 	 * @todo  think of moving this into the metadata field
 	 */
 	static private function _wp_read_image_metadata( $flickr_data ) {
+		// prevent undefined functione error if using shortcode to generate this
+		require_once(ABSPATH . 'wp-admin/includes/image.php');
+
 		// 1. Make flickr data sane
 	    $exif = self::_xform_flickr_exif($flickr_data['exif']);
 
