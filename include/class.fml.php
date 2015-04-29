@@ -103,7 +103,7 @@ class FML implements FMLConstants
 
 
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
-		add_filter( 'get_attached_file', array( $this, 'filter_get_attached_file'), 10, 2 );
+		add_filter( 'get_attached_file', array( get_class($this), 'filter_get_attached_file'), 10, 2 );
 		add_filter( 'wp_get_attachment_metadata', array( $this, 'filter_wp_get_attachment_metadata'), 10, 2 );
 		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
@@ -922,10 +922,10 @@ class FML implements FMLConstants
 	 * @param  int    $post_id       post id of attachment
 	 * @return string
 	 */
-	public function filter_get_attached_file( $file, $post_id ) {
+	static public function filter_get_attached_file( $file, $post_id ) {
 		$post = get_post( $post_id );
 		// Only operate on flickr media images
-		if ( $post->post_type != self::POST_TYPE ) { return $file; }
+		if ( $post && ( $post->post_type != self::POST_TYPE ) ) { return $file; }
 		$flickr_data = self::get_flickr_data( $post_id );
 		$img = self::_get_largest_image( $flickr_data );
 		return $img['source'];
