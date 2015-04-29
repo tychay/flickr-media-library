@@ -1022,7 +1022,7 @@
       
       // ATTACHMENT DISPLAY SETTINGS
       // Only allow injection if it's in the media library and we are injecting html
-      if ( photo_data.id && ( constants.page_type == 'media-button' ) ) {
+      if ( photo_data.id && ( constants.page_type == 'media_button' ) ) {
         var insert_box = $('<div>').attr({
           'class': 'attachment-display-settings'
         }).append(
