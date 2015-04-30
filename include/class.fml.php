@@ -109,6 +109,12 @@ class FML implements FMLConstants
 		add_filter( 'wp_get_attachment_metadata', array( $this, 'filter_wp_get_attachment_metadata'), 10, 2 );
 		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
+		// debugging
+		//add_filter( 'fml_shortcode', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
+		//add_filter( 'fml_shortcode_image_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
+		//add_filter( 'fml_shortcode_link_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
+		//add_filter( 'image_downsize', array( get_class($this), 'debug_filter_show_variables' ), 9, 3 );
+		//add_filter( 'image_downsize', array( get_class($this), 'debug_filter_show_variables' ), 11, 3 );
 	}
 	/**
 	 * Stuff to run on `init`
@@ -608,22 +614,29 @@ class FML implements FMLConstants
 		// TODO: Add support for configuring which of these classes get written
 		// by default (and how). For instance, size-Large instead of attachment-Large
 		// or map sizes to internal strings.
-		$iatts = array(
-			'class' => 'attachment-'.$size.' wp-image-'.$id,
-		);
+		$iatts = array();
+		$classes = array();
+		if ( is_string( $size ) ) {
+			$classes[] = 'attachment-'.str_replace( ' ', '_', $size );
+		}
+		$classes[] = 'wp-image-'.$id;
 		// This seems weird but is correct (WordPress is wrong). Title should be
 		// the title of the image, and alt should be a description provided for
 		// accessibility (screen readers). You can/should have both.
 		if ( $alt )   { $iatts['alt']   = $alt; }
 		if ( $title ) { $iatts['title'] = $title; }
-		if ( $align ) { $iatts['class'] = 'align'.$align.' '.$iatts['class']; }
+		if ( $align ) { $classes = 'align'.$align; }
+		// always need to override class, but there is emulation above
+		if ( !empty( $classes ) ) {
+			$iatts['class'] = implode( ' ', $classes );
+		}
 		$html = wp_get_attachment_image( $id, $size, false, $iatts);
 		$img_gen = self::extract_html_attributes( $html );
-		//     Strip out image_hwstring if running with scissors (picturefill.wp)
+		//     Strip out generated image_hwstring if running with scissors (picturefill.wp)
 		if ( !$atts['forcehw'] ) {
 			unset( $img_gen['attributes']['height'] );
 			unset( $img_gen['attributes']['width'] );
-			$html = self::build_html_attributes( $img_gen );
+			//$html = self::build_html_attributes( $img_gen );
 		}
 		if ( $atts['url'] ) {
 			$html = sprintf(
@@ -635,7 +648,7 @@ class FML implements FMLConstants
 			$a_gen = array(
 				'element'    => 'a',
 				'attributes' => array(),
-				'content'    => $html,
+				'content'    => $html, // this isn't valid, but no worries as it will be overwritten alwyas
 			);
 			if ( $rel ) { $a_gen['attributes']['rel'] = $rel; }
 		} else {
@@ -644,8 +657,17 @@ class FML implements FMLConstants
 
 		// 3. If there is no content (extracted), return html output
 		//if ( !$content ) { return apply_filters( 'fml_shortcode', $html, $post->ID, $atts ); }
-		if ( !$a && !$img ) { return apply_filters( 'fml_shortcode', $html.$content, $post->ID, $atts ); }
-		// this handles the above case too
+		if ( !$a && !$img ) {
+			// make sure to trigger all the filters
+			$img = apply_filters( 'fml_shortcode_image_attributes', $img_gen, $post->ID, $atts );
+			$html = self::build_html_attributes( $img );
+			if ( $a_gen )  {
+				$a_gen['content'] = $html;
+				$html = apply_filters( 'fml_shortcode_link_attributes', $a_gen, $post->ID, $atts );
+			}
+			return apply_filters( 'fml_shortcode', $html.$content, $post->ID, $atts );
+		}
+		// this handles the empty content case too
 
 		// 4. If there is content, merge unique things from that into our 
 		//    processed output.
@@ -672,7 +694,7 @@ class FML implements FMLConstants
 		$replace = self::build_html_attributes( $img );
 
 		//    d. iterate through a tag (if so) injecting that stuff inside
-		$skip_link = false;
+		$do_link = true;
 		if ( $a && $a_gen ) {
 			// nothing special, just merge
 			$a['attributes'] = array_merge( $a['attributes'], $a_gen['attributes'] );
@@ -684,9 +706,9 @@ class FML implements FMLConstants
 			$a = $a_gen;
 		} else {
 			// $replace has been set properly if just img tag
-			$skip_link = true;
+			$do_link = false;
 		}
-		if ( !$skip_link ) {
+		if ( $do_link) {
 			$a['content'] = $replace;
 			$a = apply_filters( 'fml_shortcode_link_attributes', $a, $post->ID, $atts );
 			$replace = self::build_html_attributes( $a );
@@ -697,16 +719,6 @@ class FML implements FMLConstants
 		$end   = $start + strlen( $needle );
 		$return = substr( $content, 0, $start ) . $replace . substr( $content, $end );
 		return apply_filters( 'fml_shortcode', $return, $post->ID, $atts );
-		/*
-		$return = substr( $content, 0, $start ) . $replace . substr( $content, $end );
-
-		
-		ob_start();
-		echo $return;
-		var_dump($atts,$html,$content,$return);die;
-		$return = ob_get_clean();
-		return $return;	
-		/* */
 	}
 	/**
 	 * Do attribute processing.
@@ -772,6 +784,17 @@ class FML implements FMLConstants
 			if ( !empty( $img['attributes']['alt']) ) {
 				$default_atts['alt'] = $img['attributes']['alt'];
 			}
+			if ( !empty( $img['attributes']['class']) ) {
+				// can be mis-typed as "false" but shouldn't be an issue
+				$default_atts['size'] = self::extract_flickr_sizes($img['attributes']['class']);
+			}
+			if ( !$default_atts['size'] && !empty( $img['attributes']['width']) && !empty( $img['attributes']['height']) ) {
+				$default_atts['size'] = array(
+					'width'   =>  $img['attributes']['width'],
+					'height'  =>  $img['attributes']['height'],
+					'crop'    =>  false,
+				);
+			}
 		}
 		 
 		// 3. Process Attributes against defaults
@@ -803,6 +826,8 @@ class FML implements FMLConstants
 			if ( !$post && apply_filters( 'fml_shortcode_should_generate_media', true ) ) {
 				// generate FML media automatically
 				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
+				// Could extract size from img src but we already check width
+				// and height and class so let's just use the default at this point
 			}
 		} else {
 			$post = get_post( $atts['id'] );
@@ -913,18 +938,6 @@ class FML implements FMLConstants
 			return $return . ' />';
 		}
 	}
-	/**
-	 * Attempt to find flickr_id from content (look for photo page)
-	 * @param  string $html content to look for
-	 * @return string       the flickr id found or enpty string
-	 */
-	static public function extract_flickr_id($html) {
-		//e.g. https://www.flickr.com/photos/tychay/16452349917
-		if ( preg_match( self::REGEX_FLICKR_PHOTO_URL, $html, $matches ) ) {
-			return $matches[1];
-		}
-		return '';
-	}
 	//
 	// ATTACHMENT EMULATIONS
 	// 
@@ -950,6 +963,7 @@ class FML implements FMLConstants
 		$img_sizes = $flickr_data['sizes']['size'];
 		if ( is_string($size) ) {
 			switch ( $size ) {
+				// built in types
 				case 'thumbnail':
 					$size = array(
 						'width'  => get_option( 'thumbnail_size_w', 150 ),
@@ -972,95 +986,15 @@ class FML implements FMLConstants
 					);
 					break;
 				case 'full':
-				case 'Original': //flickr size, if it is available then this shoudl be fine
+				// special case flickr size
+				case 'Original': //flickr size, if it is available then this should be fine
 					$img = self::_get_largest_image( $flickr_data );
 					return array( $img['source'], $img['width'], $img['height'], false );
-				// Flickr built-in types
-				case 'Square':
-					$size = array(
-						'width'  => 75,
-						'height' => 75,
-						'crop'  => true,
-					);
-					break;
-				case 'Large Square':
-				case 'Large_Square':
-					$size = array(
-						'width'  => 150,
-						'height' => 150,
-						'crop'  => true,
-					);
-					break;
-				case 'Thumbnail':
-					$size = array(
-						'width'  => 100,
-						'height' => 100,
-						'crop'  => false,
-					);
-					break;
-				case 'Small':
-					$size = array(
-						'width'  => 240,
-						'height' => 240,
-						'crop'  => false,
-					);
-					break;
-				case 'Small 320':
-				case 'Small_320':
-					$size = array(
-						'width'  => 320,
-						'height' => 320,
-						'crop'  => false,
-					);
-					break;
-				case 'Medium':
-					$size = array(
-						'width'  => 500,
-						'height' => 500,
-						'crop'  => false,
-					);
-					break;
-				case 'Medium 640':
-				case 'Medium_640':
-					$size = array(
-						'width'  => 640,
-						'height' => 640,
-						'crop'  => false,
-					);
-					break;
-				case 'Medium 800':
-				case 'Medium_800':
-					$size = array(
-						'width'  => 800,
-						'height' => 800,
-						'crop'  => false,
-					);
-					break;
-				case 'Large':
-					$size = array(
-						'width'  => 1024,
-						'height' => 1024,
-						'crop'  => false,
-					);
-					break;
-				case 'Large 1600':
-				case 'Large_1600':
-					$size = array(
-						'width'  => 1600,
-						'height' => 1600,
-						'crop'  => false,
-					);
-					break;
-				case 'Large 2048':
-				case 'Large_2048':
-					$size = array(
-						'width'  => 2048,
-						'height' => 2048,
-						'crop'  => false,
-					);
-					break;
 				default:
-					$size = $_wp_additional_image_sizes[$size];
+					// check if built-in flickr types
+					$maybe_size = self::flickr_sizes_to_dims( $size );
+					// it's either a flickr size or a WordPress size type
+					$size = ( $maybe_size ) ? $maybe_size : $_wp_additional_image_sizes[$size];
 			}
 		}
 		// Find closest image size
@@ -1373,7 +1307,172 @@ class FML implements FMLConstants
 			*/
 		}
 		return $return;
-
+	}
+	//
+	// FLICKR UTILITY FUNCTIONS
+	// 
+	/**
+	 * Attempt to find flickr_id from content (look for photo page)
+	 * @param  string $html content to look for
+	 * @return string|false the flickr id found or false
+	 */
+	static public function extract_flickr_id($html) {
+		//e.g. https://www.flickr.com/photos/tychay/16452349917
+		if ( preg_match( self::REGEX_FLICKR_PHOTO_URL, $html, $matches ) ) {
+			return $matches[1];
+		}
+		return false;
+	}
+	/**
+	 * Recognize flickr size strings.
+	 *
+	 * Supports <size>, <size_in_classname>, and size-<size_in_classname>.
+	 * 
+	 * @param  string  $size_string the string (from a class) or transformed by
+	 *                              class
+	 * @return string|false         the Flickr size string
+	 */
+	static public function extract_flickr_sizes( $size_string ) {
+		$size_string = trim($size_string);
+		// extract from class name if it is one
+		if ( strpos( $size_string, '_') && preg_match('!size-([a-z_]+)!', $size_string, $matches ) ) {
+			$size_string = $matches[1];
+		}
+		switch ( $size_string ) {
+			case 'Original':
+			case 'size-Original':
+			case 'full': //handle "full" from emulated mode
+			case 'size-full':
+				return 'Original';
+			case 'Square':
+			case 'size-Square':
+				return 'Square';
+			case 'Large Square':
+			case 'Large_Square':
+			case 'size-Large_Square':
+				return 'Large Square';
+			case 'Thumbnail':
+			case 'size-Thumbnail':
+				return 'Thumbnail';
+			case 'Small':
+			case 'size-Small':
+				return 'Small';
+			case 'Small 320':
+			case 'Small_320':
+			case 'size-Small_320':
+				return 'Small 320';
+			case 'Medium':
+			case 'size-Medium':
+				return 'Medium';
+			case 'Medium 640':
+			case 'Medium_640':
+			case 'size-Medium_640':
+				return 'Medium 640';
+			case 'Medium 800':
+			case 'Medium_800':
+			case 'size-Medium_800':
+				return 'Medium 800';
+			case 'Large':
+			case 'size-Large':
+				return 'Large';
+			case 'Large 1600':
+			case 'Large_1600':
+			case 'size-Large_1600':
+				return 'Large 1600';
+			case 'Large 2048':
+			case 'Large_2048':
+			case 'size-Large_2048':
+				return 'Large 2048';
+		}
+		return false;
+	}
+	/**
+	 * Get (usable) dims from flickr sizes.
+	 *
+	 * By "usable", if Original, it will actually return dims for largest image
+	 * @param  string $size_string {@see FML\FML::extract_flickr_sizes()}
+	 * @return array|false         width, height, crop or false if no match
+	 */
+	static public function flickr_sizes_to_dims( $size_string ) {
+		$size_string = self::extract_flickr_sizes( $size_string );
+		if ( !$size_string ) { return false; }
+		switch ( $size_string ) {
+			case 'Original': //flickr size, if it is available then this shoudl be fine
+				$img = self::_get_largest_image( $flickr_data );
+				return array(
+					'width'  => $img['width'],
+					'height' => $img['height'],
+					'crop'   => false,
+				);
+			case 'Square':
+				return array(
+					'width'  => 75,
+					'height' => 75,
+					'crop'  => true,
+				);
+			case 'Large Square':
+				return array(
+					'width'  => 150,
+					'height' => 150,
+					'crop'  => true,
+				);
+			case 'Thumbnail':
+				return array(
+					'width'  => 100,
+					'height' => 100,
+					'crop'  => false,
+				);
+			case 'Small':
+				return array(
+					'width'  => 240,
+					'height' => 240,
+					'crop'  => false,
+				);
+			case 'Small 320':
+				return array(
+					'width'  => 320,
+					'height' => 320,
+					'crop'  => false,
+				);
+			case 'Medium':
+				return array(
+					'width'  => 500,
+					'height' => 500,
+					'crop'  => false,
+				);
+			case 'Medium 640':
+			case 'Medium_640':
+				return array(
+					'width'  => 640,
+					'height' => 640,
+					'crop'  => false,
+				);
+			case 'Medium 800':
+			case 'Medium_800':
+				return array(
+					'width'  => 800,
+					'height' => 800,
+					'crop'  => false,
+				);
+			case 'Large':
+				return array(
+					'width'  => 1024,
+					'height' => 1024,
+					'crop'  => false,
+				);
+			case 'Large 1600':
+				return array(
+					'width'  => 1600,
+					'height' => 1600,
+					'crop'  => false,
+				);
+			case 'Large 2048':
+				return array(
+					'width'  => 2048,
+					'height' => 2048,
+					'crop'  => false,
+				);
+		}
 	}
 	//
 	// FLICKR MEDIA POSTTYPE
@@ -1763,4 +1862,8 @@ class FML implements FMLConstants
 	//
 	// CLASS FUNCTIONS
 	// 
+	static function debug_filter_show_variables( $return )  {
+		var_dump( func_get_args() );
+		return $return;
+	}
 }
