@@ -613,18 +613,20 @@ class FML implements FMLConstants
 			//$html = self::build_html_attributes( $img_gen );
 		}
 		if ( $atts['url'] ) {
+			$a_gen = array(
+				'element'    => 'a',
+				'attributes' => array( 'href' => $atts['url'] ),
+				'content'    => $html, // this isn't always valid, but no worries as it will be overwritten 
+			);
+			if ( $rel ) { $a_gen['attributes']['rel'] = $rel; }
+			/*
 			$html = sprintf(
 				'<a href="%s"%s>%s</a>',
 				esc_attr( $atts['url'] ),
 				( $rel ) ? ' rel="'.esc_attr($rel).'"' : '',
 				$html
 			);
-			$a_gen = array(
-				'element'    => 'a',
-				'attributes' => array(),
-				'content'    => $html, // this isn't valid, but no worries as it will be overwritten alwyas
-			);
-			if ( $rel ) { $a_gen['attributes']['rel'] = $rel; }
+			/* */
 		} else {
 			$a_gen = false;
 		}
@@ -918,8 +920,11 @@ class FML implements FMLConstants
 				case 'file':
 				//$url = get_attached_file( $id );
 				//Flickr community guidelines: link the download page
-				$atts['url'] = self::get_flickr_link( $post ).'sizes/';
-				$atts['rel'] = 'flickr';
+				$downsize = image_downsize( $post->ID, 'full' );
+				$atts['url'] = $downsize[0];
+				$atts['rel'] = 'original';
+				//$atts['url'] = self::get_flickr_link( $post ).'sizes/';
+				//$atts['rel'] = 'flickr-download';
 				break;
 				case 'post':
 				$atts['url'] = get_permalink( $post );
