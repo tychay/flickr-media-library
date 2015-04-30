@@ -111,7 +111,8 @@ class FML implements FMLConstants
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
 		if(defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1)){
 			// Add Picturefill.WP 2 specific code here.
-			add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
+			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
+			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
 		}
 		// Debugging
 		//add_filter( 'fml_shortcode', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
@@ -1015,13 +1016,19 @@ class FML implements FMLConstants
 	 *
 	 * This does it by hooking off of the img injection
 	 * 
+	 * 1. Figure out if we're an icon or an image
+	 * 2. Generate srcset
+	 * 3. Replace src with small image
+	 * 4. Figure out sizes (maybe remove width and height)
+	 * 5. Return image
+	 * 
 	 * @param  array  $img     extract of image to be inserted
 	 * @param  int    $post_id post ID of fml media
 	 * @param  array  $atts    parsed attributes
 	 * @return array           extract of image with srcset added
 	 */
 	public function shortcode_inject_srcset_srcs( $img, $post_id, $atts ) {
-		// figure out if we're an icon or an image
+		// 1. Figure out if we're an icon or an image
 		$icon_sizes = array( 'Square', 'Large Square' );
 		$desired_size = '';
 		$desired_width = '';
@@ -1045,7 +1052,7 @@ class FML implements FMLConstants
 			$is_icon = false;
 		}
 
-		// Generate srcset
+		// 2. Generate srcset
 		$metadata = wp_get_attachment_metadata( $post_id );
 		$srcsets = array();
 		foreach ( $metadata['sizes'] as $size=>$size_data ) {
@@ -1061,14 +1068,14 @@ class FML implements FMLConstants
 		}
 		$img['attributes']['srcset'] = implode( ', ', $srcsets );
 
-		// replace src with small image
+		// 3. Replace src with small image
 		if ( $is_icon ) {
 			$img['attributes']['src'] = $metadata['sizes']['Square']['src'];
 		} else {
 			$img['attributes']['src'] = $metadata['sizes']['Thumbnail']['src'];
 		}
 
-		// figure out sizes
+		// 4. Figure out sizes (maybe remove width and height)
 		if ( $desired_size ) {
 			$desired_width = $metadata['sizes'][$desired_size]['width'];
 		}
@@ -1081,11 +1088,78 @@ class FML implements FMLConstants
 			//$img['attributes']['sizes'] = '100vw';
 		}
 
+		// 5. Return image
 		return $img;
+	}
+	/**
+	 * Inject the srcset and srcs for fmlmedia into attachmen
+	 * 
+	 * 1. Figure out if we're an icon or an image
+	 * 2. Generate srcset
+	 * 3. Replace src with small image
+	 * 4. Figure out sizes (maybe remove width and height)
+	 * 5. Queue picturefill
+	 * 6. Return image
+	 * 
+	 * @param  array   $attr the attributes to inject
+	 * @param  WP_Post $post the fml media post
+	 * @param  mixed   $size size string or array
+	 * @return array         adjusted attribute array
+	 */
+	public function attachment_inject_srcset_srcs( $attr, $post, $size ) {
+		// 1. Figure out if we're an icon or an image
+		$icon_sizes = array( 'Square', 'Large Square' );
+		list ( $src, $width, $height, $is_intermediate ) = image_downsize( $post->ID, $size );
+		$desired_width = $width;
+		/*
+		$size = self::image_size( $size );
+		if ( is_array( $size ) ) {
+			$desired_width = $width;
+		}
+		*/
+		$is_icon = ( ( $width == $height ) && ( $width <= 150 ) );
+
+		// 2. Generate srcset
+		$metadata = wp_get_attachment_metadata( $post->ID );
+		$srcsets = array();
+		foreach ( $metadata['sizes'] as $size=>$size_data ) {
+			if ( in_array( $size, $icon_sizes ) ) {
+				if ( $is_icon ) {
+					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
+				}
+			} else {
+				if ( !$is_icon ) {
+					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
+				}
+			}
+		}
+		$attr['srcset'] = implode( ', ', $srcsets );
+
+		// 3. Replace src with small image
+		if ( $is_icon ) {
+			$attr['src'] = $metadata['sizes']['Square']['src'];
+		} else {
+			$attr['src'] = $metadata['sizes']['Thumbnail']['src'];
+		}
+
+		// 4. Figure out sizes (maybe remove width and height)
+		$attr['sizes'] = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
+		// remove width and height
+		unset($attr['width']);
+		unset($attr['height']);
+
+		// 5. Queue picturefill
+		// Will not grow image on older browsers if not in the_content().
+		// For instance, if you create an article where only image is post
+		// thumbnail
+		
+		wp_enqueue_script( 'picturefill' );
+		// 6. Return image
+		return $attr;
 	}
 	//
 	// ATTACHMENT EMULATIONS
-	// 
+	//
 	/**
 	 * Inject Flickr image downsize code if image is Flickr Media
 	 * 
@@ -1098,55 +1172,30 @@ class FML implements FMLConstants
 	 * @see https://developer.wordpress.org/reference/hooks/image_downsize/
 	 */
 	public function filter_image_downsize( $downsize, $id, $size ) {
-		global $_wp_additional_image_sizes;
-
-		$post = get_post( $id );
 		// Only operate on flickr media images
+		$post = get_post( $id );
 		if ( $post->post_type != self::POST_TYPE ) { return $downsize; }
 
+		// Translate sizes to array (we'll get the "is_intermediate" info by
+		// checking for the exact ratio below)
+		$size = self::image_size( $size );
+
+		// Special case: full
+		// This could be replaced by wp_image_get_metadata except for the need
+		// for the full image :-(
 		$flickr_data = self::get_flickr_data( $id );
-		$img_sizes = $flickr_data['sizes']['size'];
-		if ( is_string($size) ) {
-			switch ( $size ) {
-				// built in types
-				case 'thumbnail':
-					$size = array(
-						'width'  => get_option( 'thumbnail_size_w', 150 ),
-						'height' => get_option( 'thumbnail_size_h', 150 ),
-						'crop'  => true,
-					);
-					break;
-				case 'medium':
-					$size = array(
-						'width'  => get_option( 'medium_size_w', 300 ),
-						'height' => get_option( 'medium_size_h', 300 ),
-						'crop'  => false,
-					);
-					break;
-				case 'large':
-					$size = array(
-						'width'  => get_option( 'large_size_w', 1024 ),
-						'height' => get_option( 'large_size_h', 1024 ),
-						'crop'  => false,
-					);
-					break;
-				case 'full':
-				// special case flickr size
-				case 'Original': //flickr size, if it is available then this should be fine
-					$img = self::_get_largest_image( $flickr_data );
-					return array( $img['source'], $img['width'], $img['height'], false );
-				default:
-					// check if built-in flickr types
-					$maybe_size = self::flickr_sizes_to_dims( $size );
-					// it's either a flickr size or a WordPress size type
-					$size = ( $maybe_size ) ? $maybe_size : $_wp_additional_image_sizes[$size];
-			}
+		if ( $size == 'full' ) {
+			$img = self::_get_largest_image( $flickr_data );
+			return array( $img['source'], $img['width'], $img['height'], false );
 		}
+
+		$img_sizes = $flickr_data['sizes']['size'];
 		// Find closest image size
 		$img = array();
-		if ( $size['crop'] ) {
-			// If image is crop, then make sure we choose an image that is 
-			// bigger than the smallest dimension
+		if ( $size['crop'] && apply_filters( 'fml_image_downsize_can_crop', false ) ) {
+			// If image is crop and we support some sort of crop handling
+			// upstream then make sure we choose an image that is bigger than
+			// the smallest dimension
 			foreach ( $img_sizes as $img ) {
 				$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 				$min_ratio = min( $img['width']/$size['width'], $img['height']/$size['height'] );
@@ -1160,8 +1209,9 @@ class FML implements FMLConstants
 				}
 			}
 		} else {
-			// If image is not crop, choose an image where the object that is
-			// exactly or slightly larger than the most constraining dimension
+			// If image is not crop (or no support for cropping), choose an
+			// image where the object that is exactly or slightly larger than
+			// the most constraining dimension
 			foreach ( $img_sizes as $img ) {
 				$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 				if ( $max_ratio == 1 ) {
@@ -1233,6 +1283,7 @@ class FML implements FMLConstants
 			'src'    => $size_data['source'],
 		);
 		$metadata['sizes']  = $sizes;
+
 		//$metadata['image_meta'] = self::_wp_read_image_metadata( $flickr_data );
 		return $metadata;
 	}
@@ -1477,6 +1528,50 @@ class FML implements FMLConstants
 			return $matches[1];
 		}
 		return false;
+	}
+	/**
+	 * This is needed because cropping doesn't exist in Flickr.
+	 *
+	 * Later we'll have a hook to override this
+	 * @param  mixed  $size size string or array
+	 * @return array        size array | 'full'
+	 */
+	static public function image_size( $size ) {
+		global $_wp_additional_image_sizes;
+
+		if ( is_array($size) ) {
+			return $size;
+		}
+		switch ( $size ) {
+			// built in types
+			case 'thumbnail':
+				return array(
+					'width'  => get_option( 'thumbnail_size_w', 150 ),
+					'height' => get_option( 'thumbnail_size_h', 150 ),
+					'crop'  => true,
+				);
+			case 'medium':
+				return array(
+					'width'  => get_option( 'medium_size_w', 300 ),
+					'height' => get_option( 'medium_size_h', 300 ),
+					'crop'  => false,
+				);
+			case 'large':
+				return array(
+					'width'  => get_option( 'large_size_w', 1024 ),
+					'height' => get_option( 'large_size_h', 1024 ),
+					'crop'  => false,
+				);
+			case 'full':
+			// special case flickr size
+			case 'Original': //flickr size, if it is available then this should be fine
+				return 'full';
+			default:
+				// check if built-in flickr types
+				$maybe_size = self::flickr_sizes_to_dims( $size );
+				// it's either a flickr size or a WordPress size type
+				return ( $maybe_size ) ? $maybe_size : $_wp_additional_image_sizes[$size];
+		}
 	}
 	/**
 	 * Recognize flickr size strings.
