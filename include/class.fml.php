@@ -538,16 +538,15 @@ class FML implements FMLConstants
 	 * substituting a medium. If you want to do override the defaults, take the
 	 * time to provide the image_size and link tags.
 	 *
+	 * This method:
+	 *
+	 * 1. Process shortcode attributes (and get attachment)
+	 * 2. Generate html output (and extract attributes)
+	 * 3. If there is no content, return html output
+	 * 4. If there is content, generate new content by merging and return it
+	 * 
 	 * @see  FML\FML::run_shortcode() Process handler to run shortcode earlier
-	 * @param  array  $atts    raw shortcode attributes
-	 *   - id: The post ID of the flickr Media
-	 *   - flickr_id: if ID is not provided, this is the flickr ID of the image
-	 *   - alt: The alt tag to use in the image
-	 *   - title: image title
-	 *   - size: the size of the image to use
-	 *   - align: alignment (not really used except in class names)
-	 *   - link: the link type (or 'custom')
-	 *   - url: the url to link (if link is custom)
+	 * @param  array  $atts    shortcode attributes {@see FML\FML::_shortcode_attrs()}
 	 * @param  string $content content shortcode wrapss
 	 * @return string          HTML output corrected to embed FML asset correctly
 	 * @todo   inject plugin defaults for attributes
@@ -555,89 +554,24 @@ class FML implements FMLConstants
 	 * @todo  add option for auto-adding missing media
 	 */
 	public function shortcode( $raw_atts, $content='' ) {
-		// 1. Process shortcode attributes against defaults
-		$atts = shortcode_atts( array(
-			'id'        => 0,
-			'flickr_id' => 0,
-			'alt'       => '',
-			'title'     => '',
-			'size'      => 'Medium', // transformed from image-size
-			'align'     => '',       // editor default may be none, but ours is
-			                         // no attribute/class
-			'link'      => 'flickr', // because of TOS
-			'url'       => '',
-			//'post_excerpt' => '', // caption
-		), $raw_atts, 'fmlmedia' );
-		// 2. Verify post is FML media first.
-		//    To do this, we must have either the id or flickr_id set, prefering
-		//    id, optionally this can extract or generate
-		if ( $atts['id'] == 0 && $atts['flickr_id'] == 0 ) {
-			if (true) {
-				$atts['flickr_id'] = self::extract_flickr_id( $content );
-			}
+		// 1. Process shortcode attributes (and get attachment)
+		list ( $atts, $post ) = $this->_shortcode_attrs( $raw_atts, $content );
+		if ( !$post || ( $post->post_type != self::POST_TYPE ) ) {
+			return apply_filters( 'fml_shortcode', $content, false, $atts );
 		}
-		if ( $atts['id'] == 0 && $atts['flickr_id'] == 0 ) {
-			return $content;
-		}
-		if ( $atts['id'] == 0 ) {
-			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
-			if ( !$post && true ) {
-				// generate FML media automatically
-				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
-			}
-		} else {
-			$post = get_post( $atts['id'] );
-		}
-		if ( !$post ) {
-			return $content;
-		}
-		// 3. Process other attributes
-		//    Inject title if missing/not provided
-		if ( !$atts['title'] ) {
-			$atts['title'] = trim( $post->post_title );
-		}
-		//    Inject alt if missing/not provided
-		if ( !$atts['alt'] ) {
-			$atts['alt'] = trim( get_post_meta( $post->ID, '_wp_attachment_image_alt', true ) );
-		}
-		//    Find url to link if any
-		$rel = '';
-		if ( $atts['link'] ) {
-			switch ( $atts['link'] ) {
-				case 'file':
-				//$url = get_attached_file( $id );
-				//Flickr community guidelines: link the download page
-				$atts['url'] = self::get_flickr_link( $post ).'sizes/';
-				$rel = 'flickr';
-				break;
-				case 'post':
-				$atts['url'] = get_permalink( $post );
-				$rel = 'attachment-flickr wp-att-'.$post->ID;
-				break;
-				case 'flickr':
-				$atts['url'] = self::get_flickr_link( $post );
-				$rel = 'flickr';
-				break;
-				case 'custom': //if 'custom' with no URL, then it means flickr link
-				if ( !$atts['url'] ) {
-					$atts['url'] = self::get_flickr_link( $post );
-					//$atts['link'] = 'flickr';
-					$rel = 'flickr';
-				}
-				default: // unknown
-				$atts['link'] = '';
-			}
-		}
-		// 3. Run attachment processing on the code.
+
 		$id    = $post->ID;
 		$alt   = $atts['alt'];
 		$title = $atts['title'];
 		$align = $atts['align'];
 		$size  = $atts['size'];
+		$rel   = $atts['rel'];
+		// 2. Generate HTML output from shortcode (and extrat attributes)
+		
 		//     This is basically the corrected get_image_send_to_editor()
 		//     without any caption content (which would trigger caption handling)
-		//     Remember the real get_image_send_to_editor and it's hooks are
-		//     not available.
+		//     Remember the real get_image_send_to_editor and its hooks are
+		//     not available since they are part of admin code.
 		/* // DO NOT RUN IT THIS WAY: Reason: this does not trigger wp_get_attachment_image_attributes which is needed for things like post thumbnails, etc.
 		$html = get_image_tag($id, $alt, $title, $align, $size);
 		*/
@@ -655,7 +589,13 @@ class FML implements FMLConstants
 		if ( $title ) { $iatts['title'] = $title; }
 		if ( $align ) { $iatts['class'] = 'align'.$align.' '.$iatts['class']; }
 		$html = wp_get_attachment_image( $id, $size, false, $iatts);
+		$img_gen = self::extract_html_attributes( $html );
 		// TODO: Add code to strip out image_hwstring if running with scissors (picturefill.wp)
+		if ( !$atts['forcehw'] ) {
+			unset( $img_gen['attributes']['height'] );
+			unset( $img_gen['attributes']['width'] );
+			$html = self::build_html_attributes( $img_gen );
+		}
 		if ( $atts['url'] ) {
 			$html = sprintf(
 				'<a href="%s"%s>%s</a>',
@@ -663,43 +603,48 @@ class FML implements FMLConstants
 				( $rel ) ? ' rel="'.esc_attr($rel).'"' : '',
 				$html
 			);
+			$a_gen = array(
+				'element'    => 'a',
+				'attributes' => array(),
+				'content'    => $html,
+			);
+			if ( $rel ) { $a_gen['attributes']['rel'] = $rel; }
+		} else {
+			$a_gen = false;
 		}
-		if ( !$content ) {
-			return $html;
-		}
+
+		// 3. If there is no content, return html output
+		if ( !$content ) { return apply_filters( 'fml_shortcode', $html, $post->ID, $atts ); }
 
 		// 4. If there is content, merge unique things from that into our 
 		//    processed output.
-		//    a. run regex processing on output
-		if ( $atts['url'] ) {
-			$a_gen = self::extract_html_attributes( $html );
-			$img_gen = self::extract_html_attributes( $a_gen['content'] );
-		} else {
-			$a_gen = false;
-			$img_gen = self::extract_html_attributes( $content );
-		}
+		//    a. no need to run regex on output because we've already extracted
+		//       $a_gen and $img_gen when we generated it
 		//    b. run regex processing on content (save the match). Must be
 		//       and <img> or a <a><img></a>.
 		/* if ( !preg_match( '!<([a-z0-9\-._:]+).*?>[\s\S]*?(<\/\1>)|\s*\/?>!im', $content, $matches ) ) { */
 		if ( !preg_match( '!(<a\s[^>]*>)?<img\s[^>]*>(</a>)?!im', $content, $matches ) ) {
 			// no html in content so just prepend shortcode injection
-			return $html.$content;
+			return apply_filters( 'fml_shortcode', $html.$content, $post->ID, $atts );
 		}
-		$needle = $matches[0]; //save for later for insertion
+		$needle = $matches[0]; //save for later for to find point of re-insertion
 		$extract = self::extract_html_attributes( $needle );
 		if ( $extract['element'] == 'a' ) {
 			$img = self::extract_html_attributes ( $extract['content'] );
 			if ( $img['element'] != 'img' ) {
 				// bare a tag in content? Prepend injection
-				return  $html.$content;
+				return apply_filters( 'fml_shortcode', $html.$content, $post->ID, $atts );
 			}
 			$a = $extract;
 		} elseif ( $extract['element'] == 'img' ) {
 			$a = false;
 			$img = $extract;
+		/*
+		// This should never happen
 		} else {
 			// first tag is not media, just prepend shortcode injection
 			return $html.$content;
+		/* */
 		}
 		//    c. iterate through img tag of content injecting the generated attrs
 		foreach ( $img_gen['attributes'] as $key=>$value ) {
@@ -714,29 +659,35 @@ class FML implements FMLConstants
 			// overwrite
 			$img['attributes'][$key] = $value;
 		}
+		$img = apply_filters( 'fml_shortcode_image_attributes', $img, $post->ID, $atts );
 		$replace = self::build_html_attributes( $img );
 
 		//    d. iterate through a tag (if so) injecting that stuff inside
+		$skip_link = false;
 		if ( $a && $a_gen ) {
 			// nothing special, just merge
 			$a['attributes'] = array_merge( $a['attributes'], $a_gen['attributes'] );
 			// and then insert img content above
-			$a['content'] = $replace;
-			$replace = self::build_html_attributes( $a );
 		} elseif ( $a ) {
 			// just the a tag in content
-			$a['content'] = $replace;
-			$replace = self::build_html_attributes( $a );
 		} elseif ( $a_gen ) {
 			// just the a tag in generated injection
-			$a_gen['content'] = $replace;
-			$replace = self::build_html_attributes( $a_gen );
-		}// else $replace has been set properly if just img tag
+			$a = $a_gen;
+		} else {
+			// $replace has been set properly if just img tag
+			$skip_link = true;
+		}
+		if ( !$skip_link ) {
+			$a['content'] = $replace;
+			$a = apply_filters( 'fml_shortcode_link_attributes', $a, $post->ID, $atts );
+			$replace = self::build_html_attributes( $a );
+		}
 		
 		//    e. restore and return
 		$start = strpos( $content, $needle );
 		$end   = $start + strlen( $needle );
-		return substr( $content, 0, $start ) . $replace . substr( $content, $end );
+		$return = substr( $content, 0, $start ) . $replace . substr( $content, $end );
+		return apply_filters( 'fml_shortcode', $return, $post->ID, $atts );
 		/*
 		$return = substr( $content, 0, $start ) . $replace . substr( $content, $end );
 
@@ -747,6 +698,124 @@ class FML implements FMLConstants
 		$return = ob_get_clean();
 		return $return;	
 		/* */
+	}
+	/**
+	 * Do attribute processing
+	 * 
+	 *   - id: The post ID of the flickr Media
+	 *   - flickr_id: if ID is not provided, this is the flickr ID of the image
+	 *   - alt: The alt tag to use in the image
+	 *   - title: image title
+	 *   - size: the size of the image to use
+	 *   - align: alignment (not really used except in class names)
+	 *   - link: the link type (or 'custom')
+	 *   - url: the url to link (if link is custom)
+	 *   - forcehw: overwrite height and width attributes with generated ones
+	 *   
+	 * @param  array $raw_atts attributes from the shortcode processor
+	 * @return array an array consisting of the processed attributes and the post
+	 */
+	private function _shortcode_attrs( $raw_atts, $content ) {
+		global $wp_version;
+
+		// 1. Get Default Attributes
+		$default_atts = array(
+			'id'        => 0,
+			'flickr_id' => 0,
+			'alt'       => '',
+			'title'     => '',
+			'size'      => 'Medium', // transformed from image-size
+			'align'     => '',       // editor default may be none, but ours is
+			                         // no attribute/class
+			'link'      => 'flickr', // because of TOS
+			'url'       => '',
+			'forcehw'   => false,
+			//'post_excerpt' => '', // caption
+		);
+		// 2. Process Attributes against defaults
+		// Technically we support WordPress 3.5 so we need to trap this (untested)
+		if ( version_compare( $wp_version, '3.6', '<' ) ) {
+			$atts = shortcode_atts( $default_atts, $raw_atts );
+			$atts = apply_filters( 'shortcode_atts_fmlmedia', $atts, $default_atts, $raw_atts );
+		} else {
+			$atts = shortcode_atts( $default_atts, $raw_atts, 'fmlmedia' );
+		}
+
+		// 3. Verify post is FML media first.
+		//    To do this, we must have either the id or flickr_id set, prefering
+		//    id, optionally this can extract or generate
+		if ( $atts['id'] == 0 && $atts['flickr_id'] == 0 ) {
+			if (true) {
+				$atts['flickr_id'] = self::extract_flickr_id( $content );
+			}
+		}
+		if ( $atts['id'] == 0 && $atts['flickr_id'] == 0 ) {
+			return array( $atts, false );
+		}
+		if ( $atts['id'] == 0 ) {
+			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
+			if ( !$post && true ) {
+				// generate FML media automatically
+				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
+			}
+		} else {
+			$post = get_post( $atts['id'] );
+		}
+		if ( !$post ) {
+			return array( $atts, $post );
+		}
+
+		// 4. Process other attributes
+		//    Format flags
+		$atts['forcehw'] = self::shortcode_bool( $atts['forcehw'] );
+		//    Inject title if missing/not provided
+		if ( !$atts['title'] ) {
+			$atts['title'] = trim( $post->post_title );
+		}
+		//    Inject alt if missing/not provided
+		if ( !$atts['alt'] ) {
+			$atts['alt'] = trim( get_post_meta( $post->ID, '_wp_attachment_image_alt', true ) );
+		}
+		//    Find url to link if any
+		$atts['rel'] = '';
+		if ( $atts['link'] ) {
+			switch ( $atts['link'] ) {
+				case 'file':
+				//$url = get_attached_file( $id );
+				//Flickr community guidelines: link the download page
+				$atts['url'] = self::get_flickr_link( $post ).'sizes/';
+				$atts['rel'] = 'flickr';
+				break;
+				case 'post':
+				$atts['url'] = get_permalink( $post );
+				$atts['rel'] = 'attachment-flickr wp-att-'.$post->ID;
+				break;
+				case 'flickr':
+				$atts['url'] = self::get_flickr_link( $post );
+				$atts['rel'] = 'flickr';
+				break;
+				case 'custom': //if 'custom' with no URL, then it means flickr link
+				if ( !$atts['url'] ) {
+					$atts['url'] = self::get_flickr_link( $post );
+					//$atts['link'] = 'flickr';
+					$rel = 'flickr';
+				}
+				default: // unknown
+				$atts['link'] = '';
+			}
+		}
+		return array( $atts, $post );
+	}
+	/**
+	 * Helper method to determine if a shortcode attribute is true or false.
+	 * (Taken from gistpress)
+	 *
+	 * @param string|int|bool $var Attribute value.
+	 * @return bool
+	 */
+	static public function shortcode_bool( $var ) {
+		$falsey = array( 'false', '0', 'no', 'n' );
+		return ( ! $var || in_array( strtolower( $var ), $falsey ) ) ? false : true;
 	}
 	/**
 	 * Extract HTML attributes.
@@ -773,18 +842,6 @@ class FML implements FMLConstants
 	    return $results;
 	}
 	/**
-	 * Attempt to find flickr_id from content (look for photo page)
-	 * @param  string $html content to look for
-	 * @return string|false the flickr id found or false
-	 */
-	static public function extract_flickr_id($html) {
-		//e.g. https://www.flickr.com/photos/tychay/16452349917
-		if ( preg_match( self::REGEX_FLICKR_PHOTO_URL, $html, $matches ) ) {
-			return $matches[1];
-		}
-		return false;
-	}
-	/**
 	 * Reverse extract_html_attributes()
 	 * 
 	 * @param  array  $extract output (or equiv) from extract_html_attributes()
@@ -801,8 +858,20 @@ class FML implements FMLConstants
 			return $return . ' />';
 		}
 	}
+	/**
+	 * Attempt to find flickr_id from content (look for photo page)
+	 * @param  string $html content to look for
+	 * @return string|false the flickr id found or false
+	 */
+	static public function extract_flickr_id($html) {
+		//e.g. https://www.flickr.com/photos/tychay/16452349917
+		if ( preg_match( self::REGEX_FLICKR_PHOTO_URL, $html, $matches ) ) {
+			return $matches[1];
+		}
+		return false;
+	}
 	//
-	// ATTACHEMENT EMULATIONS
+	// ATTACHMENT EMULATIONS
 	// 
 	/**
 	 * Inject Flickr image downsize code if image is Flickr Media
