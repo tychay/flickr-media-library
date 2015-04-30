@@ -109,7 +109,11 @@ class FML implements FMLConstants
 		add_filter( 'wp_get_attachment_metadata', array( $this, 'filter_wp_get_attachment_metadata'), 10, 2 );
 		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
-		// debugging
+		if(defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1)){
+			// Add Picturefill.WP 2 specific code here.
+			add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
+		}
+		// Debugging
 		//add_filter( 'fml_shortcode', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
 		//add_filter( 'fml_shortcode_image_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
 		//add_filter( 'fml_shortcode_link_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
@@ -819,7 +823,7 @@ class FML implements FMLConstants
 			}
 			if ( !empty( $img['attributes']['class']) ) {
 				// can be mis-typed as "false" but shouldn't be an issue
-				$default_atts['size']  = self::extract_flickr_sizes($img['attributes']['class']);
+				$default_atts['size']  = self::extract_flickr_sizes( $img['attributes']['class'], true );
 			}
 			if ( !$default_atts['size'] && !empty( $img['attributes']['width']) && !empty( $img['attributes']['height']) ) {
 				$default_atts['size'] = array(
@@ -1004,6 +1008,82 @@ class FML implements FMLConstants
 		}
 	}
 	//
+	// PICTUREFILL SUPPORT
+	//
+	/**
+	 * Inject the srcset and srcs for fmlmedia into shortcode
+	 *
+	 * This does it by hooking off of the img injection
+	 * 
+	 * @param  array  $img     extract of image to be inserted
+	 * @param  int    $post_id post ID of fml media
+	 * @param  array  $atts    parsed attributes
+	 * @return array           extract of image with srcset added
+	 */
+	public function shortcode_inject_srcset_srcs( $img, $post_id, $atts ) {
+		// figure out if we're an icon or an image
+		$icon_sizes = array( 'Square', 'Large Square' );
+		$desired_size = '';
+		$desired_width = '';
+		if ( !empty( $img['attributes']['width'] ) && !empty( $img['attributes']['height'] ) ) {
+			$is_icon = ( ( $img['attributes']['width'] == $img['attributes']['height'] ) && in_array( $img['attributes']['width'], array(75,150) ) );
+			$desired_width = $img['attributes']['width'];
+		} elseif ( !empty( $img['attributes']['class'] ) ) {
+			$desired_size = self::extract_flickr_sizes( $img['attributes']['class'], true );
+			$is_icon = ( $desired_size && in_array( $desired_size, $icon_sizes ) );
+		}
+		if ( !$desired_size && !$desired_width && !empty( $atts['size'] ) ) {
+			if ( is_array( $atts['size'] ) ) {
+				$is_icon = ( ( $atts['size']['width'] == $atts['size']['height'] ) && in_array( $atts['size']['width'], array(75,150) ) );
+				$desired_width = $atts['size']['width'];
+			} else {
+				$desired_size = self::extract_flickr_sizes( $atts['size'] );
+				$is_icon = ( $desired_size && in_array( $desired_size, $icon_sizes ) );
+			}
+		} else {
+			// assume it's not
+			$is_icon = false;
+		}
+
+		// Generate srcset
+		$metadata = wp_get_attachment_metadata( $post_id );
+		$srcsets = array();
+		foreach ( $metadata['sizes'] as $size=>$size_data ) {
+			if ( in_array( $size, $icon_sizes ) ) {
+				if ( $is_icon ) {
+					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
+				}
+			} else {
+				if ( !$is_icon ) {
+					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
+				}
+			}
+		}
+		$img['attributes']['srcset'] = implode( ', ', $srcsets );
+
+		// replace src with small image
+		if ( $is_icon ) {
+			$img['attributes']['src'] = $metadata['sizes']['Square']['src'];
+		} else {
+			$img['attributes']['src'] = $metadata['sizes']['Thumbnail']['src'];
+		}
+
+		// figure out sizes
+		if ( $desired_size ) {
+			$desired_width = $metadata['sizes'][$desired_size]['width'];
+		}
+		if ( $desired_width ) {
+			$img['attributes']['sizes'] = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
+			// remove width and height
+			unset($img['attributes']['width']);
+			unset($img['attributes']['height']);
+		} else {
+			//$img['attributes']['sizes'] = '100vw';
+		}
+
+		return $img;
+	}
+	//
 	// ATTACHMENT EMULATIONS
 	// 
 	/**
@@ -1140,9 +1220,19 @@ class FML implements FMLConstants
 				'width'  => intval( $size_data['width'] ),
 				'height' => intval( $size_data['height'] ),
 				'crop'   => ( strpos($label, 'Square') !== false && !$is_square ),
+				// not needed in core, but useful here
+				'src'    => $size_data['source'],
 			);
 		}
-		$metadata['sizes']      = $sizes;
+		// inject back in original (or just overwrite next largest)
+		$size_data = self::_get_largest_image($flickr_data);
+		$sizes[$size_data['label']] = array(
+			'width'  => intval( $size_data['width'] ),
+			'height' => intval( $size_data['height'] ),
+			'crop'   => ( strpos($size_data['label'], 'Square') !== false && !$is_square ),
+			'src'    => $size_data['source'],
+		);
+		$metadata['sizes']  = $sizes;
 		//$metadata['image_meta'] = self::_wp_read_image_metadata( $flickr_data );
 		return $metadata;
 	}
@@ -1397,11 +1487,14 @@ class FML implements FMLConstants
 	 *                              class
 	 * @return string|false         the Flickr size string
 	 */
-	static public function extract_flickr_sizes( $size_string ) {
-		$size_string = trim($size_string);
+	static public function extract_flickr_sizes( $size_string, $is_class=false ) {
 		// extract from class name if it is one
-		if ( strpos( $size_string, '_') && preg_match('!size-([a-z_]+)!', $size_string, $matches ) ) {
-			$size_string = $matches[1];
+		if ( $is_class ) {
+			if ( preg_match('!size-([a-z0-9_]+)!i', $size_string, $matches ) ) {
+				$size_string = $matches[1];
+			} elseif ( preg_match('!attachment-([a-z0-9_]+)!i', $size_string, $matches ) ) {
+				$size_string = $matches[1];
+			}
 		}
 		switch ( $size_string ) {
 			case 'Original':
