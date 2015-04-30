@@ -603,7 +603,7 @@ class FML implements FMLConstants
 		// accessibility (screen readers). You can/should have both.
 		if ( $alt )   { $iatts['alt']   = $alt; }
 		if ( $title ) { $iatts['title'] = $title; }
-		if ( $align ) { $classes = 'align'.$align; }
+		if ( $align ) { $classes[] = 'align'.$align; }
 		// always need to override class, but there is emulation above
 		if ( !empty( $classes ) ) {
 			$iatts['class'] = implode( ' ', $classes );
