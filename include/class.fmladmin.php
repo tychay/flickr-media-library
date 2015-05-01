@@ -30,7 +30,7 @@ class FMLAdmin
 	 * Display name (on tab) keyed by column id
 	 * @var array
 	 */
-	private $_option_tabs = array();
+	private $_options_tabs = array();
 	/**
 	 * The help tabs (indexed by (page) tab and tabid)
 	 */
@@ -41,7 +41,7 @@ class FMLAdmin
 	 * Display name (in screen options) keyed by column id.
 	 * @var array
 	 */
-	private $_option_checkboxes = array();
+	private $_options_checkboxes = array();
 	/**
 	 * Plugin Admin function initialization 
 	 * 
@@ -58,21 +58,24 @@ class FMLAdmin
 			'tab_media_upload'   => str_replace('-','_',FML::SLUG).'_insert_flickr',
 		);
 
-		$this->_option_tabs = array(
+		$this->_options_tabs = array(
 			'flickr_options' => __( 'Flickr API', FML::SLUG ),
 			'cpt_options'    => __( 'Custom Post', FML::SLUG ),
+			'output_options' => __( 'Editing &amp; Output', FML::SLUG ),
 		);
 		$this->_options_help_tabs = array(
 			'flickr_options' => array(
 				FML::SLUG.'-help-flickrauth' => __('Flickr authorization', FML::SLUG),
 			),
-			'cpt_options'     => array(
+			'cpt_options'    => array(
+			),
+			'output_options'  => array(
 			),
 		);
 		// I am removing the verb and the period to standardize on columns
 		// habits instead of on the special otpions
 		// (e.g. "Show full-height editor and distraction-free functionality."")
-		$this->_option_checkboxes = array(
+		$this->_options_checkboxes = array(
 			'fml_show_apikey' => __( 'Flickr API Key and Secret', FML::SLUG ),
 		);
 	}
@@ -353,7 +356,7 @@ class FMLAdmin
 	 * @return array           the columns with the new ones injected
 	 */
 	public function options_hidden_columns( $columns ) {
-		return array_merge( $columns, $this->_option_checkboxes );
+		return array_merge( $columns, $this->_options_checkboxes );
 	}
 	/**
 	 * Filter the get_options on hidden columns to inject defaults
@@ -363,7 +366,7 @@ class FMLAdmin
 	public function options_get_hidden_columns( $columns ) {
 		if ( $columns === false ) {
 			// all hidden columns should be hidden by default
-			return array_keys( $this->_option_checkboxes );
+			return array_keys( $this->_options_checkboxes );
 		}
 		return $columns;
 	}
@@ -382,8 +385,9 @@ class FMLAdmin
 		                 : $settings['flickr_api_secret'];
 		$auth_form_id    = $this->_ids['form_flickr_auth'];
 		$deauth_form_id  = $this->_ids['form_flickr_deauth'];
-		$tabs            = $this->_option_tabs;
+		$tabs            = $this->_options_tabs;
 		$active_tab      = $this->_options_active_tab();
+		$hidden_cols     = $this->_options_checkboxes;
 		include $this->_fml->template_dir.'/page.settings.php';
 	}
 	/**
@@ -425,8 +429,10 @@ class FMLAdmin
 	 */
 	private function _options_get_help_tab_content( $page_tab, $help_tab ) {
 		// remove the FML::SLUG part from the name
-		$tab_switch = $page_tab.'-'.substr( $help_tab, strlen(FML::SLUG)+1 );
+		$tab_switch          = $page_tab.'-'.substr( $help_tab, strlen(FML::SLUG)+1 );
 		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
+		$tabs                = $this->_options_tabs;
+		$hidden_cols         = $this->_options_checkboxes;
 
 		ob_start();
 		include $this->_fml->template_dir.'/help.options-tabs.php';
@@ -458,7 +464,7 @@ class FMLAdmin
 	 */
 	private function _options_active_tab() {
 		if ( isset( $_GET['tab'] ) ) {
-			if (in_array($_GET['tab'], array_keys( $this->_option_tabs ) ) ) {
+			if (in_array($_GET['tab'], array_keys( $this->_options_tabs ) ) ) {
 				return $_GET['tab'];
 			}
 		}

@@ -85,6 +85,8 @@ namespace FML;
 			break;
 		case 'cpt_options':
 			break;
+		case 'output_options':
+			break;
 	endswitch;
 
 	// Inject the hidden column table for screen options
@@ -92,7 +94,7 @@ namespace FML;
 	<table class="hidden_column_table" style="position: absolute; left: -999em;">
 		<tr>
 <?php
-	foreach( $this->_option_checkboxes as $key=>$value ) {
+	foreach( $hidden_cols as $key=>$value ) {
 		printf('<th scope="col" id="%1$s" class="manage-column column-%1$s" style="%2$s"></th>',
 			$key,
 			( $this->_options_column_is_hidden( $key ) ) ? 'display: none;' : ''
