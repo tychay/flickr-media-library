@@ -34,6 +34,13 @@ class FMLAdmin
 	 */
 	private $_flickr_apikey_option_name = '';
 	/**
+	 * All the hidden screen options columns on the Settings page.
+	 *
+	 * Key is the id of column, value is display name in the screen options
+	 * @var array
+	 */
+	private $_option_checkboxes = array();
+	/**
 	 * Plugin Admin function initialization 
 	 * 
 	 * @param \FML\FML $fml the FML plugin object
@@ -50,6 +57,9 @@ class FMLAdmin
 		);
 
 		$this->_flickr_apikey_option_name = str_replace('-','_',FML::SLUG).'_show_apikey';
+		$this->_option_checkboxes = array(
+			'fml_show_apikey' => __( 'Show Flickr API Key and Secret.', FML::SLUG ),
+		);
 	}
 	/**
 	 * Stuff to do on plugins_loaded
@@ -230,6 +240,9 @@ class FMLAdmin
 		add_action( 'admin_action_'.$this->_ids['form_flickr_auth'], array( $this, 'handle_auth_form') );
 		// - deauthorize: remove oAuth settings
 		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'handle_deauth_form') );
+		if ( !empty($_POST['action'] ) ) {
+			do_action( 'admin_action_'.$_POST['action'] );
+		}
 
 		// Add Settings contextual help tabs
 		//add_filter('contextual_help', array($this,'filter_settings_help'), 10, 3);
@@ -250,8 +263,13 @@ class FMLAdmin
 			'callback' => array( $this, 'show_settings_help_flickrauth' ),
 		));
 		$screen->set_help_sidebar( $this->_get_settings_help_sidebar() );
-		// Add Settings custom control to screen options tab
-		add_filter('screen_settings',array( $this, 'filter_settings_screen_options' ), 10, 2 );
+
+		// Hidden column support
+		add_filter( 'manage_'.$screen->id.'_columns', array( $this, 'filter_settings_hidden_columns' ) );
+		// this doesn't work yet, but can't hurt
+		add_filter( 'default_hidden_columns', array( $this, 'filter_settings_hidden_columns') );
+		add_filter( 'get_user_option_manage'.$screen->id.'columnshidden', array( $this, 'filter_settings_get_hidden_columns' ) );
+
 		// Enqueue Settings-specific Javascript (controls screenoptions)
 		wp_enqueue_script(
 			FML::SLUG.'-screen-settings', //handle
@@ -260,8 +278,9 @@ class FMLAdmin
 			FML::VERSION, //version
 			true //in footer?
 		);
-		// Save Settings screen options tab
-		//add_filter('set-screen-option', array($this,'filter_settings_set_screen_options'), 11, 3);
+		
+		// debugging: clear options to test default
+		//delete_user_option( get_current_user_id(), 'manage'.$screen->id.'columnshidden', true );
 	}
 	/**
 	 * Form request to (start) Flickr oAuth.
@@ -334,53 +353,39 @@ class FMLAdmin
 		return ob_get_clean();
 	}
 	/**
-	 * Tack on checkbox for customizing Flickr API Key
-	 * 
-	 * @param string $screen_settings The current state of the return value
-	 * @param WP_SCREEN $screen the screen object that triggered this
-	 * @return  string form element html to tack to the end of screen options
-	 */
-	public function filter_settings_screen_options($screen_settings, $screen) {
-		// We should only be triggered if in the right screen already
-		$form_html = sprintf(
-			'<div class="%1$s %4$s"><label for="%1$s-toggle"><input type="checkbox" id="%1$s-toggle"%2$s/>%3$s</label></div>',
-			$this->_flickr_apikey_option_name,
-			checked( get_user_setting( $this->_flickr_apikey_option_name, 'off' ), 'on', false ),
-			__( 'Show Flickr API Key and Secret.', FML::SLUG ),
-			'hidden'
-		);
-		return $form_html . $screen_settings;
-	}
-	/**
-	 * Filter used to define what screen_options are saved to user_meta
-	 * @param mixed $status current value of screen option (if false, it does not save)
-	 * @param string $option the option name that triggered filter
-	 * @param mixed $value  the value assigned to the option (e.g. number of rows to use)
-	 * @return mixed the value to set the screen option to (if false, don't save at all)
-	 */
-	/*
-	public function filter_settings_set_screen_options($status, $option, $value) {
-		if ( $option == $this->_flickr_apikey_option_name ) {
-			return $value;
-		}
-		// pass through filter
-		return $status;
-	}
-	*/
-	/**
-	 * hide/show API key + secret screen option settings coming via ajax
+	 * Inject the hidden columns into the screens columns array for tracking
 	 *
-	 * @todo  probably needs moving somewhere else
+	 * (Also used to set default_hidden_columns when that feature is supported
+	 * since all columns should be hidden by default.)
+	 * 
+	 * @param  array  $columns columns indexed by column_id with the value being
+	 *                         it's display name in screen options
+	 * @return array           the columns with the new ones injected
 	 */
-	public function handle_ajax_option_setapi() {
-		// we are pirating the nonce created in screen for screen options :-)
-		check_ajax_referer( 'screen-options-nonce', 'screenoptionnonce' );
-		//var_dump($_POST);
-		if ( !empty( $_POST[$this->_flickr_apikey_option_name] ) ) {
-			set_user_setting( $this->_flickr_apikey_option_name, $_POST[$this->_flickr_apikey_option_name] );
-			//die('here :-)');
+	public function filter_settings_hidden_columns( $columns ) {
+		return array_merge( $columns, $this->_option_checkboxes );
+	}
+	/**
+	 * Filter the get_options on hidden columns to inject defaults
+	 * @param  mixed  $columns the return from get_user_option() for columns
+	 * @return array
+	 */
+	public function filter_settings_get_hidden_columns( $columns ) {
+		if ( $columns === false ) {
+			// all hidden columns should be hidden by default
+			return array_keys( $this->_option_checkboxes );
 		}
-		//die('there :-(');
+		return $columns;
+	}
+	/**
+	 * Shortcut to easily find if column is hidden.
+	 * 
+	 * @param  string $column_name the id of the column to check status of
+	 * @return bool                true if column is hidden
+	 */
+	private function _settings_column_is_hidden( $column_name ) {
+		$screen = get_current_screen();
+		return ( in_array( $column_name, get_hidden_columns( $screen ) ) );
 	}
 	/**
 	 * Show the Settings (Options) page which allows you to do Flickr oAuth.
