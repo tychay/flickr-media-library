@@ -32,6 +32,10 @@ class FMLAdmin
 	 */
 	private $_option_tabs = array();
 	/**
+	 * The help tabs (indexed by (page) tab and tabid)
+	 */
+	private $_options_help_tabs = array();
+	/**
 	 * All the hidden screen options columns on the Settings page.
 	 *
 	 * Display name (in screen options) keyed by column id.
@@ -54,12 +58,19 @@ class FMLAdmin
 			'tab_media_upload'   => str_replace('-','_',FML::SLUG).'_insert_flickr',
 		);
 
-		$this->_option_checkboxes = array(
-			'fml_show_apikey' => __( 'Show Flickr API Key and Secret.', FML::SLUG ),
-		);
 		$this->_option_tabs = array(
 			'flickr_options' => __( 'Flickr API', FML::SLUG ),
 			'cpt_options'    => __( 'Custom Post', FML::SLUG ),
+		);
+		$this->_options_help_tabs = array(
+			'flickr_options' => array(
+				FML::SLUG.'-help-flickrauth' => __('Flickr authorization', FML::SLUG),
+			),
+			'cpt_options'     => array(
+			),
+		);
+		$this->_option_checkboxes = array(
+			'fml_show_apikey' => __( 'Show Flickr API Key and Secret.', FML::SLUG ),
 		);
 	}
 	/**
@@ -250,7 +261,7 @@ class FMLAdmin
 		// - authorize: oAuth with Flickr
 		add_action( 'admin_action_'.$this->_ids['form_flickr_auth'], array( $this, 'options_handle_auth_form') );
 		// - deauthorize: remove oAuth settings
-		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'optiosn_handle_deauth_form') );
+		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'options_handle_deauth_form') );
 		if ( !empty($_POST['action'] ) ) {
 			do_action( 'admin_action_'.$_POST['action'] );
 		}
@@ -259,21 +270,8 @@ class FMLAdmin
 		//add_filter('contextual_help', array($this,'filter_settings_help'), 10, 3);
 		$screen = get_current_screen();
 		$screen->remove_help_tabs();
-		/*
-		$screen->add_help_tab( array(
-			'id'       => FML::SLUG.'-default',
-			'title'    => __('Default'),
-			'content'  => '',
-			'callback' => array($this,'show_settings_help_default')
-		));
-		*/
-		$screen->add_help_tab( array(
-			'id'       => FML::SLUG.'-flickrauth',
-			'title'    => __('Flickr authorization', FML::SLUG),
-			'content'  => '',
-			'callback' => array( $this, 'show_settings_help_flickrauth' ),
-		));
-		$screen->set_help_sidebar( $this->_get_settings_help_sidebar() );
+		$this->_options_add_help_tabs();
+		$screen->set_help_sidebar( $this->_options_get_help_sidebar() );
 
 		// Hidden column support
 		add_filter( 'manage_'.$screen->id.'_columns', array( $this, 'options_hidden_columns' ) );
@@ -341,24 +339,10 @@ class FMLAdmin
 		$this->_fml->clear_flickr_authentication();
 	}
 	/**
-	 * Render the default help tab for settings
-	 * @return void
-	 */
-	public function show_settings_help_default() {
-		include $this->_fml->template_dir.'/help.settings-overview.php';
-	}
-	/**
-	 * Render the "Flickr Authorization" help tab for plugin settings page.
-	 * @return void
-	 */
-	public function show_settings_help_flickrauth() {
-		include $this->_fml->template_dir.'/help.settings-flickrauth.php';
-	}
-	/**
 	 * Return contents of the help sidebar in the plugin settings page
 	 * @return string
 	 */
-	private function _get_settings_help_sidebar() {
+	private function _options_get_help_sidebar() {
 		ob_start();
 		include $this->_fml->template_dir.'/help.settings-sidebar.php';
 		return ob_get_clean();
@@ -407,6 +391,51 @@ class FMLAdmin
 		$tabs            = $this->_option_tabs;
 		$active_tab      = $this->_options_active_tab();
 		include $this->_fml->template_dir.'/page.settings.php';
+	}
+	/**
+	 * Add all the tabs associated with a given Settings tab.
+	 *
+	 * Note that there is a default tab that appears on all options page tabs
+	 * After that, it adds all the other tabs.
+	 * 
+	 * @return void
+	 */
+	private function _options_add_help_tabs() {
+		$screen = get_current_screen();
+
+		// show default tab on all tabs
+		$tab_id = FML::SLUG.'-help-default';
+		$screen->add_help_tab( array(
+			'id'	=> $tab_id,
+			'title' => __( 'Default' ),
+			'content' => $this->_options_get_help_tab_content( 'default', $tab_id ),
+		) );
+
+		// show help tabs for specific options tab (confusing, I know)
+		$active_page_tab = $this->_options_active_tab();
+		$current_help_page = $this->_options_help_tabs[$active_page_tab];
+		foreach ( $current_help_page as $tab_id => $tab_title ) {
+			$screen->add_help_tab( array(
+				'id'	=> $tab_id,
+				'title' => $tab_title,
+				'content' => $this->_options_get_help_tab_content( $active_page_tab, $tab_id ),
+			) );
+		}
+	}
+	/**
+	 * Return the desired help tab for the Settings page tab showing.
+	 *
+	 * @param  string $page_tab The current tab of the options page
+	 * @param  string $help_tab The desired help tab to show.
+	 * @return void
+	 */
+	private function _options_get_help_tab_content( $page_tab, $help_tab ) {
+		// remove the FML::SLUG part from the name
+		$tab_switch = $page_tab.'-'.substr( $help_tab, strlen(FML::SLUG)+1 );
+
+		ob_start();
+		include $this->_fml->template_dir.'/help.options-tabs.php';
+		return ob_get_clean();
 	}
 	/**
 	 * Shortcut to easily find if column is hidden.
