@@ -70,7 +70,7 @@ namespace FML;
 					<p class="description"><?php echo __('Leave blank if you wish to use default value.', FML::SLUG); ?></p>
 				</td>
 			</tr>
-			<tr class="display_fml_show_apikey<?php if ( $this->_settings_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
+			<tr class="display_fml_show_apikey<?php if ( $this->_options_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
 				<th scope="row"><label for="<?php echo $api_form_slug; ?>-secret"><?php esc_html_e('Flickr API Secret', FML::SLUG); ?></label></th>
 				<td><input id="<?php echo $api_form_slug; ?>-secret" name="flickr_apisecret" value="<?php echo $api_secret_attr; ?>" disabled="disabled" /></td>
 			</tr>

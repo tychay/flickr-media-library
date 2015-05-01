@@ -69,8 +69,11 @@ class FMLAdmin
 			'cpt_options'     => array(
 			),
 		);
+		// I am removing the verb and the period to standardize on columns
+		// habits instead of on the special otpions
+		// (e.g. "Show full-height editor and distraction-free functionality."")
 		$this->_option_checkboxes = array(
-			'fml_show_apikey' => __( 'Show Flickr API Key and Secret.', FML::SLUG ),
+			'fml_show_apikey' => __( 'Flickr API Key and Secret', FML::SLUG ),
 		);
 	}
 	/**
@@ -339,15 +342,6 @@ class FMLAdmin
 		$this->_fml->clear_flickr_authentication();
 	}
 	/**
-	 * Return contents of the help sidebar in the plugin settings page
-	 * @return string
-	 */
-	private function _options_get_help_sidebar() {
-		ob_start();
-		include $this->_fml->template_dir.'/help.settings-sidebar.php';
-		return ob_get_clean();
-	}
-	/**
 	 * Filter to inject the hidden columns into the screens columns array for
 	 * tracking.
 	 *
@@ -432,9 +426,19 @@ class FMLAdmin
 	private function _options_get_help_tab_content( $page_tab, $help_tab ) {
 		// remove the FML::SLUG part from the name
 		$tab_switch = $page_tab.'-'.substr( $help_tab, strlen(FML::SLUG)+1 );
+		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 
 		ob_start();
 		include $this->_fml->template_dir.'/help.options-tabs.php';
+		return ob_get_clean();
+	}
+	/**
+	 * Return contents of the help sidebar in the plugin settings page
+	 * @return string
+	 */
+	private function _options_get_help_sidebar() {
+		ob_start();
+		include $this->_fml->template_dir.'/help.settings-sidebar.php';
 		return ob_get_clean();
 	}
 	/**
