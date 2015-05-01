@@ -25,18 +25,16 @@ class FMLAdmin
 	 */
 	private $_ids = array();
 	/**
-	 * User_meta field for if display apikey and secret.
-	 * 
-	 * (Due to future cookie stuff, this can contain only ascii, numbers and underscores.)
-	 * Also used as action for ajax request
-	 * @var string
-	 * @deprecated will be getting rid of this soon
+	 * The tabs that appear on the options page
+	 *
+	 * Display name (on tab) keyed by column id
+	 * @var array
 	 */
-	private $_flickr_apikey_option_name = '';
+	private $_option_tabs = array();
 	/**
 	 * All the hidden screen options columns on the Settings page.
 	 *
-	 * Key is the id of column, value is display name in the screen options
+	 * Display name (in screen options) keyed by column id.
 	 * @var array
 	 */
 	private $_option_checkboxes = array();
@@ -56,9 +54,12 @@ class FMLAdmin
 			'tab_media_upload'   => str_replace('-','_',FML::SLUG).'_insert_flickr',
 		);
 
-		$this->_flickr_apikey_option_name = str_replace('-','_',FML::SLUG).'_show_apikey';
 		$this->_option_checkboxes = array(
 			'fml_show_apikey' => __( 'Show Flickr API Key and Secret.', FML::SLUG ),
+		);
+		$this->_option_tabs = array(
+			'flickr_options' => __( 'Flickr API', FML::SLUG ),
+			'cpt_options'    => __( 'Custom Post', FML::SLUG ),
 		);
 	}
 	/**
@@ -75,28 +76,32 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function run() {
-		// Register init() on admin_init
+		// PERMALINK: Register init() on admin_init (PERMALINK)
 		add_action( 'admin_init', array( $this, 'init') );
-		// Add various menu pages (e.g. Settings) to admin menu 
+		// Add various menu pages (e.g. Settings) to admin menu (OPTIONS, CUSTOMPOST)
 		add_action( 'admin_menu', array( $this, 'create_admin_menus' ) );
-		// Add link to Settings page to Plugin page
+
+		// PLUGIN: Add link to Settings page
 		add_filter( 'plugin_action_links_'.$this->_fml->plugin_basename, array($this, 'filter_plugin_settings_links'), 10, 2 );
-		// Add set permalink form to Permalink page 
-		add_action( 'load-options-permalink.php', array( $this, 'handle_permalink_form') );
-		// Add ajax servers
+
+		// PERMALINK: Handle set permalink form
+		add_action( 'load-options-permalink.php', array( $this, 'permalink_handle_form') );
+
+		// AJAX: Add ajax servers
 		add_action( 'wp_ajax_'.$this->_ids['ajax_action'], array($this, 'handle_ajax') );
-		// - for handling ajax api options
-		add_action( 'wp_ajax_'.$this->_flickr_apikey_option_name, array($this, 'handle_ajax_option_setapi') );
-		// Add init handlers for custom post pages
+
+		// CUSTOMPOST: Add init handlers for custom post pages
 		add_action( 'load-edit.php', array( $this, 'loading_edit') );
 		add_action( 'load-post.php', array( $this, 'loading_post') );
 		add_action( 'load-post-new.php', array( $this, 'loading_post_new') );
-		// Add tab to Media upload button
+
+		// ADDMEDIA: Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
 		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array( $this, 'get_media_upload_iframe' ) );
 		//add_action( 'wp_enqueue_media', array( $this, 'wp_enqueue_media') );
+
 		// This is called in three places (post.php, post-new.php and ajax), so
-		// let's do it here
+		// let's do it here (POST, ADDMEDIA)
 		add_action( 'admin_post_thumbnail_html', array( $this, 'filter_admin_post_thumbnail_html' ), 10, 2 );
 	}
 	/**
@@ -109,31 +114,37 @@ class FMLAdmin
 	public function init() {
 		// "As of WordPress 4.1, this function does not save settings if added to the permalink page."
 		//register_setting( 'permalink', $this->_fml->permalink_slug_id, 'urlencode');
+	
+		// PERMALINK: Render permalink form	
 		add_settings_field(
 			$this->_fml->permalink_slug_id,
-			__( 'Flickr Media base', FML::SLUG ), //title
-			array( $this, 'render_permalink_field' ), //form render callback
-			'permalink', //page
-			'optional', // section
-			array( //args
+			__( 'Flickr Media base', FML::SLUG ),     // title
+			array( $this, 'permalink_render_field' ), // form render callback
+			'permalink',                              // page
+			'optional',                               // section
+			array(                                    // args
 				'label_for' => $this->_fml->permalink_slug_id
 			)
 		);
 	}
 	/**
-	 * Add the admin menus for FML to /wp_admin
+	 * Add the settings and media menus to admin page (and load loaders)
+	 *
+	 * @return  void
 	 */
 	public function create_admin_menus() {
+		// OPTIONS: Add menu to settings page
 		$_options_suffix = add_options_page(
 			__( 'Flickr Media Library Settings', FML::SLUG ),
 			__( 'Flickr Media Library', FML::SLUG ),
 			'manage_options',
 			$this->_ids['page_options'],
-			array( $this, 'show_settings_page' )
+			array( $this, 'options_show_page' )
 		);
 		if ( $_options_suffix ) {
-			add_action( 'load-'.$_options_suffix, array( $this, 'loading_settings' ) );
+			add_action( 'load-'.$_options_suffix, array( $this, 'options_loading' ) );
 		}
+		// CUSTOMPOST: Add menu to media page
 		$_add_media_suffix = add_media_page(
 			__( 'Add New Flickr Media', FML::SLUG ),
 			__( 'Add Flickr', FML::SLUG ),
@@ -146,7 +157,7 @@ class FMLAdmin
 		}
 	}
 	//
-	// PERMALINK PAGE
+	// PERMALINK PAGE: Settings > Permalink
 	// 
 	/**
 	 * Save the permalink base option.
@@ -158,7 +169,7 @@ class FMLAdmin
 	 * Note that things like settings-updated=true will be handled by the
 	 * default things itself.
 	 */
-	public function handle_permalink_form() {
+	public function permalink_handle_form() {
 		if ( !empty( $_POST[$this->_fml->permalink_slug_id] ) ) {
 			check_admin_referer('update-permalink');
 			$this->_fml->permalink_slug = urlencode( $_POST[$this->_fml->permalink_slug_id] );
@@ -170,7 +181,7 @@ class FMLAdmin
 	 * @param  [type] $args [description]
 	 * @return [type]       [description]
 	 */
-	public function render_permalink_field($args) {
+	public function permalink_render_field($args) {
 		$slug = $this->_fml->permalink_slug;
 		printf(
 			'<input name="%1$s" id="%1$s" type="text" value="%2$s" class="regular-text code" />',
@@ -179,7 +190,7 @@ class FMLAdmin
 		);
 	}
 	//
-	// SETTINGS PAGE
+	// OPTIONS PAGE: Settings > Flickr Media Library 
 	// 
 	/**
 	 * Loading the settings page:
@@ -204,7 +215,7 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function loading_settings() {
+	public function options_loading() {
 		// Register this page as the Flickr callback for oAuth
 		$this->_fml->flickr_callback = admin_url(sprintf(
 			'options-general.php?page=%s',
@@ -237,9 +248,9 @@ class FMLAdmin
 		}
 		// Handle form posts that are not otherwise supported
 		// - authorize: oAuth with Flickr
-		add_action( 'admin_action_'.$this->_ids['form_flickr_auth'], array( $this, 'handle_auth_form') );
+		add_action( 'admin_action_'.$this->_ids['form_flickr_auth'], array( $this, 'options_handle_auth_form') );
 		// - deauthorize: remove oAuth settings
-		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'handle_deauth_form') );
+		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'optiosn_handle_deauth_form') );
 		if ( !empty($_POST['action'] ) ) {
 			do_action( 'admin_action_'.$_POST['action'] );
 		}
@@ -265,10 +276,10 @@ class FMLAdmin
 		$screen->set_help_sidebar( $this->_get_settings_help_sidebar() );
 
 		// Hidden column support
-		add_filter( 'manage_'.$screen->id.'_columns', array( $this, 'filter_settings_hidden_columns' ) );
+		add_filter( 'manage_'.$screen->id.'_columns', array( $this, 'options_hidden_columns' ) );
 		// this doesn't work yet, but can't hurt
-		add_filter( 'default_hidden_columns', array( $this, 'filter_settings_hidden_columns') );
-		add_filter( 'get_user_option_manage'.$screen->id.'columnshidden', array( $this, 'filter_settings_get_hidden_columns' ) );
+		add_filter( 'default_hidden_columns', array( $this, 'options_hidden_columns') );
+		add_filter( 'get_user_option_manage'.$screen->id.'columnshidden', array( $this, 'options_get_hidden_columns' ) );
 
 		// Enqueue Settings-specific Javascript (controls screenoptions)
 		wp_enqueue_script(
@@ -287,7 +298,7 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function handle_auth_form() {
+	public function options_handle_auth_form() {
 		check_admin_referer( $this->_ids['form_flickr_auth'] . '-verify' );
 		$this->_fml->clear_flickr_authentication();
 		if ( array_key_exists( 'flickr_apikey', $_POST ) ) {
@@ -325,7 +336,7 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function handle_deauth_form() {
+	public function options_handle_deauth_form() {
 		check_admin_referer( $this->_ids['form_flickr_deauth'] . '-verify' );
 		$this->_fml->clear_flickr_authentication();
 	}
@@ -353,7 +364,8 @@ class FMLAdmin
 		return ob_get_clean();
 	}
 	/**
-	 * Inject the hidden columns into the screens columns array for tracking
+	 * Filter to inject the hidden columns into the screens columns array for
+	 * tracking.
 	 *
 	 * (Also used to set default_hidden_columns when that feature is supported
 	 * since all columns should be hidden by default.)
@@ -362,7 +374,7 @@ class FMLAdmin
 	 *                         it's display name in screen options
 	 * @return array           the columns with the new ones injected
 	 */
-	public function filter_settings_hidden_columns( $columns ) {
+	public function options_hidden_columns( $columns ) {
 		return array_merge( $columns, $this->_option_checkboxes );
 	}
 	/**
@@ -370,7 +382,7 @@ class FMLAdmin
 	 * @param  mixed  $columns the return from get_user_option() for columns
 	 * @return array
 	 */
-	public function filter_settings_get_hidden_columns( $columns ) {
+	public function options_get_hidden_columns( $columns ) {
 		if ( $columns === false ) {
 			// all hidden columns should be hidden by default
 			return array_keys( $this->_option_checkboxes );
@@ -378,19 +390,10 @@ class FMLAdmin
 		return $columns;
 	}
 	/**
-	 * Shortcut to easily find if column is hidden.
-	 * 
-	 * @param  string $column_name the id of the column to check status of
-	 * @return bool                true if column is hidden
-	 */
-	private function _settings_column_is_hidden( $column_name ) {
-		$screen = get_current_screen();
-		return ( in_array( $column_name, get_hidden_columns( $screen ) ) );
-	}
-	/**
 	 * Show the Settings (Options) page which allows you to do Flickr oAuth.
 	 */
-	public function show_settings_page() {
+	public function options_show_page() {
+		// set some utility template parameters
 		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 		//$flickr = $this->_fml->flickr;
 		$settings        = $this->_fml->settings;
@@ -401,7 +404,33 @@ class FMLAdmin
 		                 : $settings['flickr_api_secret'];
 		$auth_form_id    = $this->_ids['form_flickr_auth'];
 		$deauth_form_id  = $this->_ids['form_flickr_deauth'];
+		$tabs            = $this->_option_tabs;
+		$active_tab      = $this->_options_active_tab();
 		include $this->_fml->template_dir.'/page.settings.php';
+	}
+	/**
+	 * Shortcut to easily find if column is hidden.
+	 * 
+	 * @param  string $column_name the id of the column to check status of
+	 * @return bool                true if column is hidden
+	 */
+	private function _options_column_is_hidden( $column_name ) {
+		$screen = get_current_screen();
+		return ( in_array( $column_name, get_hidden_columns( $screen ) ) );
+	}
+	/**
+	 * Return current tab showing (if on options page)
+	 * 
+	 * @return string tab id
+	 */
+	private function _options_active_tab() {
+		if ( isset( $_GET['tab'] ) ) {
+			if (in_array($_GET['tab'], array_keys( $this->_option_tabs ) ) ) {
+				return $_GET['tab'];
+			}
+		}
+		// default tab
+		return 'flickr_options';
 	}
 	//
 	// PLUGINS PAGE
