@@ -1196,17 +1196,32 @@ class FML implements FMLConstants
 			// If image is crop and we support some sort of crop handling
 			// upstream then make sure we choose an image that is bigger than
 			// the smallest dimension
-			foreach ( $img_sizes as $img ) {
-				$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
-				$min_ratio = min( $img['width']/$size['width'], $img['height']/$size['height'] );
-				if ( $min_ratio >= 1 ) {
-					if ( $max_ratio == 1 ) {
-						// perfect match
-						return array( $img['source'], $img['width'], $img['height'], false );
+			if ( apply_filters( 'fml_image_downsizez_can_crop', false ) ) {
+				foreach ( $img_sizes as $img ) {
+					$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
+					$min_ratio = min( $img['width']/$size['width'], $img['height']/$size['height'] );
+					if ( $min_ratio >= 1 ) {
+						if ( $max_ratio == 1 ) {
+							// perfect match
+							return array( $img['source'], $img['width'], $img['height'], false );
+						}
+						// imperfect match
+						return array( $img['source'], intval($img['width']/$min_ratio), intval($img['height']/$min_ratio), true );
 					}
-					// imperfect match
-					return array( $img['source'], intval($img['width']/$min_ratio), intval($img['height']/$min_ratio), true );
 				}
+			} else {
+				// Other version of crop makes is like a non-crop (below) except for the test for "intermediate"
+				foreach ( $img_sizes as $img ) {
+					$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
+					if ( $max_ratio == 1 ) {
+						$is_intermediate = ( min( $img['width']/$size['width'], $img['height']/$size['height'] ) == 1 );
+						return array( $img['source'], $img['width'], $img['height'], $is_intermediate );
+					}
+					if ( $max_ratio >= 1 ) {
+						return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+					}
+				}
+
 			}
 		} else {
 			// If image is not crop (or no support for cropping), choose an
