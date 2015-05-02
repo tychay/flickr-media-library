@@ -11,7 +11,6 @@
 		this.$img         = $img;
 		this.$cropDiv     = null;
 		this.$origParent  = $img.parent();
-		console.log(this);
 
 		this._computeImgCss = function() {
 			var css = {'position': 'absolute'};
