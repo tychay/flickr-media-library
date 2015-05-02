@@ -1211,8 +1211,7 @@ class FML implements FMLConstants
 		}
 
 		$attr['class']               .= ' csscrop';
-		$attr['data-csscrop_width']  = $size_data['width'];
-		$attr['data-csscrop_height'] = $size_data['height'];
+		$attr['data-csscrop_ratio']  = $size_data['width']/$size_data['height'];
 		$attr['data-csscrop_method'] = 'centercrop';
 
 		wp_enqueue_script( 'csscrop' );
