@@ -38,6 +38,12 @@ class FML implements FMLConstants
 	 * accessible publicly (but not writeable).
 	 */
 	private $_post_metas = array();
+	/**
+	 * Should we support picturefill?
+	 * 
+	 * @var  bool
+	 */
+	private $_support_picturefill = false;
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
@@ -109,23 +115,8 @@ class FML implements FMLConstants
 		add_filter( 'wp_get_attachment_metadata', array( $this, 'filter_wp_get_attachment_metadata'), 10, 2 );
 		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
-		if(defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1)){
-			// Add Picturefill.WP 2 specific code here.
-			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
-			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
-		}
-		if ( apply_filters( 'fml_image_use_css_crop', true ) ) {
-			// we need larger image dimensions for this s--t to work (of coruse picturefill() will put in larger dims, but what if picturefill isn't running?)
-			add_filter( 'fml_image_downsize_can_crop', '__return_true' );
-			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_css_crop'), 10,  3 );
-
-		}
-		// Debugging
-		//add_filter( 'fml_shortcode', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
-		//add_filter( 'fml_shortcode_image_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
-		//add_filter( 'fml_shortcode_link_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
-		//add_filter( 'image_downsize', array( get_class($this), 'debug_filter_show_variables' ), 9, 3 );
-		//add_filter( 'image_downsize', array( get_class($this), 'debug_filter_show_variables' ), 11, 3 );
+		// Don't worry, you can change this later,
+		$this->_support_picturefill = ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 	}
 	/**
 	 * Stuff to run on `init`
@@ -147,6 +138,27 @@ class FML implements FMLConstants
 				true
 			);
 		}
+
+		// move the code later to give filters a chance to change it in plugins_loaded
+		//$this->_support_picturefill = false;
+		if ( $this->_support_picturefill = apply_filters( 'fml_image_support_picturefill', $this->_support_picturefill ) ) {
+			// Add Picturefill.WP 2 emulation specific code here.
+			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
+			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
+		}
+		if ( apply_filters( 'fml_image_use_css_crop', true ) ) {
+			// we need larger image dimensions for this s--t to work (of course
+			// picturefill() will put in larger dims, but what if picturefill
+			// isn't running? We want the larger image for that case)
+			add_filter( 'fml_image_downsize_can_crop', '__return_true' );
+			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_css_crop'), 10,  3 );
+		}
+		// Debugging
+		//add_filter( 'fml_shortcode', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
+		//add_filter( 'fml_shortcode_image_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
+		//add_filter( 'fml_shortcode_link_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
+		//add_filter( 'image_downsize', array( get_class($this), 'debug_filter_show_variables' ), 9, 3 );
+		//add_filter( 'image_downsize', array( get_class($this), 'debug_filter_show_variables' ), 11, 3 );
 	}
 	/**
 	 * Actually register the flickr media custom post type
@@ -1128,24 +1140,12 @@ class FML implements FMLConstants
 		if ( !$post || ( $post->post_type != self::POST_TYPE ) ) {
 			return $attr;
 		}
+
 		// 1. Figure out if we're an icon or an image
 		$icon_sizes = array( 'Square', 'Large Square' );
-		//$size_data = self::image_size( $size );
 		list ( $src, $width, $height, $is_intermediate ) = image_downsize( $post->ID, $size );
-		//if ( is_array( $size_data ) ) {
-		//	$desired_width = $size_data['width'];
-		//} else {
-			// handles the "full" case nicely
-			$desired_width = $width;
-		//}
-
-		/*
-		$size = self::image_size( $size );
-		if ( is_array( $size ) ) {
-			$desired_width = $width;
-		}
-		*/
 		$is_icon = ( ( $width == $height ) && ( $width <= 150 ) );
+
 
 		// 2. Generate srcset
 		$metadata = wp_get_attachment_metadata( $post->ID );
@@ -1170,9 +1170,15 @@ class FML implements FMLConstants
 			$attr['src'] = $metadata['sizes']['Thumbnail']['src'];
 		}
 
-		// 4. Figure out sizes (maybe remove width and height)
-		$attr['sizes'] = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
-		// don't remove width and height since stylesheets will override as
+		// 4. Figure out sizes if not set already
+		$desired_width = $width;
+		if ( empty( $attr['sizes'] ) ) {
+			// TODO: Emulate "sizes-*" class attribute here
+			$sizes_string = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
+			$attr['sizes'] = apply_filters( 'fml_image_sizes_attribute', $sizes_string, $attr, $post, $size );
+		}
+
+		// Don't remove width and height since stylesheets will override as
 		// these have priority 0. Keeping them will help with initial rendering
 		// (even if it causes things to get a bit "jumpy" later).
 		//unset($attr['width']);
@@ -1210,9 +1216,21 @@ class FML implements FMLConstants
 			return $attr;
 		}
 
+		// hook for javascript to work
 		$attr['class']               .= ' csscrop';
-		$attr['data-csscrop_ratio']  = $size_data['width']/$size_data['height'];
-		$attr['data-csscrop_method'] = 'centercrop';
+
+		// need to pass this to cropper
+		$attr['data-csscrop-ratio-box']  = $size_data['width']/$size_data['height'];
+		$attr['data-csscrop-ratio-img']  = $width/$height;
+
+		// stub out width and height to be what the crop values were supposed to be
+		$attr['width'] = $size_data['width'];
+		$attr['height'] = $size_data['height'];
+
+		// Assign crop method;	
+		if ( empty( $attr['data-csscrop-method'] ) ) {
+			$attr['data-csscrop-method'] = apply_filters( 'fml_image_css_crop_set_method', 'centercrop', $attr, $post, $size );
+		}
 
 		wp_enqueue_script( 'csscrop' );
 		return $attr;
@@ -1252,11 +1270,11 @@ class FML implements FMLConstants
 		$img_sizes = $flickr_data['sizes']['size'];
 		// Find closest image size
 		$img = array();
-		if ( $size['crop'] && apply_filters( 'fml_image_downsize_can_crop', false ) ) {
+		if ( $size['crop'] ) {
 			// If image is crop and we support some sort of crop handling
 			// upstream then make sure we choose an image that is bigger than
 			// the smallest dimension
-			if ( apply_filters( 'fml_image_downsizez_can_crop', false ) ) {
+			if ( apply_filters( 'fml_image_downsize_can_crop', false ) ) {
 				foreach ( $img_sizes as $img ) {
 					$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 					$min_ratio = min( $img['width']/$size['width'], $img['height']/$size['height'] );

@@ -1,22 +1,12 @@
 ( function( window, $, undefined ) {
 	'use strict';
 
-	$.fn.newGuid = function() {
-		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,
-			function(c) {
-				var r = Math.random() * 16 | 0,
-				v = c == 'x' ? r : (r & 0x3 | 0x8);
-				return v.toString(16);
-			}).toUpperCase();
-	};
-
 	function CSSCropObject($img) {
 		var self = this;
 
-		//this.targetWidth  = parseInt($img.attr('data-csscrop_width'));
-		//this.targetHeight = parseInt($img.attr('data-csscrop_height'));
-		this.targetRatio  = parseFloat($img.attr('data-csscrop_ratio'));
-		this.targetMethod = $img.attr('data-csscrop_method');
+		this.targetRatio  = parseFloat($img.attr('data-csscrop-ratio-box'));
+		this.imageRatio   = parseFloat($img.attr('data-csscrop-ratio-img'));
+		this.targetMethod = $img.attr('data-csscrop-method');
 		// bowing to the responsive design gods, we will assume the width is the width is the width
 		this.$img         = $img;
 		this.$imgTemplate = $img.clone(true); //because we will be adding css to the real thing
@@ -44,6 +34,15 @@
 				$(window).resize( this.windowResized );
 				this.resizeAdded = true;
 			}
+
+			// force a dom redraw for chrome 
+			// http://www.eccesignum.org/blog/solving-display-refreshredrawrepaint-issues-in-webkit-browsers
+			//var n = document.createTextNode(' ');
+			//this.$origParent.append(n);
+			//setTimeout(function(){n.parentNode.removeChild(n);}, 0);
+			//var ignore = this.$origParent.hide().get(0).offsetHeight;
+			//console.log(ignore);
+			//this.$origParent.show();
 		};
 		this.refresh = function() {
 			// put everything back where it belongs
@@ -68,6 +67,7 @@
 			}, 200);
 		};
 		this._computeImgCss = function() {
+			// TODO add different methods here
 			var css = {'position': 'absolute'},
 			    tw  = this.$cropDiv.width(),
 			    th  = this.$cropDiv.height(),
@@ -75,22 +75,27 @@
                 ih  = this.$img.height(),
                 sm  = Math.min( ih/th, iw/tw ),
                 scale = 1;
-			// TODO add different methods here
-            if ( sm > 1 ) {
-	            // image is larger than bounding box
+            
+            if ( sm != 1 ) {
+	            // image is larger or smaller than bounding box
             	scale = 1/sm;
-            	css.transform = 'scale('+scale+','+scale+')';
-            	css['-ms-interpolation-mode'] = 'bicubic';
-            } else if ( sm < 1 ) {
-            	//image is smaller than bounding box
-            	scale = 1/sm;
-            	css.transform = 'scale('+scale+','+scale+')';
-            	css['-ms-interpolation-mode'] = 'bicubic';
+            	css.width  = iw*scale+'px';
+            	css.height = ih*scale+'px';
+            	// inherited 100% default was squishing wide images
+            	css['max-width'] = css.width;
+            	//css['max-heigth'] = css.height;
+            	// NO need for transform: scale
+            	//css.transform = 'scale('+scale+','+scale+')';
+            	//css['-ms-interpolation-mode'] = 'bicubic';
             }
             // center it in box
             // the first part adjusts for the scaling shift, the second part centers image
-			css.left = parseInt(iw*(scale-1)/2 - (iw*scale-tw)/2)+'px';
-			css.top = parseInt(ih*(scale-1)/2 - (ih*scale-th)/2)+'px';
+			css.left = -((iw*scale-tw)/2)+'px';
+			css.top  = -((ih*scale-th)/2)+'px';
+			// No need for transform: scale
+			//css.left = parseInt(iw*(scale-1)/2 - (iw*scale-tw)/2)+'px';
+			//css.top  = parseInt(ih*(scale-1)/2 - (ih*scale-th)/2)+'px';
+
 			return css;
 		};
 	}
