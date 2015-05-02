@@ -1554,13 +1554,16 @@ class FML implements FMLConstants
 	static public function image_size( $size ) {
 		global $_wp_additional_image_sizes;
 
-		// turn an array size into the same format as $wp_additional_image_sizes
 		if ( is_array($size) ) {
-			return array(
-				'width'  => $size[0],
-				'height' => $size[1],
-				'crop'   => false,
-			);
+			// turn an dimension size into the same format as
+			// $wp_additional_image_sizes
+			if ( !isset($size['crop']) ) {
+				return array(
+					'width'  => $size[0],
+					'height' => $size[1],
+					'crop'   => apply_filters( 'fml_image_size_array_is_crop', false ),
+				);
+			}
 			return $size;
 		}
 		switch ( $size ) {
