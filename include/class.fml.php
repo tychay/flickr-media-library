@@ -114,6 +114,12 @@ class FML implements FMLConstants
 			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
 			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
 		}
+		if ( apply_filters( 'fml_image_use_css_crop', true ) ) {
+			// we need larger image dimensions for this s--t to work (of coruse picturefill() will put in larger dims, but what if picturefill isn't running?)
+			add_filter( 'fml_image_downsize_can_crop', '__return_true' );
+			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_css_crop'), 10,  3 );
+
+		}
 		// Debugging
 		//add_filter( 'fml_shortcode', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
 		//add_filter( 'fml_shortcode_image_attributes', array( get_class($this), 'debug_filter_show_variables' ), 10, 3 );
@@ -132,6 +138,15 @@ class FML implements FMLConstants
 	 */
 	public function init() {
 		$this->register_post_type();
+		if ( apply_filters( 'fml_image_use_css_crop', true ) ) {
+			wp_register_script(
+				'csscrop',
+				$this->static_url.'/js/csscrop.js',
+				array('jquery'),
+				self::VERSION,
+				true
+			);
+		}
 	}
 	/**
 	 * Actually register the flickr media custom post type
@@ -1015,7 +1030,7 @@ class FML implements FMLConstants
 	 * Inject the srcset and srcs for fmlmedia into shortcode
 	 *
 	 * This does it by hooking off of the img injection
-	 * 
+	 *
 	 * 1. Figure out if we're an icon or an image
 	 * 2. Generate srcset
 	 * 3. Replace src with small image
@@ -1026,6 +1041,7 @@ class FML implements FMLConstants
 	 * @param  int    $post_id post ID of fml media
 	 * @param  array  $atts    parsed attributes
 	 * @return array           extract of image with srcset added
+	 * @deprecated (this is handled by attachment_inject_srcset_srcs)
 	 */
 	public function shortcode_inject_srcset_srcs( $img, $post_id, $atts ) {
 		// 1. Figure out if we're an icon or an image
@@ -1092,8 +1108,9 @@ class FML implements FMLConstants
 		return $img;
 	}
 	/**
-	 * Inject the srcset and srcs for fmlmedia into attachmen
+	 * Inject the srcset and srcs for fmlmedia into attachment
 	 * 
+	 * 0. Only do this sort of work on Flickr Media
 	 * 1. Figure out if we're an icon or an image
 	 * 2. Generate srcset
 	 * 3. Replace src with small image
@@ -1107,10 +1124,21 @@ class FML implements FMLConstants
 	 * @return array         adjusted attribute array
 	 */
 	public function attachment_inject_srcset_srcs( $attr, $post, $size ) {
+		// 0. Only do stuff for Flickr Media
+		if ( !$post || ( $post->post_type != self::POST_TYPE ) ) {
+			return $attr;
+		}
 		// 1. Figure out if we're an icon or an image
 		$icon_sizes = array( 'Square', 'Large Square' );
+		//$size_data = self::image_size( $size );
 		list ( $src, $width, $height, $is_intermediate ) = image_downsize( $post->ID, $size );
-		$desired_width = $width;
+		//if ( is_array( $size_data ) ) {
+		//	$desired_width = $size_data['width'];
+		//} else {
+			// handles the "full" case nicely
+			$desired_width = $width;
+		//}
+
 		/*
 		$size = self::image_size( $size );
 		if ( is_array( $size ) ) {
@@ -1144,17 +1172,50 @@ class FML implements FMLConstants
 
 		// 4. Figure out sizes (maybe remove width and height)
 		$attr['sizes'] = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
-		// remove width and height
-		unset($attr['width']);
-		unset($attr['height']);
+		// don't remove width and height since stylesheets will override as
+		// these have priority 0. Keeping them will help with initial rendering
+		// (even if it causes things to get a bit "jumpy" later).
+		//unset($attr['width']);
+		//unset($attr['height']);
 
 		// 5. Queue picturefill
 		// Will not grow image on older browsers if not in the_content().
 		// For instance, if you create an article where only image is post
 		// thumbnail
-		
 		wp_enqueue_script( 'picturefill' );
+
 		// 6. Return image
+		return $attr;
+	}
+	//
+	// CROP SUPPORT
+	//
+	/**
+	 * Emulate cropping using css on the image.
+	 * @param  array   $attr  attributes for img tag
+	 * @param  WP_Post $post  the fml media post (or attachment)
+	 * @param  mixed   $size  desired size string or array
+	 * @return array
+	 */
+	public function attachment_inject_css_crop( $attr, $post, $size )  {
+		$size_data = self::image_size( $size );
+		list ( $src, $width, $height, $is_intermediate ) = image_downsize( $post->ID, $size );
+
+		// Only run if its a crop and the post is the wrong size
+		if ( is_array( $size_data ) ) {
+			if ( !$size_data['crop'] ) { return $attr; }
+			if ( ( $width == $size_data['width'] ) && ( $height == $size_data['height'] ) ) {return $attr; }
+		} else {
+			// handles the "full" case which is never cropped
+			return $attr;
+		}
+
+		$attr['class']               .= ' csscrop';
+		$attr['data-csscrop_width']  = $size_data['width'];
+		$attr['data-csscrop_height'] = $size_data['height'];
+		$attr['data-csscrop_method'] = 'centercrop';
+
+		wp_enqueue_script( 'csscrop' );
 		return $attr;
 	}
 	//
