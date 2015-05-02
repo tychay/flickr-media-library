@@ -41,7 +41,6 @@
 			//this.$origParent.append(n);
 			//setTimeout(function(){n.parentNode.removeChild(n);}, 0);
 			//var ignore = this.$origParent.hide().get(0).offsetHeight;
-			//console.log(ignore);
 			//this.$origParent.show();
 		};
 		this.refresh = function() {
@@ -106,7 +105,11 @@
 			// check to see if already run, if so do nothing (TODO: call refresh)
 			if ( $this.csscrop ) { return; }
 			$this.csscrop = new CSSCropObject( $this );
-			$this.csscrop.crop();
+			// wait until images are loaded before we start messing with their chi
+			$(window).load(function(){
+				$this.csscrop.crop();
+				//$this.csscrop.refresh();
+			});
 		});
 	}
 
