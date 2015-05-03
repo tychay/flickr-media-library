@@ -68,5 +68,19 @@ switch ( $tab_switch ):
 		);
 ?></p><?php
 		break;
+	case 'cpt_options-help-cptoptions':
+?><p><?php
+		_e( 'Flickr data is cached as a custom post type. These options control how those posts are stored. The following options are available:', FML::SLUG );
+?></p>
+	<ul>
+		<li><?php
+		printf(
+			__( '<b>%s</b>: Allows flickr data to set the post’s post_date. For instance, you can set the date to be the date the photo was taken, when it was uploaded to flickr, when it was last modified on flickr, or leave it unlinked from flickr entirely. Note that the last modified linking is not recommended.', FML::SLUG ),
+			__( 'Post date', FML::SLUG )
+		);
+?></li>
+	</ul>
+<?php
+		break;
 endswitch;
 ?>

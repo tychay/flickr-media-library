@@ -15,8 +15,7 @@ class FMLAdmin
 	 *
 	 * - page_add_media: the page: Media > Add Flickr
 	 * - page_options: the page: Settings > Flickr Media Library
-	 * - form_flickr_auth: form action for flickr authentication
-	 * - form_flickr_deauth: form action for flickr deauthentication
+	 * - forms: array consisting of action names for various option forms
 	 * - ajax_action: action name for FML ajax API (all ajax apis are merged into
 	 *                this one and "method" is used to disnguish between
 	 *                different API calls into teh FML ajax API)
@@ -50,12 +49,17 @@ class FMLAdmin
 	public function __construct($fml) {
 		$this->_fml                       = $fml;
 		$this->_ids = array(
-			'page_add_media'     => FML::SLUG.'-add-flickr',
-			'page_options'       => FML::SLUG.'-settings',
-			'form_flickr_auth'   => FML::SLUG.'-flickr-auth',
-			'form_flickr_deauth' => FML::SLUG.'-flickr-deauth',
-			'ajax_action'        => str_replace('-','_',FML::SLUG).'_api',
-			'tab_media_upload'   => str_replace('-','_',FML::SLUG).'_insert_flickr',
+			'page_add_media'   => FML::SLUG.'-add-flickr',
+			'page_options'     => FML::SLUG.'-settings',
+			'forms'            => array(
+				'flickr_auth'    => FML::SLUG.'-flickr-auth',
+				'flickr_deauth'  => FML::SLUG.'-flickr-deauth',
+				'flickr_options' => FML::SLUG.'-flickr_options',
+				'cpt_options'    => FML::SLUG.'-cpt_options',
+				'output_options' => FML::SLUG.'-output_options',
+			),
+			'ajax_action'      => str_replace('-','_',FML::SLUG).'_api',
+			'tab_media_upload' => str_replace('-','_',FML::SLUG).'_insert_flickr',
 		);
 
 		$this->_options_tabs = array(
@@ -68,6 +72,7 @@ class FMLAdmin
 				FML::SLUG.'-help-flickrauth' => __('Flickr authorization', FML::SLUG),
 			),
 			'cpt_options'    => array(
+				FML::SLUG.'-help-cptoptions' => __('Custom Post Type options', FML::SLUG),
 			),
 			'output_options'  => array(
 			),
@@ -214,15 +219,14 @@ class FMLAdmin
 	 *
 	 * - Register this page as Flickr callback for Auth
 	 * - Handle an oAuth callback to the options page
-	 * - Handle form action = authorize (_ids[form_flickr_auth])
-	 * - Handle form action = deauthorize (_ids[form_flickr_deauth])
+	 * - Handle all form actions in _ids['forms']
 	 * - Add Settings contextual help tabs
 	 * - Add Settings custom control to screen options
 	 * - Enqueue Settings-specific Javascript (controls screenoptions)
 	 *
 	 * Here's the auth process:
 	 * 
-	 * 1) user clicks submit button and creates action $_ids[form_flickr_auth]
+	 * 1) user clicks submit button and creates action $_ids[form][flickr_auth]
 	 * 2) server authenticates and receives request token and secret from flickr
 	 * 3) user gets redirected by flickr object to https://www.flickr.com/services/oauth/authorize
 	 * 4) User clicks authorize
@@ -263,17 +267,16 @@ class FMLAdmin
 				//echo '<plaintext>'; var_dump($flickr); die('Whoops!');
 			}
 		}
+
 		// Handle form posts that are not otherwise supported
-		// - authorize: oAuth with Flickr
-		add_action( 'admin_action_'.$this->_ids['form_flickr_auth'], array( $this, 'options_handle_auth_form') );
-		// - deauthorize: remove oAuth settings
-		add_action( 'admin_action_'.$this->_ids['form_flickr_deauth'], array( $this, 'options_handle_deauth_form') );
+		foreach( $this->_ids['forms'] as $form=>$action ) {
+			add_action( 'admin_action_'.$action, array( $this, 'options_handle_'.$form ) );
+		}
 		if ( !empty($_POST['action'] ) ) {
 			do_action( 'admin_action_'.$_POST['action'] );
 		}
 
 		// Add Settings contextual help tabs
-		//add_filter('contextual_help', array($this,'filter_settings_help'), 10, 3);
 		$screen = get_current_screen();
 		$screen->remove_help_tabs();
 		$this->_options_add_help_tabs();
@@ -302,8 +305,8 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function options_handle_auth_form() {
-		check_admin_referer( $this->_ids['form_flickr_auth'] . '-verify' );
+	public function options_handle_flickr_auth() {
+		check_admin_referer( $this->_ids['forms']['flickr_auth'] . '-verify' );
 		$this->_fml->clear_flickr_authentication();
 		if ( array_key_exists( 'flickr_apikey', $_POST ) ) {
 			if ( $_POST['flickr_apikey'] ) {
@@ -340,9 +343,63 @@ class FMLAdmin
 	 * 
 	 * @return void
 	 */
-	public function options_handle_deauth_form() {
-		check_admin_referer( $this->_ids['form_flickr_deauth'] . '-verify' );
+	public function options_handle_flickr_deauth() {
+		check_admin_referer( $this->_ids['forms']['flickr_deauth'] . '-verify' );
 		$this->_fml->clear_flickr_authentication();
+	}
+	/**
+	 * Form request to save flickr API settings
+	 * 
+	 * @return void
+	 */
+	public function options_handle_flickr_options() {
+		check_admin_referer( $this->_ids['forms']['flickr_options'] . '-verify' );
+		//var_dump($_POST);die;
+		$options = array();
+		$this->_options_update_settings($options);
+	}
+	/**
+	 * Form request to save settings related to custom post type
+	 *
+	 * Settings supported:
+	 * - post_date_map: link between the custom post post_date and flickr dates
+	 * 
+	 * @return void
+	 */
+	public function options_handle_cpt_options() {
+		check_admin_referer( $this->_ids['forms']['cpt_options'] . '-verify' );
+		$options = array();
+		foreach( $_POST as $key=>$value ) {
+			switch( $key ) {
+				case 'post_date_map':
+					$options[$key] = $value;
+					break;
+			}
+		}
+		$this->_options_update_settings($options);
+	}
+	/**
+	 * Form request to save settings related to output
+	 * 
+	 * @return void
+	 */
+	public function options_handle_output_options() {
+		check_admin_referer( $this->_ids['forms']['output_options'] . '-verify' );
+		//var_dump($_POST);die;
+		$options = array();
+		$this->_options_update_settings($options);
+	}
+	/**
+	 * Utility function to update fml::settings and then report it to UI
+	 * 
+	 * @param  array  $settings settings to change
+	 * @return void
+	 */
+	private function _options_update_settings( $settings ) {
+		if ( !empty($settings) ) {
+			$this->_fml->update_settings($settings);
+			add_settings_error('general', 'settings_updated', __('Settings saved.'), 'updated');
+		}
 	}
 	/**
 	 * Filter to inject the hidden columns into the screens columns array for
@@ -375,19 +432,18 @@ class FMLAdmin
 	 */
 	public function options_show_page() {
 		// set some utility template parameters
-		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 		//$flickr = $this->_fml->flickr;
 		$settings        = $this->_fml->settings;
 		$this_page_url   = 'options-general.php?page=' . urlencode( $this->_ids['page_options'] );
-		$api_form_slug   = FML::SLUG.'-apiform';
-		$api_secret_attr = ( $settings['flickr_api_secret'] == FML::_FLICKR_SECRET )
-		                 ? ''
-		                 : $settings['flickr_api_secret'];
-		$auth_form_id    = $this->_ids['form_flickr_auth'];
-		$deauth_form_id  = $this->_ids['form_flickr_deauth'];
 		$tabs            = $this->_options_tabs;
 		$active_tab      = $this->_options_active_tab();
 		$hidden_cols     = $this->_options_checkboxes;
+		$form_ids        = $this->_ids['forms'];
+		$api_secret_attr = ( $settings['flickr_api_secret'] == FML::_FLICKR_SECRET )
+		                 ? ''
+		                 : $settings['flickr_api_secret'];
+		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
+		$post_dates_map  = $this->_fml->post_dates_map;
 		include $this->_fml->template_dir.'/page.settings.php';
 	}
 	/**

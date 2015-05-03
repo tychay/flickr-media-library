@@ -28,7 +28,18 @@ class FML implements FMLConstants
 	 */
 	public $plugin_basename;
 	/**
-	 * access through _get() to make it read-only
+	 * List of possible post dates names (indexed by the setting name)
+	 * 
+	 * @var array
+	 */
+	public $post_dates_map;
+	/**
+	 * The option name for the permalink base.
+	 * 
+	 * This is needed in this object because it is used in registration of
+	 * the custom post and the name is the blog options. Publicly access this
+	 * through _get() to make it a read-only value. (Writing its contents is a
+	 * different variable, you want $this->permalink_slug)
 	 * 
 	 * @var string the option name for the permalink base
 	 */
@@ -58,12 +69,18 @@ class FML implements FMLConstants
 	 * @param  string $pluginFile __FILE__ for the plugin file
 	 */
 	function __construct($pluginFile) {
-		$this->plugin_dir = dirname($pluginFile);
-		$this->template_dir = $this->plugin_dir . '/templates';
-		$this->static_url = plugins_url('static',$pluginFile);
-		$this->plugin_basename = plugin_basename($pluginFile);
+		$this->plugin_dir         = dirname($pluginFile);
+		$this->template_dir       = $this->plugin_dir . '/templates';
+		$this->static_url         = plugins_url('static',$pluginFile);
+		$this->post_dates_map     = array(
+			'posted'     => __( 'Date uploaded to flickr', self::SLUG ),
+			'taken'      => __( 'Date photo taken', self::SLUG ),
+			'lastupdate' => __( 'When last updated on flickr', self::SLUG ),
+			'none'       => __( 'WordPress-only date', self::SLUG )
+			);
+		$this->plugin_basename    = plugin_basename($pluginFile);
 		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
-		$this->_post_metas = array(
+		$this->_post_metas        = array(
 			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
 			'flickr_id' => '_flickr_id',
 		);
@@ -289,6 +306,12 @@ class FML implements FMLConstants
 		}
 	}
 	/**
+	 * The indexes are the following:
+	 *
+	 * - flickr_api_key: the api key to use
+	 * - flickr_api_secret: the api secret for the key
+	 * - Flickr::*: various flickr-specific variables like user name, access token, etc.
+	 * - post-date_map: what the custom post date maps onto (only: posted, taken, lastupdate, none)
 	 * @var array Plugin blog options
 	 */
 	private $_settings = array();
@@ -301,10 +324,9 @@ class FML implements FMLConstants
 	 * The options array is stored in the blog options using the SLUG as the
 	 * key
 	 */
-	private function _load_settings()
-	{
+	private function _load_settings() {
 		$settings_changed = false;
-		$settings = get_option(self::SLUG, array());
+		$settings = get_option( self::SLUG, array() );
 		$_default_settings = array(
 			'flickr_api_key'                  => self::_FLICKR_API_KEY,
 			'flickr_api_secret'               => self::_FLICKR_SECRET,
@@ -313,13 +335,16 @@ class FML implements FMLConstants
 			Flickr::USER_NSID                 => '',
 			Flickr::OAUTH_ACCESS_TOKEN        => '',
 			Flickr::OAUTH_ACCESS_TOKEN_SECRET => '',
+			'post_date_map'                   => 'taken', // map post date to flickr date taken
 			//photo link option
 			//link rel option
 			//link class option
 		);
 		// upgrade missing parameters (or initialize defaults if none)
-		foreach ($_default_settings as $option=>$value) {
-			if ( !array_key_exists($option, $settings) ) {
+		// cannot do a straight array_merge because we're looking for if we
+		// need to update the blog options.
+		foreach ( $_default_settings as $option=>$value ) {
+			if ( !array_key_exists( $option, $settings ) ) {
 				$settings[$option] = $value;
 			}
 			$settings_changed = true;
@@ -332,14 +357,21 @@ class FML implements FMLConstants
 	/**
 	 * Change any settings and save to blog options
 	 * 
-	 * @param array $settings options to modify/save. If you jsut want to save
+	 * @param array $settings options to modify/save. If you just want to save
 	 *        the existing options, just don't provide any settings here.
 	 * @return void
 	 */
-	public function update_settings( $settings=array() )
-	{
-		foreach ($settings as $key=>$value) {
+	public function update_settings( $settings=array() ) {
+		// Make sure we have settings loaded before we start "overwriting" them
+		if ( empty($this->_settings) ) { $this->_load_settings(); }
+		foreach ( $settings as $key=>$value ) {
 			$this->_settings[$key] = $value;
+		}
+		// If you mess up the post_date_map, just unlink it
+		if ( !empty( $settings['post_date_map'] ) ) {
+			if ( !in_array( $settings['post_date_map'], array_keys($this->post_dates_map ) ) ) {
+				$this->_settings['post_date_map'] = 'none';
+			}
 		}
 		update_option(self::SLUG, $this->_settings);
 	}
@@ -2065,8 +2097,8 @@ class FML implements FMLConstants
 		$post_data = array(
 			//ID
 			//'post_author'    => 0,//userid
-			'post_date'      => $data['dates']['taken'], //TODO: consider varying date
-			//'post_date_gmt'  => above in GMT
+			//'post_date'      => SEE BELOW
+			//'post_date_gmt'  => SEE BELOW
 			//'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
 			'post_content'   => $data['description']['_content'],
 			'post_title'     => $data['title']['_content'],
@@ -2094,6 +2126,24 @@ class FML implements FMLConstants
 			//'page_template' (empty)
 			//'file' (from attachment) @see https://codex.wordpress.org/Function_Reference/wp_insert_attachment
 		);
+		// handle post_date
+		switch ( $this->settings['post_date_map'] ) {
+			case 'posted':
+				$post_data['post_date']     = date( 'Y-m-d H:i:s', $data['dates']['posted']);
+				$post_data['post_date_gmt'] = gmdate( 'Y-m-d H:i:s', $data['dates']['posted']);
+				break;
+			case 'taken':
+				// probably can refine this using date taken granularity
+				$time = strtotime( $data['dates']['taken'] );
+				$post_data['post_date']     = date( 'Y-m-d H:i:s', $time );
+				$post_data['post_date_gmt'] = gmdate( 'Y-m-d H:i:s', $time );
+			case 'lastupdate':
+				$post_data['post_date']     = date( 'Y-m-d H:i:s', $data['dates']['lastupdate']);
+				$post_data['post_date_gmt'] = gmdate( 'Y-m-d H:i:s', $data['dates']['lastupdate']);
+				break;
+			//default (case 'none'). When creating, WordPress uses current time,
+			//and it maintains this on update so no worries on update
+		}
 		// make sure it has a title
 		if ( empty($post_data['post_title']) ) {
 			$post_data['post_title'] = $data['id'];

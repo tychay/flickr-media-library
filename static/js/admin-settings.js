@@ -6,7 +6,6 @@
 
 	/* onReady: Handle Settings page for Flickr Media Library. */
 	$( function() {
-
 		// bind the checkboxes to hide/show display_<cbox_id> classes
 		$('.hide-column-tog', '#adv-settings').change( function() {
 			var $this = $(this), id = $this.val();
@@ -18,6 +17,16 @@
 					.find('input').prop( 'disabled', true );
 			}
 		});
+
+		// handle showing warnings
+		$('#flickr-media-library-cpt_options-post_date_map').change(function(ev) {
+			var $this = $(this);
+			if ( $this.val() == 'lastupdate' ) {
+				$('#post_date_map_description').removeClass('hidden');
+			} else {
+				$('#post_date_map_description').addClass('hidden');
+			}
+		}).change();
 
 	});
 
