@@ -27,7 +27,14 @@
 				$('#post_date_map_description').addClass('hidden');
 			}
 		}).change();
-
+		$('#flickr-media-library-output_options-media_default_link').change(function(ev) {
+			var $this = $(this);
+			if ( $this.val() != 'flickr' && $this.val() != 'post' ) {
+				$('#media_default_link_description').removeClass('hidden');
+			} else {
+				$('#media_default_link_description').addClass('hidden');
+			}
+		}).change();
 	});
 
 } )( window, window.jQuery );

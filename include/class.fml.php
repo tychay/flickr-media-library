@@ -335,16 +335,55 @@ class FML implements FMLConstants
 			Flickr::USER_NSID                 => '',
 			Flickr::OAUTH_ACCESS_TOKEN        => '',
 			Flickr::OAUTH_ACCESS_TOKEN_SECRET => '',
-			'post_date_map'                   => 'taken', // map post date to flickr date taken
-			//photo link option
+			'post_date_map'                   => 'taken',  // map post date to flickr date taken
+			'media_default_link'              => false,
+			'media_default_align'             => false,
+			'media_default_size'              => false,
 			//link rel option
 			//link class option
 		);
+
 		// upgrade missing parameters (or initialize defaults if none)
 		// cannot do a straight array_merge because we're looking for if we
 		// need to update the blog options.
 		foreach ( $_default_settings as $option=>$value ) {
 			if ( !array_key_exists( $option, $settings ) ) {
+				// values that may involve calls to dB are put here to resolve
+				// defaults only on a new/upgrade of setting
+				if ( $value === false ) {
+					switch ( $option) {
+						case 'media_default_link':
+						$value = get_option( 'image_default_link_type' ); // db default 'file'
+						if (!$value) {
+							$value = 'flickr'; // comply with flickr TOS
+						}
+						break;
+						case 'media_default_align':
+						$value  = get_option( 'image_default_align' ); //empty default
+						if (!$value) { $value = 'none'; }
+						break;
+						case 'media_default_size':
+						$value = ucfirst( 'image_default_size' ); //empty default
+						switch ( $value ) {
+							case 'thumb':
+							case 'thumbnail': // normally 150x150 square
+							$value = 'Large Square';
+							break;
+							case 'medium': //normally 300 max
+							$value = 'Small';
+							break;
+							case 'large': //normally 640 max
+							$value = 'Medium 640';
+							break;
+							case 'full': //original
+							$value = 'full';
+							break;
+							default:
+							$value = 'Medium';
+						}
+						break;
+					}
+				}
 				$settings[$option] = $value;
 			}
 			$settings_changed = true;

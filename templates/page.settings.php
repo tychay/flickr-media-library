@@ -15,6 +15,22 @@
  * @author terry chay <tychay@php.net>
  */
 namespace FML;
+
+function _make_th( $form_id, $select_name, $label ) {
+	printf(
+		'<th scope="row"><label for="%s-%s">%s</label></th>',
+		esc_attr($form_id),
+		esc_attr($select_name),
+		$label
+	);
+}
+function _make_select( $form_id, $select_name, $selects, $selected ) {
+	printf( '<select id="%1$s-%2$s" name="%2$s">', esc_attr($form_id), esc_attr($select_name) );
+	foreach ( $selects as $value=>$name ) {
+		printf( '<option value="%s"%s>%s</option>', esc_attr($value), ( $selected == $value ) ? ' selected="selected"' : '', esc_html($name) );
+	}
+	echo '</select>';
+}
 ?>
 <div class="wrap">
 
@@ -60,21 +76,23 @@ namespace FML;
 			</tr>
 		</table>
 		<?php submit_button(__('Remove authorization', FML::SLUG)); ?>
-<?php else: ?>
-		<?php wp_nonce_field($form_ids['flickr_auth'].'-verify'); ?>
-		<input type="hidden" name="action" value="<?php echo $form_ids['flickr_auth']; ?>" />
+<?php else:
+		$form_id = $form_ids['flickr_auth'];
+?>
+		<?php wp_nonce_field($form_id.'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $form_id ?>" />
 		<p class="copy"><?php echo __('Flickr authorization is needed for plugin access of private photos as well as data syncronization features.', FML::SLUG); ?></p>
 		<!-- begin api screen options stuff -->
 		<table class="form-table">
 			<tr class="display_fml_show_apikey<?php if ( $this->_options_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
-				<th scope="row"><label for="<?php echo $form_ids['flickr_auth']; ?>-secret"><?php esc_html_e('Flickr API Key', FML::SLUG); ?></label></th>
-				<td><input id="<?php echo $form_ids['flickr_auth']; ?>-apikey" name="flickr_apikey" value="<?php echo esc_attr($settings['flickr_api_key']); ?>" disabled="disabled" />
+				<?php _make_th( $form_id, 'key', __('Flickr API Key',FML::SLUG) ); ?>
+				<td><input id="<?php echo $form_id; ?>-apikey" name="flickr_apikey" value="<?php echo esc_attr($settings['flickr_api_key']); ?>" disabled="disabled" />
 					<p class="description"><?php echo __('Leave blank if you wish to use default value.', FML::SLUG); ?></p>
 				</td>
 			</tr>
 			<tr class="display_fml_show_apikey<?php if ( $this->_options_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
-				<th scope="row"><label for="<?php echo $form_ids['flickr_auth']; ?>-secret"><?php esc_html_e('Flickr API Secret', FML::SLUG); ?></label></th>
-				<td><input id="<?php echo $form_ids['flickr_auth']; ?>-secret" name="flickr_apisecret" value="<?php echo $api_secret_attr; ?>" disabled="disabled" /></td>
+				<?php _make_th( $form_id, 'key', __('Flickr API Secret',FML::SLUG) ); ?>
+				<td><input id="<?php echo $form_id; ?>-secret" name="flickr_apisecret" value="<?php echo $api_secret_attr; ?>" disabled="disabled" /></td>
 			</tr>
 		</table>
 		<!-- end api screen options stuff -->
@@ -84,6 +102,7 @@ namespace FML;
 <?php
 			break;
 		case 'cpt_options':
+			$form_id = $form_ids['cpt_options'];
 ?>
 	<form method="post" id="cpt_options_form">
 		<?php wp_nonce_field($form_ids['cpt_options'].'-verify'); ?>
@@ -91,27 +110,38 @@ namespace FML;
 		<h3><?php _e('Custom Post Type Options', FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
-				<th scope="row">
-					<label for="<?php echo $form_ids['cpt_options']; ?>-post_date_map"><?php _e('Post date', FML::SLUG); ?></label>
-				</th>
-				<td>
-					<select id="<?php echo $form_ids['cpt_options']; ?>-post_date_map" name="post_date_map">
-<?php
-			foreach ( $post_dates_map as $id=>$name ) {
-				printf( '<option value="%s"%s>%s</option>', esc_attr($id), ( $settings['post_date_map'] == $id ) ? ' selected="selected"' : '', esc_html($name) );
-			}
-?>
-					</select>
+				<?php _make_th( $form_id, 'post_date_map', __('Post date Alignment',FML::SLUG) ); ?>
+				<td><?php _make_select( $form_id, 'post_date_map', $select_post_dates, $settings['post_date_map'] ); ?>
 					<p class="description hidden" id="post_date_map_description"><?php _e( 'It is not recommended to map the date to flickr’s last modified time as it may change the post date arbitrarily.', FML::SLUG); ?></p>
 				</td>
 			</tr>
 		</table>
 		<?php submit_button(__('Save Changes')); ?>
 	</form>
-
 <?php
 			break;
 		case 'output_options':
+			$form_id = $form_ids['output_options'];
+?>
+	<form method="post" id="output_options_form">
+		<?php wp_nonce_field($form_ids['output_options'].'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $form_ids['output_options']; ?>" />
+		<h3><?php _e('Editor Options', FML::SLUG); ?></h3>
+		<table class="form-table">
+			<tr>
+				<?php _make_th( $form_id, 'media_default_align', __('Default Alignment',FML::SLUG) ); ?>
+				<td><?php _make_select( $form_id, 'media_default_align', $select_aligns, $settings['media_default_align'] ); ?></td>
+			</tr>
+			<tr>
+				<?php _make_th( $form_id, 'media_default_link', __('Default Link To',FML::SLUG) ); ?>
+				<td><?php _make_select( $form_id, 'media_default_link', $select_links, $settings['media_default_link'] ); ?>
+					<p class="description hidden" id="media_default_link_description"><?php _e('Remember <a href="https://www.flickr.com/help/guidelines">Flickr Community Guidelines</a> state that you link back to Flickr when you post Flickr content elsewhere.',FML::SLUG); ?></p>
+				</td>
+			</tr>
+		</table>
+		<?php submit_button(__('Save Changes')); ?>
+	</form>
+<?php
 			break;
 	endswitch;
 

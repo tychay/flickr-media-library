@@ -42,6 +42,16 @@ class FMLAdmin
 	 */
 	private $_options_checkboxes = array();
 	/**
+	 * media alignments (and display names)
+	 * @var array
+	 */
+	private $_aligns = array();
+	/**
+	 * media links (and display names)
+	 * @var array
+	 */
+	private $_links = array();
+	/**
 	 * Plugin Admin function initialization 
 	 * 
 	 * @param \FML\FML $fml the FML plugin object
@@ -79,9 +89,22 @@ class FMLAdmin
 		);
 		// I am removing the verb and the period to standardize on columns
 		// habits instead of on the special otpions
-		// (e.g. "Show full-height editor and distraction-free functionality."")
+		// (e.g. "Show full-height editor and distraction-free functionality.")
 		$this->_options_checkboxes = array(
 			'fml_show_apikey' => __( 'Flickr API Key and Secret', FML::SLUG ),
+		);
+		$this->_aligns = array(
+			'left'   => __( 'Left' ),
+			'center' => __( 'Center' ),
+			'right'  => __( 'Right' ),
+			'none'   => __( 'None' ),
+		);
+		$this->_links = array(
+			'file'   => __( 'Media File' ),
+			'post'   => __( 'Attachment Page' ),
+			'flickr' => __( 'flickr Photo Page', FML::SLUG ),
+			'custom' => __( 'Custom URL' ),
+			'none'   => __( 'None' ),
 		);
 	}
 	/**
@@ -387,6 +410,20 @@ class FMLAdmin
 		check_admin_referer( $this->_ids['forms']['output_options'] . '-verify' );
 		//var_dump($_POST);die;
 		$options = array();
+		foreach( $_POST as $key=>$value ) {
+			switch( $key ) {
+				case 'media_default_align':
+					if ( in_array( $value, array_keys( $this->_aligns ) ) ) {
+						$options[$key] = $value;
+					}
+					break;
+				case 'media_default_link':
+					if ( in_array( $value, array_keys( $this->_links ) ) ) {
+						$options[$key] = $value;
+					}
+					break;
+			}
+		}
 		$this->_options_update_settings($options);
 	}
 	/**
@@ -443,7 +480,10 @@ class FMLAdmin
 		                 ? ''
 		                 : $settings['flickr_api_secret'];
 		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
-		$post_dates_map  = $this->_fml->post_dates_map;
+		$select_post_dates   = $this->_fml->post_dates_map;
+		$select_links        = $this->_links;
+		$select_aligns       = $this->_aligns;
+
 		include $this->_fml->template_dir.'/page.settings.php';
 	}
 	/**
@@ -1219,10 +1259,25 @@ class FMLAdmin
 	private function _media_upload_constants( $page_type, $post_id=0 ) {
 		$settings = $this->_fml->settings;
 		$props = array(
-			'link'  => get_option( 'image_default_link_type' ), // db default is 'file'
-			'align' => get_option( 'image_default_align' ), // empty default
-			'size'  => ucfirst(get_option( 'image_default_size' )),  // empty default
-			// capitalize to make it have a chance of matching flickr's sizes if set
+			'link'  => $settings['media_default_link'],
+			'align' => $settings['media_default_align'],
+			'size'  => $settings['media_default_size'],
+		);
+		$msg_attachments = array_merge(
+			$this->_aligns,
+			$this->_links,
+			array(
+				'attachment_details'  => __( 'Attachment Details' ),
+				'attachment_settings' => __( 'Attachment Display Settings' ),
+				'url'                 => __( 'URL' ),
+				'title'               => __( 'Title' ),
+				'description'         => __( 'Description' ),
+				'caption'             => __( 'Caption' ),
+				'alt'                 => __( 'Alt Text' ),
+				'alignment'           => __( 'Alignment' ),
+				'linkto'              => __( 'Link To' ),
+				'size'                => __( 'Size' ),
+			)
 		);
 		$constants = array(
 			'slug'               => FML::SLUG,
@@ -1238,29 +1293,11 @@ class FMLAdmin
 				'flickr_unk' => __('Flickr API returned an unknown error.', FML::SLUG),
 				'fml'        => __('Flickr Media Library API error %s (%s).', FML::SLUG),
 			),
-			'msgs_pagination' => array(
+			'msgs_pagination'    => array(
 				'load'    => __('Load More'),
 				'loading' => __('Loading…', FML::SLUG),
 			),
-			'msgs_attachment'    => array(
-				'attachment_details'  => __( 'Attachment Details' ),
-				'attachment_settings' => __( 'Attachment Display Settings' ),
-				'url'                 => __( 'URL' ),
-				'title'               => __( 'Title' ),
-				'description'         => __( 'Description' ),
-				'caption'             => __( 'Caption' ),
-				'alt'                 => __( 'Alt Text' ),
-				'alignment'           => __( 'Alignment' ),
-				'left'                => __( 'Left' ),
-				'center'              => __( 'Center' ),
-				'right'               => __( 'Right' ),
-				'none'                => __( 'None' ),
-				'linkto'              => __( 'Link To' ),
-				'file'                => __( 'Media File' ),
-				'post'                => __( 'Attachment Page' ),
-				'flickr'              => __( 'Flickr Page' ),
-				'size'                => __( 'Size' ),
-			),
+			'msgs_attachment'    => $msg_attachments,
 			'msgs_add_btn'       => array(
 				'add_to'  => __( 'Add to media library', FML::SLUG ),
 				'adding'  => __( 'Adding…', FML::SLUG ),

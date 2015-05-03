@@ -1042,7 +1042,7 @@
         // Link To
         insert_box.append(self._wrapLabelTag(
           self._makeSelectInput(
-            {'file':msgs.file, 'post':msgs.post, 'custom':msgs.flickr, 'none':msgs.none},
+            {'file':msgs.file, 'post':msgs.post, 'custom':msgs.custom, 'flickr':msgs.flickr, 'none':msgs.none},
             constants.default_props.link,
             'link',
             'link-to'
@@ -1050,8 +1050,14 @@
           false,
           msgs.linkto
         ));
-        // TODO: add text box <input type="text" class="link-to-custom" data-setting="linkUrl" />
-        // TODO: add controls
+
+        // TODO: wrong place for this :-(
+        insert_box.append( $('<input>').attr({
+          type: 'text',
+          'class': 'link-to-custom',
+          'data-setting': 'linkUrl'
+        }) );
+        // TODO: add controls??
         // Sizes
         insert_box.append(self._wrapLabelTag(
           self._makeSelectInput(
@@ -1097,21 +1103,28 @@
       }
     };
     this._makeSelectInput = function(values, selected, dataSetting, className) {
+      var keys = Object.keys(values);
       if ( !values[selected] ) {
         switch (dataSetting) {
           case 'size': selected='Medium';break;
-          case 'link': selected='custom';break;
+          case 'link': selected='flickr';break;
           default:     selected='none';
         }
+      }
+      // if 'full' provided, choose the last one
+      if ( selected == 'full' ) {
+        selected = keys[keys.length-1];
       }
       var select_input = $('<select>').attr({
         'class': className,
         'data-setting': dataSetting
       });
-      for ( var idx in values ) {
-        var attrs = { 'value': idx };
-        if ( idx === selected ) { attrs.selected='selected'; }
-        select_input.append( $('<option>').attr(attrs).text(values[idx]));
+
+      for(var i=0, end=keys.length; i<end; ++i) {
+        var key = keys[i],
+            attrs = { 'value': key };
+        if ( key === selected ) { attrs.selected='selected'; }
+        select_input.append( $('<option>').attr(attrs).text(values[key]));
       }
       return select_input;
     };
