@@ -176,7 +176,19 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_rel_flickr', __('Flickr Photo "rel"',FML::SLUG) ); ?>
-				<td><?php _page_settings_input( $form_id, 'media_default_rel_flickr', $settings['media_default_rel_flickr'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?></td>
+				<td><?php _page_settings_input( $form_id, 'media_default_rel_flickr', $settings['media_default_rel_flickr'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
+				<?php _page_settings_th( $form_id, 'media_default_class_size', __('Image class for size',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'media_default_class_size', $settings['media_default_class_size'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
+					<p class="description"><?php _e('Use <code>size-</code> to emulate attachments'); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
+				<?php _page_settings_th( $form_id, 'media_default_class_id', __('Image class for ID',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'media_default_class_id', $settings['media_default_class_id'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
+					<p class="description"><?php _e('Use <code>wp-image-</code> to emulate attachments'); ?></p>
 				</td>
 			</tr>
 		</table>

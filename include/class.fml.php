@@ -120,6 +120,8 @@ class FML implements FMLConstants
 	 * - register filter_wp_get_attachment_metadata to inject metadata results
 	 *   without having to clutter up post_meta with more stuff
 	 * - register filter media_send_to_editor to wrap shortcode around fmlmedia
+	 * - register get_image_tag_class to override lasses in send_to_editor images
+	 * - initial "set" of picturefill compatibility
 	 *
 	 * @return void
 	 */
@@ -137,7 +139,9 @@ class FML implements FMLConstants
 		add_filter( 'get_attached_file', array( get_class($this), 'filter_get_attached_file'), 10, 2 );
 		add_filter( 'wp_get_attachment_metadata', array( $this, 'filter_wp_get_attachment_metadata'), 10, 2 );
 		// TODO make this optional depending on the style of handling shortcode injection
-		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3);
+		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3 );
+		add_filter( 'get_image_tag_class', array($this,'filter_image_tag_class'), 10, 4 );
+		
 		// Don't worry, you can change this later,
 		$this->_support_picturefill = ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 	}
@@ -599,6 +603,20 @@ class FML implements FMLConstants
 			);
 		}
 		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
+	}
+	public function filter_image_tag_class($class, $id, $align, $size) {
+		$post = get_post($id);
+		// only operate on fml media
+		if ( !$post || ( $post->post_type != self::POST_TYPE ) ) { return $class; }
+		$settings = $this->settings;
+		$classes = array( 'align'.esc_attr($align) );
+		if ( $settings['media_default_class_size'] ) {
+			$classes[] = esc_attr( $settings['media_default_class_size'] . $size );
+		}
+		if ( $settings['media_default_class_id'] ) {
+			$classes[] = esc_attr( $settings['media_default_class_id'] . $id );
+		}
+		return implode( ' ', $classes );
 	}
 	/**
 	 * Trigger the process of the [fmlmedia] shortcode earlier.
