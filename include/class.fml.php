@@ -34,17 +34,6 @@ class FML implements FMLConstants
 	 */
 	public $post_dates_map;
 	/**
-	 * The option name for the permalink base.
-	 * 
-	 * This is needed in this object because it is used in registration of
-	 * the custom post and the name is the blog options. Publicly access this
-	 * through _get() to make it a read-only value. (Writing its contents is a
-	 * different variable, you want $this->permalink_slug)
-	 * 
-	 * @var string the option name for the permalink base
-	 */
-	private $_permalink_slug_id;
-	/**
 	 * @var array store the post_meta names of FML-specific metadata. This is
 	 * accessible publicly (but not writeable).
 	 */
@@ -79,7 +68,6 @@ class FML implements FMLConstants
 			'none'       => __( 'WordPress-only date', self::SLUG )
 			);
 		$this->plugin_basename    = plugin_basename($pluginFile);
-		$this->_permalink_slug_id = str_replace('-','_',self::SLUG).'_base';
 		$this->_post_metas        = array(
 			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
 			'flickr_id' => '_flickr_id',
@@ -234,7 +222,7 @@ class FML implements FMLConstants
 			'has_archive'         => true, // can have archive template
 			//'permalink_epmask'    => // endpoint bitmask?
 			'rewrite'             => array(
-				'slug' => $this->permalink_slug,
+				'slug' => $this->settings['permalink_slug'],
 				'with_front' => false, //make it a root level, just like categories & tags
 				//'feeds' //defaults to 'has_archive' value
 				//'pages' //allow pagination?
@@ -256,6 +244,7 @@ class FML implements FMLConstants
 	 * - settings(array): The options array for the plugin
 	 * - flickr (\FML\Flickr): flickr api object
 	 * - flickr_callback: the callback URL when authenticating flickr requests
+	 * 
 	 * @param  string $name the property to get
 	 * @return mixed the thing to be gotten
 	 */
@@ -270,10 +259,6 @@ class FML implements FMLConstants
 				return $this->_get_flickr();
 			case 'flickr_callback':
 				return $this->_flickr_callback;
-			case 'permalink_slug_id':
-				return $this->_permalink_slug_id;
-			case 'permalink_slug':
-				return get_option( $this->permalink_slug_id, self::_DEFAULT_BASE );
 			case 'post_metas':
 				return $this->_post_metas;
 			default:
@@ -298,8 +283,6 @@ class FML implements FMLConstants
 			case 'flickr_callback':
 				$this->_flickr_callback = $value;
 				break;
-			case 'permalink_slug':
-				update_option( $this->permalink_slug_id, $value );
 			default:
 				trigger_error( sprintf( 'Property %s is not settable', $name ) );
 			break;
@@ -335,6 +318,7 @@ class FML implements FMLConstants
 			Flickr::USER_NSID                 => '',
 			Flickr::OAUTH_ACCESS_TOKEN        => '',
 			Flickr::OAUTH_ACCESS_TOKEN_SECRET => '',
+			'permalink_slug'                  => self::_DEFAULT_BASE,
 			'post_date_map'                   => 'taken',  // map post date to flickr date taken
 			'media_default_link'              => false,
 			'media_default_align'             => false,
@@ -414,7 +398,7 @@ class FML implements FMLConstants
 		}
 		update_option(self::SLUG, $this->_settings);
 	}
-	// PROPERTES: Flickr
+	// PROPERTIES: Flickr
 	/**
 	 * @var \FML\Flickr Flickr API object
 	 */
@@ -539,7 +523,7 @@ class FML implements FMLConstants
 		$p = $this->shortcode( $shortcode_attrs, $shortcode_content );
 		// append caption if available
 		if ( $caption_text = $post->post_excerpt ) {
-			list( $img_src, $width, $height ) = image_downsize( $post->ID, $shortcode_attrs['img_size'] );
+			list( $img_src, $width, $height ) = image_downsize( $post->ID, $shortcode_attrs['size'] );
 			$attr = array(
 				'id'      => self::SLUG.'-attachment',
 				'width'   => $width,

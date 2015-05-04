@@ -61,6 +61,7 @@ class FMLAdmin
 		$this->_ids = array(
 			'page_add_media'   => FML::SLUG.'-add-flickr',
 			'page_options'     => FML::SLUG.'-settings',
+			'permalink_slug'   => FML::SLUG.'-base',
 			'forms'            => array(
 				'flickr_auth'    => FML::SLUG.'-flickr-auth',
 				'flickr_deauth'  => FML::SLUG.'-flickr-deauth',
@@ -162,13 +163,13 @@ class FMLAdmin
 	
 		// PERMALINK: Render permalink form	
 		add_settings_field(
-			$this->_fml->permalink_slug_id,
+			$this->_ids['permalink_slug'],
 			__( 'Flickr Media base', FML::SLUG ),     // title
 			array( $this, 'permalink_render_field' ), // form render callback
 			'permalink',                              // page
 			'optional',                               // section
 			array(                                    // args
-				'label_for' => $this->_fml->permalink_slug_id
+				'label_for' => $this->_ids['permalink_slug']
 			)
 		);
 	}
@@ -215,11 +216,13 @@ class FMLAdmin
 	 * default things itself.
 	 */
 	public function permalink_handle_form() {
-		if ( !empty( $_POST[$this->_fml->permalink_slug_id] ) ) {
+		if ( !empty( $_POST[$this->_ids['permalink_slug']] ) ) {
 			check_admin_referer('update-permalink');
-			$this->_fml->permalink_slug = urlencode( $_POST[$this->_fml->permalink_slug_id] );
+			$this->_fml->update_settings( array(
+				'permalink_slug' => $_POST[$this->_ids['permalink_slug']]
+			) );
 		}
-		// pass through
+		// pass through "updated" status
 	}
 	/**
 	 * Settings API to render base HTML form in options-permalink.php
@@ -227,7 +230,7 @@ class FMLAdmin
 	 * @return [type]       [description]
 	 */
 	public function permalink_render_field($args) {
-		$slug = $this->_fml->permalink_slug;
+		$slug = $this->_fml->settings['permalink_slug'];
 		printf(
 			'<input name="%1$s" id="%1$s" type="text" value="%2$s" class="regular-text code" />',
 			$args['label_for'],
@@ -421,6 +424,9 @@ class FMLAdmin
 					if ( in_array( $value, array_keys( $this->_links ) ) ) {
 						$options[$key] = $value;
 					}
+					break;
+				case 'media_default_size':
+					$options[$key] = $value;
 					break;
 			}
 		}
