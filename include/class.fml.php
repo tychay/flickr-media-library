@@ -1496,10 +1496,17 @@ class FML implements FMLConstants
 			'orientation' => ( $full['height'] > $full['width'] ) ? 'portrait' : 'landscape',
 		);
 		$response['sizes'] = $sizes;
-		
+		// blocked by hard-coded attachment again
+		$response['url'] =  $full['source'];
+		// $response['link']: works right now, but it's using get_attachment_link()
+		// and might not work down the road
+		$resposne['link'] = get_permalink( $post->ID );
+
 		// FML-specific
 		$response['flickrId'] = get_post_meta( $post->ID, $self->post_metas['flickr_id'], true );
 		$response['_flickrData'] = $flickr_data;
+		//$response['photoUrl'] = $flickr_data['urls']['url'][0]['_content'];
+		$response['photoUrl'] = self::get_flickr_link($post);
 		// testing
 		//$response['_file'] = get_attached_file( $post->ID );
 		//$response['_metadata'] = wp_get_attachment_metadata( $post->ID );

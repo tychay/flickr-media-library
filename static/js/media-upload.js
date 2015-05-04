@@ -39,6 +39,7 @@
     this.$search_filter = null;
     this.$photo_list    = null;
     this.$media_sidebar = null;
+    this.$select_link   = null;
     this.$add_button    = null;
     this.$error_box     = null;
     this.$spinner       = null;
@@ -410,6 +411,34 @@
         }
       );
     };
+    /**
+     * When the link select box is selected, call this to change the URL box
+     * @param  {event} ev [description]
+     * @return null
+     */
+    this.changeLinkUrl = function(ev) {
+      var $this = $(this),
+          $input_linkurl = $('[data-setting="linkUrl"]', self.$media_sidebar),
+          id = $('.attachment-details',self.$media_sidebar).attr('data-id'),
+          photo_data = self.photo_data[id];
+      switch ($this.val()) {
+        case 'file':
+          $input_linkurl.val(photo_data.url).removeClass('hidden').attr('readonly','readonly');
+          break;
+        case 'post':
+          $input_linkurl.val(photo_data.link).removeClass('hidden').attr('readonly','readonly');
+          break;
+        case 'flickr':
+          $input_linkurl.val(photo_data.photoUrl).removeClass('hidden').attr('readonly','readonly');
+          break;
+        case 'custom':
+          $input_linkurl.val('http://').removeClass('hidden').removeAttr('readonly');
+          break;
+        case 'none':
+          $input_linkurl.addClass('hidden');
+          break;
+      }
+    };
 
     /**
      * Handle return on a query of if FML post exists or if FML post created
@@ -468,13 +497,15 @@
 
       if ( photo_data.id ) {
         //It's already in library: API get the HTML to inject
+        var $sidebar = self.$media_sidebar;
         var params = {
           'attachment[id]'          : photo_data.id,
-          'attachment[image_alt]'   : $('label[data-setting=alt] input').val(),
-          'attachment[post_excerpt]': $('label[data-setting=caption] textarea').val(),
-          'attachment[align]'       : $('select[data-setting=align]').val(),
-          'attachment[image-size]'  : $('select[data-setting=size]').val(),
-          'attachment[link]'        : $('select[data-setting=link]').val()
+          'attachment[image_alt]'   : $('[data-setting=alt] input', $sidebar).val(),
+          'attachment[post_excerpt]': $('[data-setting=caption] textarea', $sidebar).val(),
+          'attachment[align]'       : $('[data-setting=align]', $sidebar).val(),
+          'attachment[image-size]'  : $('[data-setting=size]', $sidebar).val(),
+          'attachment[link]'        : $('[data-setting=link]', $sidebar).val(),
+          'attachment[linkUrl]'     : $('[data-setting=linkUrl]', $sidebar).val()
         };
         if ( constants.post_id ) { params.post_id = post_id; }
         //console.log(params);
@@ -488,7 +519,7 @@
               return true; //cancel spinner
             }
             self.guessRenderAddButton(0);
-            //console.log(data);
+            //console.log(data.html);return;
             // Inject code into parent frame
             var win = window.dialogArguments || opener || parent || top;
             win.send_to_editor(data.html);
@@ -1013,7 +1044,8 @@
         // Alignment
         $('select[data-setting="align"]',$attach_display).val(constants.default_props.align);
         // Link To
-        $('select[data-setting="link"]',$attach_display).val(constants.default_props.link);
+        //   also trigger the event
+        $('select[data-setting="link"]',$attach_display).val(constants.default_props.link).change();
         // TODO: add url setting
         //$('select[data-setting="linkUrl"]').attr().val(constants.default_props.link);
         // Size
@@ -1101,6 +1133,7 @@
       self.$search_query  = $('#'+constants.slug+'-search-input');
       self.$photo_list    = $('#'+constants.slug+'-photo-list');
       self.$media_sidebar = $('#'+constants.slug+'-media-sidebar');
+      self.$select_link   = $('[data-setting="link"]', self.$media_sidebar);
       self.$add_button    = $('#'+constants.slug+'-media-add-button');
       self.$error_box     = $('#'+constants.slug+'-ajax-error');
       self.$spinner       = $('.spinner');
@@ -1113,6 +1146,7 @@
       self.$select_main.on(  'change', self.changeSearchType);
       self.$select_filter.on('change', self.changeFilterType);
       self.$search_query.on(   'blur', self.blurSearchField);
+      self.$select_link.on(  'change', self.changeLinkUrl);
       switch ( constants.page_type ) {
         case 'admin_menu': //add flickr (to media library) "overlay"
           self.$add_button.on('click', self.clickAddButtonMediaLibrary);

@@ -952,33 +952,29 @@ class FMLAdmin
 					) );
 				}
 				// TODO: don't attach unnattached attachment for flickr media
-				// TODO: we don't support custom URLs because of flickr TOS
 				$url = '';
 				$rel = false;
 				if ( !empty( $attachment['link'] ) ) {
 					switch ( $attachment['link'] ) {
 						case 'file':
-						//$url = get_attached_file( $id );
+						$url = get_attached_file( $id );
 						//Flickr community guidelines: link the download page
-						$url = FML::get_flickr_link( $id ).'sizes/';
+						//$url = FML::get_flickr_link( $id ).'sizes/';
 						break;
 						case 'post':
 						$url = get_permalink( $id );
 						$rel = true;
 						break;
-						case 'custom':
+						case 'flickr':
 						$url = FML::get_flickr_link( $id );
+						break;
+						case 'custom':
+						$url = $attachment['linkUrl'];
 						break;
 						default:
 						$url = '';
 						// no link
 					}
-					// consume attachment link
-					/*
-					if ( empty( $url ) ) {
-						unset( $attachment['link'] );
-					}
-					*/
 				}
 				//https://developer.wordpress.org/reference/functions/get_image_send_to_editor/
 				remove_filter( 'media_send_to_editor', 'image_media_send_to_editor' );
