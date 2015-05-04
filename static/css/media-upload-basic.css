@@ -39,7 +39,7 @@
 }
 .attachment-info .thumbnail, .attachment-info .thumbnail img {
     max-width: 240px; /* default is 120px, but let's make it larger because we can */
-    max-height: 240px;
+    max-height: 100%; /* prevents squished images */
 }
 .attachments-browser .attachments {
     top:70px; /* leave enough room for an error */
