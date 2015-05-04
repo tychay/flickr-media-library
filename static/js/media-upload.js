@@ -937,7 +937,7 @@
         draggable: 'false',
         title: photo_data.title,
         alt: photo_data.alt,
-      })//.css({'max-width':'240px','max-height':'240px'})
+      });//.css({'max-width':'240px','max-height':'240px'});
       $('.thumbnail-image',$attach_details).empty().append($img);
       // filename
       $('.filename',$attach_details).text(photo_data.title).removeClass('hidden');
@@ -1019,10 +1019,16 @@
         // Size
         var sizes = self._generateSizesArray(photo_data.sizes);
         var $sizes_select = $('select[data-setting="size"]',$attach_display).empty();
+        var largest_size = '';
         for ( var size in sizes ) {
           $sizes_select.append($('<option>').attr({value:size}).text(sizes[size]));
+          largest_size = size; // not best, but cheapest way of finding the "full" size
         }
-        $sizes_select.val(constants.default_props.size)
+        if (constants.default_props.size != 'full') {
+          $sizes_select.val(constants.default_props.size);
+        } else {
+          $sizes_select.val(largest_size);
+        }
 
         $attach_display.removeClass('hidden');
       } else {
