@@ -341,8 +341,11 @@ class FML implements FMLConstants
 			'media_default_link'              => false,
 			'media_default_align'             => false,
 			'media_default_size'              => false,
-			//link rel option
-			//link class option
+			'media_default_rel_post'          => 'attachment',
+			'media_default_rel_post_id'       => 'wp-att-',
+			'media_default_rel_flickr'        => 'flickr',
+			'media_default_class_size'        => 'size-',
+			'media_default_class_id'          => 'wp-image-',
 		);
 
 		// upgrade missing parameters (or initialize defaults if none)

@@ -93,6 +93,8 @@ class FMLAdmin
 		// (e.g. "Show full-height editor and distraction-free functionality.")
 		$this->_options_checkboxes = array(
 			'fml_show_apikey' => __( 'Flickr API Key and Secret', FML::SLUG ),
+			'fml_show_rels'   => __( 'Link "rel" attributes', FML::SLUG ),
+			'fml_show_classes'=> __( 'Image "class" attributes', FML::SLUG ),
 		);
 		$this->_aligns = array(
 			'left'   => __( 'Left' ),
@@ -145,6 +147,7 @@ class FMLAdmin
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
 		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array( $this, 'get_media_upload_iframe' ) );
 		//add_action( 'wp_enqueue_media', array( $this, 'wp_enqueue_media') );
+		//add_action( 'image_send_to_editor', array($this,'addmedia_send_to_editor') );
 
 		// This is called in three places (post.php, post-new.php and ajax), so
 		// let's do it here (POST, ADDMEDIA)
@@ -426,6 +429,11 @@ class FMLAdmin
 					}
 					break;
 				case 'media_default_size':
+				case 'media_default_rel_post':
+				case 'media_default_rel_post_id':
+				case 'media_default_rel_flickr':
+				case 'media_default_class_size':
+				case 'media_default_class_id':
 					$options[$key] = $value;
 					break;
 			}
@@ -558,7 +566,7 @@ class FMLAdmin
 	 * @param  string $column_name the id of the column to check status of
 	 * @return bool                true if column is hidden
 	 */
-	private function _options_column_is_hidden( $column_name ) {
+	public function options_column_is_hidden( $column_name ) {
 		$screen = get_current_screen();
 		return ( in_array( $column_name, get_hidden_columns( $screen ) ) );
 	}
@@ -936,6 +944,7 @@ class FMLAdmin
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'attachment', array('id',) );
 				$attachment = $_POST['attachment']; //wp_unslash is outdated
+				$settings = $this->_fml->settings;
 				$id = intval( $attachment['id'] );
 				if ( ! $post = get_post( $id ) ) {
 					$this->_send_json_fail( -100, sprintf(
@@ -960,13 +969,15 @@ class FMLAdmin
 						$url = get_attached_file( $id );
 						//Flickr community guidelines: link the download page
 						//$url = FML::get_flickr_link( $id ).'sizes/';
+						//$rel = 'file';
 						break;
 						case 'post':
 						$url = get_permalink( $id );
-						$rel = true;
+						$rel = 'post';
 						break;
 						case 'flickr':
 						$url = FML::get_flickr_link( $id );
+						$rel = $settings['media_default_rel_flickr'];
 						break;
 						case 'custom':
 						$url = $attachment['linkUrl'];
@@ -980,10 +991,10 @@ class FMLAdmin
 				remove_filter( 'media_send_to_editor', 'image_media_send_to_editor' );
 				$html = '';
 				if ( wp_attachment_is_image( $id ) ) {
-					$html = get_image_send_to_editor(
+					$html = $this->get_image_send_to_editor(
 						$id,
 						( isset( $attachment['post_excerpt'] ) ) ? $attachment['post_excerpt'] : '', //caption
-						$post->post_title, //insert title as it is NOT redundant (but will be smashed anyway)
+						$post->post_title, //insert title as it is NOT redundant (but would normally be smashed anyway)
 						isset( $attachment['align'] ) ? $attachment['align'] : 'none',
 						$url,
 						$rel,
@@ -1010,6 +1021,69 @@ class FMLAdmin
 				//dies
 		}
 		wp_send_json( $return );
+	}
+	/**
+	 * Emulate get_image_send_to_editor() for flickr media
+	 * 
+	 * In it's infinite wisdom, none of the hooks inside the real function pass
+	 * on the rel attribute.
+	 *
+	 * Besides, the original function doesn't know there is a difference between
+	 * title and alt tags
+	 * 
+	 * @param  int     $id      [description]
+	 * @param  string  $caption [description]
+	 * @param  string  $title   [description]
+	 * @param  string  $align   [description]
+	 * @param  url     $url     [description]
+	 * @param  string  $rel     if !false then it is the rel to add (post is special case)
+	 * @param  string  $size    [description]
+	 * @param  string  $alt     [description]
+	 * @return [type]           [description]
+	 */
+	public function get_image_send_to_editor( $id, $caption, $title, $align, $url='', $rel=false, $size='Medium', $alt='' ) {
+	    $html = get_image_tag($id, $alt, $title, $align, $size);
+	    $settings = $this->_fml->settings;
+	
+		if ( $rel ) {
+			if ( $rel == 'post' ) {
+				$rels = array();
+				if ( $settings['media_default_rel_post'] ) {
+					$rels[] = $settings['media_default_rel_post'];
+				}
+				if ( $settings['media_default_rel_post_id'] ) {
+					$rels[] = $settings['media_default_rel_post_id'].$id;
+				}
+				$rel = implode(' ',$rels);
+			}
+			// also traps non-post cases
+			if ( $rel ) {
+				$rel = ' rel="'.esc_attr($rel).'"';
+			}
+		} else {
+			$rel = '';
+		}
+	 
+	    if ( $url )
+	        $html = '<a href="' . esc_attr($url) . "\"$rel>$html</a>";
+	 
+	    /**
+	     * Filter the image HTML markup to send to the editor.
+	     *
+	     * @since 2.5.0
+	     *
+	     * @param string $html    The image HTML markup to send.
+	     * @param int    $id      The attachment id.
+	     * @param string $caption The image caption.
+	     * @param string $title   The image title.
+	     * @param string $align   The image alignment.
+	     * @param string $url     The image source URL.
+	     * @param string $size    The image size.
+	     * @param string $alt     The image alternative, or alt, text.
+	     */
+	    $html = apply_filters( 'image_send_to_editor', $html, $id, $caption, $title, $align, $url, $size, $alt );
+	 
+	    return $html;		
 	}
 	/**
 	 * If a parameter is missing, AJAX return a 400 Fail

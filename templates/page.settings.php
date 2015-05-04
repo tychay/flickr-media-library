@@ -16,7 +16,7 @@
  */
 namespace FML;
 
-function _make_th( $form_id, $select_name, $label ) {
+function _page_settings_th( $form_id, $select_name, $label ) {
 	printf(
 		'<th scope="row"><label for="%s-%s">%s</label></th>',
 		esc_attr($form_id),
@@ -24,12 +24,26 @@ function _make_th( $form_id, $select_name, $label ) {
 		$label
 	);
 }
-function _make_select( $form_id, $select_name, $selects, $selected ) {
+function _page_input_select( $form_id, $select_name, $selects, $selected ) {
 	printf( '<select id="%1$s-%2$s" name="%2$s">', esc_attr($form_id), esc_attr($select_name) );
 	foreach ( $selects as $value=>$name ) {
 		printf( '<option value="%s"%s>%s</option>', esc_attr($value), ( $selected == $value ) ? ' selected="selected"' : '', esc_html($name) );
 	}
 	echo '</select>';
+}
+function _page_settings_input( $form_id, $input_name, $input_value, $disabled ) {
+	printf(
+		'<input id="%1$s-%2$s" name="%2$s" value="%3$s"%4$s />',
+		esc_attr($form_id),
+		esc_attr($input_name),
+		esc_attr($input_value),
+		( $disabled) ? ' disabled="disabled"' : ''
+	);
+}
+function _page_settings_hidden_class( $screen_option_id, $that ) {
+	$return = 'display_'.esc_attr( $screen_option_id);
+	if ( $that->options_column_is_hidden( $screen_option_id ) ) $return .= ' hidden';
+	echo $return;
 }
 ?>
 <div class="wrap">
@@ -61,7 +75,7 @@ function _make_select( $form_id, $select_name, $selects, $selected ) {
 		<input type="hidden" name="action" value="<?php echo $form_ids['flickr_deauth']; ?>" />
 		<table class="form-table">
 			<!-- begin api screen options stuff -->
-			<tr class="display_fml_show_apikey<?php if ( $this->_options_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
+			<tr class="<?php _page_settings_hidden_class('fml_show_apikey', $this ); ?>">
 				<th scope="row"><?php esc_html_e('Flickr API Key', FML::SLUG); ?></th>
 				<td><?php echo esc_html($settings['flickr_api_key']); ?></td>
 			</tr>
@@ -84,15 +98,15 @@ function _make_select( $form_id, $select_name, $selects, $selected ) {
 		<p class="copy"><?php echo __('Flickr authorization is needed for plugin access of private photos as well as data syncronization features.', FML::SLUG); ?></p>
 		<!-- begin api screen options stuff -->
 		<table class="form-table">
-			<tr class="display_fml_show_apikey<?php if ( $this->_options_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
-				<?php _make_th( $form_id, 'key', __('Flickr API Key',FML::SLUG) ); ?>
-				<td><input id="<?php echo $form_id; ?>-apikey" name="flickr_apikey" value="<?php echo esc_attr($settings['flickr_api_key']); ?>" disabled="disabled" />
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_apikey', $this )?>">
+				<?php _page_settings_th( $form_id, 'flickr_apikey', __('Flickr API Key',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'flickr_apikey', $settings['flickr_api_key'], $this->options_column_is_hidden( 'fml_show_apikey' ) )  ?>
 					<p class="description"><?php echo __('Leave blank if you wish to use default value.', FML::SLUG); ?></p>
 				</td>
 			</tr>
-			<tr class="display_fml_show_apikey<?php if ( $this->_options_column_is_hidden('fml_show_apikey') ) { echo ' hidden'; } ?>">
-				<?php _make_th( $form_id, 'key', __('Flickr API Secret',FML::SLUG) ); ?>
-				<td><input id="<?php echo $form_id; ?>-secret" name="flickr_apisecret" value="<?php echo $api_secret_attr; ?>" disabled="disabled" /></td>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_apikey', $this )?>">
+				<?php _page_settings_th( $form_id, 'flickr_apisecret', __('Flickr API Secret',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'flickr_apisecret', $api_secret_attr, $this->options_column_is_hidden( 'fml_show_apikey' ) )  ?></td>
 			</tr>
 		</table>
 		<!-- end api screen options stuff -->
@@ -110,8 +124,9 @@ function _make_select( $form_id, $select_name, $selects, $selected ) {
 		<h3><?php _e('Custom Post Type Options', FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
-				<?php _make_th( $form_id, 'post_date_map', __('Post date Alignment',FML::SLUG) ); ?>
-				<td><?php _make_select( $form_id, 'post_date_map', $select_post_dates, $settings['post_date_map'] ); ?>
+				<?php _page_settings_th( $form_id, 'post_date_map', __('Post date Alignment',FML::SLUG) ); ?>
+				<td><?php _page_input_select
+			( $form_id, 'post_date_map', $select_post_dates, $settings['post_date_map'] ); ?>
 					<p class="description hidden" id="post_date_map_description"><?php _e( 'It is not recommended to map the date to flickr’s last modified time as it may change the post date arbitrarily.', FML::SLUG); ?></p>
 				</td>
 			</tr>
@@ -129,19 +144,39 @@ function _make_select( $form_id, $select_name, $selects, $selected ) {
 		<h3><?php _e('Editor Options', FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
-				<?php _make_th( $form_id, 'media_default_align', __('Default Alignment',FML::SLUG) ); ?>
-				<td><?php _make_select( $form_id, 'media_default_align', $select_aligns, $settings['media_default_align'] ); ?></td>
+				<?php _page_settings_th( $form_id, 'media_default_align', __('Default Alignment',FML::SLUG) ); ?>
+				<td><?php _page_input_select
+			( $form_id, 'media_default_align', $select_aligns, $settings['media_default_align'] ); ?></td>
 			</tr>
 			<tr>
-				<?php _make_th( $form_id, 'media_default_link', __('Default Link To',FML::SLUG) ); ?>
-				<td><?php _make_select( $form_id, 'media_default_link', $select_links, $settings['media_default_link'] ); ?>
+				<?php _page_settings_th( $form_id, 'media_default_link', __('Default Link To',FML::SLUG) ); ?>
+				<td><?php _page_input_select
+			( $form_id, 'media_default_link', $select_links, $settings['media_default_link'] ); ?>
 					<p class="description hidden" id="media_default_link_description"><?php _e('Remember <a href="https://www.flickr.com/help/guidelines">Flickr Community Guidelines</a> state that you link back to Flickr when you post Flickr content elsewhere.',FML::SLUG); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<?php _make_th( $form_id, 'media_default_size', __('Default Size',FML::SLUG) ); ?>
-				<td><?php _make_select( $form_id, 'media_default_size', $select_sizes, $settings['media_default_size'] ); ?>
+				<?php _page_settings_th( $form_id, 'media_default_size', __('Default Size',FML::SLUG) ); ?>
+				<td><?php _page_input_select
+			( $form_id, 'media_default_size', $select_sizes, $settings['media_default_size'] ); ?>
 					<p class="description" id="media_default_size_description"><?php _e('Some sizes will be unavailable for photos that are too small or too old.',FML::SLUG); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
+				<?php _page_settings_th( $form_id, 'media_default_rel_post', __('Attachment "rel"',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'media_default_rel_post', $settings['media_default_rel_post'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+					<p class="description"><?php _e('Use <code>attachment</code> to emulate attachments'); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
+				<?php _page_settings_th( $form_id, 'media_default_rel_post_id', __('Attachment "rel" w/ID',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'media_default_rel_post_id', $settings['media_default_rel_post_id'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+					<p class="description"><?php _e('Use <code>wp-att-</code> to emulate attachments'); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
+				<?php _page_settings_th( $form_id, 'media_default_rel_flickr', __('Flickr Photo "rel"',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'media_default_rel_flickr', $settings['media_default_rel_flickr'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?></td>
 				</td>
 			</tr>
 		</table>
@@ -159,7 +194,7 @@ function _make_select( $form_id, $select_name, $selects, $selected ) {
 	foreach( $hidden_cols as $key=>$value ) {
 		printf('<th scope="col" id="%1$s" class="manage-column column-%1$s" style="%2$s"></th>',
 			$key,
-			( $this->_options_column_is_hidden( $key ) ) ? 'display: none;' : ''
+			( $this->options_column_is_hidden( $key ) ) ? 'display: none;' : ''
 		);
 	}
 ?>
