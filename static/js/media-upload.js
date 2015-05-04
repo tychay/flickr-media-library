@@ -920,213 +920,117 @@
      * @return null     
      */
     this.renderPhotoInfo = function(id) {
-      this.$media_sidebar.empty();
-
       var photo_data = self.photo_data[id],
           msgs = constants.msgs_attachment;
 
       // if ( !photo_data ) { ???; } TODO
       //console.log(photo_data);
-
-      // ATTACHEMENT DETAILS
-      var info_box = $('<div>').attr({
-        tabindex: 0,
-        'data-id': id,
-        'class': 'attachment-details save-ready'
-      }).append(
-        $('<h3>').text(msgs.attachment_details)
-      );
-
-      // spinner is elsewhere
       
-      // TODO: remove dependency on core _flickrData
-      // declare image so we can run picturefill on it after rendering
+      // ATTACHMENT DETAILS
+      var $attach_details = $('.attachment-details',self.$media_sidebar);
+      // image:
+      //   declare image so we can run picturefill on it after rendering
+      //   TODO: remove dependency on core _flickrData
       var $img = $('<img>').attr({
         src: self.imgUrl(photo_data._flickrData,'m'),
         srcset: self.imgUrl(photo_data._flickrData,'m')+' 1x, '+self.imgUrl(photo_data._flickrData,'z')+' 2x, '+self.imgUrl(photo_data._flickrData,'c')+' 3x',
         draggable: 'false',
         title: photo_data.title,
         alt: photo_data.alt,
-      });//.css({'max-width':'240px','max-height':'240px'});
-      var attachment_info = $('<div>').attr('class', 'attachment-info').append(
-        $('<div>').attr('class','thumbnail thumbnail-image')
-        .append( $img )
-      );
-
-      var details = $('<div>').attr('class', 'details');
-      // filename: use title
-      details.append($('<div>').attr('class', 'filename').text(photo_data.title));
+      })//.css({'max-width':'240px','max-height':'240px'})
+      $('.thumbnail-image',$attach_details).empty().append($img);
+      // filename
+      $('.filename',$attach_details).text(photo_data.title).removeClass('hidden');
       // uploaded: if not uploaded, use flickr data
       if ( photo_data.dateFormatted ) {
-        details.append($('<div>').attr('class', 'uploaded').text(photo_data.dateFormatted));
+        $('.uploaded',$attach_details).text(photo_data.dateFormatted).removeClass('hidden');
       } else if ( photo_data.date ) {
         var date = new Date(parseInt(photo_data.date));
-        details.append($('<div>').attr('class', 'uploaded').text(date.toLocaleString()));
+        $('.uploaded',$attach_details).text(date.toLocaleString()).removeClass('hidden');
+      } else {
+        $('.uploaded',$attach_details).addClass('hidden');
       }
-      // X file-size
       // dimensions
       if ( photo_data.width && photo_data.height ) {
-        details.append($('<div>').attr('class', 'dimensions').html(photo_data.width+' &times; '+photo_data.height));
+        $('.dimensions',$attach_details).html(photo_data.width+' &times; '+photo_data.height).removeClass('hidden');
+      } else {
+        $('.dimensions',$attach_details).addClass('hidden');
       }
-      // X edit attachment link
-      // X refresh attachment link
-      // X delete/tras/untrash attachment link
-      // TODO: compat-meta: <div class="compat-meta">data.compat.meta</div>
-      attachment_info.append(details);
-      info_box.append(attachment_info);
-
+      // TODO: compat-meta
       // FORM
-      // url      
-      info_box.append(self._wrapLabelTag(
-        self._makeTextInput(self.webUrl(photo_data._flickrData), 'readonly'),
-        'url',
-        msgs.url
-      ) );
+      // url
+      $('label[data-setting="url"] input',$attach_details).attr({
+        readonly: 'readonly',
+        value: self.webUrl(photo_data._flickrData)
+      });
       // title
-      info_box.append(self._wrapLabelTag(
-        self._makeTextInput(photo_data.title, 'readonly'),
-        'title',
-        msgs.title
-      ) );
+      $('label[data-setting="title"] input',$attach_details).attr({
+        readonly: 'readonly',
+        value: photo_data.title
+      });
       var disable_form = false;
       // if in admin menu and already added to flickr, deactivate form
-      // if it's a psot thumbnail and already added, deactivate form as we can only extract ID
+      // if it's a post thumbnail and already added, deactivate form as we can only extract ID
       if ( constants.page_type == 'admin_menu' || constants.page_type == 'post_thumbnail') {
         if ( photo_data.id ) {
-          disable_form = 'readonly';
+          disable_form = true;
         }
       }
       // caption
-      info_box.append(self._wrapLabelTag(
-        self._makeTextArea(photo_data.caption, disable_form),
-        'caption',
-        msgs.caption
-      ) );
-      // alt text
-      info_box.append(self._wrapLabelTag(
-        self._makeTextInput(photo_data.alt, disable_form),
-        'alt',
-        msgs.alt
-      ) );
-      // description
-      if ( photo_data.description ) {
-        info_box.append(self._wrapLabelTag(
-          self._makeTextArea(photo_data.description, 'readonly'),
-          'description',
-          msgs.description
-        ) );
+      if ( disable_form ) {
+        $('label[data-setting="caption"] textarea',$attach_details).attr({ readonly: 'readonly' }).html(photo_data.caption);
+      } else {
+        $('label[data-setting="caption"] textarea',$attach_details).removeAttr('readonly').html(photo_data.caption);
       }
-      self.$media_sidebar.append(info_box);
+      // alt text
+      if ( disable_form ) {
+        $('label[data-setting="alt"] input',$attach_details).attr({
+          readonly: 'readonly',
+          value: photo_data.alt
+        });
+      } else {
+        $('label[data-setting="alt"] input',$attach_details).attr({
+          value: photo_data.alt
+        }).removeAttr('readonly');
+      }
+      // description
+      //   instead of photo_data.description use photo_data.id because 
+      //   description can be empty
+      if ( photo_data.id ) {
+        $('label[data-setting="description"] textarea',$attach_details).attr({ readonly: 'readonly' }).html(photo_data.caption);
+      } else {
+        $('label[data-setting="description"] textarea',$attach_details).removeAttr('readonly').html('');
+      }
+      $attach_details.attr({'data-id': id}).removeClass('hidden');
 
       // TODO: compat-item?
       
       // ATTACHMENT DISPLAY SETTINGS
+      
+      var $attach_display = $('.attachment-display-settings',self.$media_sidebar);
       // Only allow injection if it's in the media library and we are injecting html
       if ( photo_data.id && ( constants.page_type == 'media_button' ) ) {
-        var insert_box = $('<div>').attr({
-          'class': 'attachment-display-settings'
-        }).append(
-          $('<h3>').text(msgs.attachment_settings)
-        );
         // Alignment
-        insert_box.append(self._wrapLabelTag(
-          self._makeSelectInput(
-            {'left':msgs.left, 'center':msgs.center, 'right':msgs.right, 'none':msgs.none},
-            constants.default_props.align,
-            'align',
-            'alignment'
-          ),
-          false,
-          msgs.alignment
-        ));
+        $('select[data-setting="align"]',$attach_display).val(constants.default_props.align);
         // Link To
-        insert_box.append(self._wrapLabelTag(
-          self._makeSelectInput(
-            {'file':msgs.file, 'post':msgs.post, 'custom':msgs.custom, 'flickr':msgs.flickr, 'none':msgs.none},
-            constants.default_props.link,
-            'link',
-            'link-to'
-          ),
-          false,
-          msgs.linkto
-        ));
-
-        // TODO: wrong place for this :-(
-        insert_box.append( $('<input>').attr({
-          type: 'text',
-          'class': 'link-to-custom',
-          'data-setting': 'linkUrl'
-        }) );
-        // TODO: add controls??
-        // Sizes
-        insert_box.append(self._wrapLabelTag(
-          self._makeSelectInput(
-            self._generateSizesArray(photo_data.sizes),
-            constants.default_props.size,
-            'size',
-            'size'
-          ),
-          false,
-          msgs.size
-        ));
-        self.$media_sidebar.append(insert_box);
-      }
-
-      if (window.picturefill) { window.picturefill($img); }
-    };
-    this._wrapLabelTag = function(formElement, dataSetting, name) {
-      var attrs = {'class':'setting'};
-      if ( dataSetting ) {
-        attrs['data-setting'] = dataSetting;
-      }
-      var label = $('<label>').attr(attrs).append(
-        $('<span>').attr('class','name').text(name)
-      );
-      label.append(formElement);
-      return label;
-    };
-    this._makeTextInput = function(value, readOnly) {
-      var attrs = {
-        'type': 'text',
-        'value': value
-      };
-      if ( readOnly ) {
-        attrs.readonly = 'readonly';
-      }
-      return $('<input>').attr(attrs);
-    };
-    this._makeTextArea = function(value, readOnly) {
-      if ( readOnly ) {
-        return $('<textarea>').attr('readonly', 'readonly').text(value);
-      } else {
-        return $('<textarea>').text(value);
-      }
-    };
-    this._makeSelectInput = function(values, selected, dataSetting, className) {
-      var keys = Object.keys(values);
-      if ( !values[selected] ) {
-        switch (dataSetting) {
-          case 'size': selected='Medium';break;
-          case 'link': selected='flickr';break;
-          default:     selected='none';
+        $('select[data-setting="link"]',$attach_display).val(constants.default_props.link);
+        // TODO: add url setting
+        //$('select[data-setting="linkUrl"]').attr().val(constants.default_props.link);
+        // Size
+        var sizes = self._generateSizesArray(photo_data.sizes);
+        var $sizes_select = $('select[data-setting="size"]',$attach_display).empty();
+        for ( var size in sizes ) {
+          $sizes_select.append($('<option>').attr({value:size}).text(sizes[size]));
         }
-      }
-      // if 'full' provided, choose the last one
-      if ( selected == 'full' ) {
-        selected = keys[keys.length-1];
-      }
-      var select_input = $('<select>').attr({
-        'class': className,
-        'data-setting': dataSetting
-      });
+        $sizes_select.val(constants.default_props.size)
 
-      for(var i=0, end=keys.length; i<end; ++i) {
-        var key = keys[i],
-            attrs = { 'value': key };
-        if ( key === selected ) { attrs.selected='selected'; }
-        select_input.append( $('<option>').attr(attrs).text(values[key]));
+        $attach_display.removeClass('hidden');
+      } else {
+        $attach_display.addClass('hidden');
       }
-      return select_input;
+
+      // call picturefill
+      if (window.picturefill) { window.picturefill($img); }
     };
     this._generateSizesArray = function(sizes) {
       var return_obj = {};
