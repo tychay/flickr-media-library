@@ -138,6 +138,12 @@ function _make_select( $form_id, $select_name, $selects, $selected ) {
 					<p class="description hidden" id="media_default_link_description"><?php _e('Remember <a href="https://www.flickr.com/help/guidelines">Flickr Community Guidelines</a> state that you link back to Flickr when you post Flickr content elsewhere.',FML::SLUG); ?></p>
 				</td>
 			</tr>
+			<tr>
+				<?php _make_th( $form_id, 'media_default_size', __('Default Size',FML::SLUG) ); ?>
+				<td><?php _make_select( $form_id, 'media_default_size', $select_sizes, $settings['media_default_size'] ); ?>
+					<p class="description" id="media_default_size_description"><?php _e('Some sizes will be unavailable for photos that are too small or too old.',FML::SLUG); ?></p>
+				</td>
+			</tr>
 		</table>
 		<?php submit_button(__('Save Changes')); ?>
 	</form>

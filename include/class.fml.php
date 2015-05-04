@@ -34,6 +34,10 @@ class FML implements FMLConstants
 	 */
 	public $post_dates_map;
 	/**
+	 * List of all Flickr sizes
+	 */
+	public $flickr_sizes = array();
+	/**
 	 * @var array store the post_meta names of FML-specific metadata. This is
 	 * accessible publicly (but not writeable).
 	 */
@@ -72,7 +76,21 @@ class FML implements FMLConstants
 			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
 			'flickr_id' => '_flickr_id',
 		);
-		// settings and flickr are lazy loaded
+		$this->flickr_sizes = array(
+			'Square'       => __('Square', self::SLUG),
+			'Large Square' => __('Large Square', self::SLUG),
+			'Thumbnail'    => __('Thumbnail', self::SLUG),
+			'Small'        => __('Small', self::SLUG),
+			'Small 320'    => __('Small 320', self::SLUG),
+			'Medium'       => __('Medium', self::SLUG),
+			'Medium 640'   => __('Medium 640', self::SLUG),
+			'Medium 800'   => __('Medium 800', self::SLUG),
+			'Large'        => __('Large', self::SLUG),
+			'Large 1600'   => __('Large 1600', self::SLUG),
+			'Large 2048'   => __('Large 2048', self::SLUG),
+			'Original'     => __('Original', self::SLUG),
+		);
+		// $settings and $flickr are lazy loaded
 	}
 	/**
 	 * Returns instance.

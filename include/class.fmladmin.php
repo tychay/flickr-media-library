@@ -489,6 +489,9 @@ class FMLAdmin
 		$select_post_dates   = $this->_fml->post_dates_map;
 		$select_links        = $this->_links;
 		$select_aligns       = $this->_aligns;
+		$select_sizes        = $this->_fml->flickr_sizes;
+		// add "full" size
+		$select_sizes['full'] = __('Full',FML::SLUG);
 
 		include $this->_fml->template_dir.'/page.settings.php';
 	}
