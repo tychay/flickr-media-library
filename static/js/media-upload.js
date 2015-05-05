@@ -115,6 +115,7 @@
       var query = {
         page: self.page,
         per_page: self.perpage,
+        media: 'photos'//,
         //extras: 'url_s,url_q,url_n,url_z'
       };
       if ( self.query ) {
