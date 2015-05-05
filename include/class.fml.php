@@ -741,7 +741,6 @@ class FML implements FMLConstants
 			$classes[] = esc_attr( $settings['shortcode_default_class_id'] . $id );
 		}
 		*/
-		return implode( ' ', $classes );
 		// This seems weird but is correct (WordPress is wrong). Title should be
 		// the title of the image, and alt should be a description provided for
 		// accessibility (screen readers). You can/should have both.
@@ -2186,6 +2185,7 @@ class FML implements FMLConstants
 	 */
 	static private function _post_data_from_flickr_data( $data ) {
 		// generate list of tags
+		$self = self::get_instance();
 		$post_tags = [];
 		if ( !empty( $data['tags']['tag'] ) ) {
 			$tags = $data['tags']['tag'];
@@ -2230,7 +2230,7 @@ class FML implements FMLConstants
 			//'file' (from attachment) @see https://codex.wordpress.org/Function_Reference/wp_insert_attachment
 		);
 		// handle post_date
-		switch ( $this->settings['post_date_map'] ) {
+		switch ( $self->settings['post_date_map'] ) {
 			case 'posted':
 				$post_data['post_date']     = date( 'Y-m-d H:i:s', $data['dates']['posted']);
 				$post_data['post_date_gmt'] = gmdate( 'Y-m-d H:i:s', $data['dates']['posted']);
