@@ -156,15 +156,6 @@ class FML implements FMLConstants
 	 */
 	public function init() {
 		$this->register_post_type();
-		if ( apply_filters( 'fml_image_use_css_crop', true ) ) {
-			wp_register_script(
-				'csscrop',
-				$this->static_url.'/js/csscrop.js',
-				array('jquery'),
-				self::VERSION,
-				true
-			);
-		}
 
 		// move the code later to give filters a chance to change it in plugins_loaded
 		//$this->_support_picturefill = false;
@@ -173,7 +164,14 @@ class FML implements FMLConstants
 			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
 			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
 		}
-		if ( apply_filters( 'fml_image_use_css_crop', true ) ) {
+		if ( apply_filters( 'fml_image_use_css_crop', $this->settings['image_use_css_crop'] ) ) {
+			wp_register_script(
+				'csscrop',
+				$this->static_url.'/js/csscrop.js',
+				array('jquery'),
+				self::VERSION,
+				true
+			);
 			// we need larger image dimensions for this s--t to work (of course
 			// picturefill() will put in larger dims, but what if picturefill
 			// isn't running? We want the larger image for that case)
@@ -353,7 +351,7 @@ class FML implements FMLConstants
 			'shortcode_default_link'          => 'flickr',
 			'shortcode_extract_flickr_id'     => true,
 			'shortcode_generate_custom_post'  => true,
-
+			'image_use_css_crop'              => true,
 		);
 
 		// upgrade missing parameters (or initialize defaults if none)

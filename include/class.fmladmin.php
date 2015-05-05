@@ -431,6 +431,7 @@ class FMLAdmin
 					break;
 				case 'shortcode_generate_custom_post':
 				case 'shortcode_extract_flickr_id':
+				case 'image_use_css_crop':
 					if ( $value == 'on' ) {
 						$options[$key] = true;
 					} elseif ( $value == 'off' ) {

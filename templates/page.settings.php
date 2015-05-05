@@ -205,7 +205,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 				</td>
 			</tr>
 		</table>
-		<h3 class="title"><?php _e('Shortcode Options', FML::SLUG); ?></h3>
+		<h3 class="title"><?php _e('Shortcode Options',FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
 				<?php _page_settings_th( $form_id, 'shortcode_default_link', __('Default link',FML::SLUG) ); ?>
@@ -221,6 +221,14 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 					<?php _page_settings_cb( $form_id, 'shortcode_generate_custom_post', $settings['shortcode_generate_custom_post'], $this->options_column_is_hidden( 'fml_show_perf' ), __('Shortcode generates missing Flickr Media custom posts',FML::SLUG) );  ?>
 				</td>
 			</tr>
+		</table>
+		<h3 class="title"><?php _e('Image Options',FML::SLUG); ?></h3>
+		<table class="form-table">
+			<tr>
+				<th scope="row"><?php _e('Javascript routines',FML::SLUG); ?></th>
+				<td>
+					<?php _page_settings_cb( $form_id, 'image_use_css_crop', $settings['image_use_css_crop'], false, __('Use CSS cropping',FML::SLUG) );  ?>
+				</td>
 		</table>
 		<?php submit_button(__('Save Changes')); ?>
 	</form>
