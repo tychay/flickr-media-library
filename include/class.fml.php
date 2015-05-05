@@ -806,10 +806,7 @@ class FML implements FMLConstants
 			// special case, class should be merged, not overwritten
 			if ( $key == 'class' && !empty( $img['attributes']['class'] ) ) {
 				// TODO think about how to filter align* attributes??
-				$img['attributes'][$key] = implode( ' ', array_unique( array_merge(
-					explode( ' ', $value ),
-					explode( ' ', $img['attributes'][$key] )
-				) ) );
+				$img['attributes'][$key] = self::_merge_attribute( $img['attributes'][$key], $value );
 				continue;
 			}
 			// overwrite
@@ -822,7 +819,15 @@ class FML implements FMLConstants
 		$do_link = true;
 		if ( $a && $a_gen ) {
 			// nothing special, just merge
-			$a['attributes'] = array_merge( $a['attributes'], $a_gen['attributes'] );
+			foreach ( $a_gen['attributes'] as $key=>$value ) {
+				if ( $key == 'rel' && !empty( $a['attributes']['rel'] ) ) {
+					$a['attributes'][$key] = self::_merge_attribute( $a['attributes'][$key], $value );
+					continue;
+				}
+				// overwrite
+				$a['attributes'][$key] = $value;
+			}
+			//$a['attributes'] = array_merge( $a['attributes'], $a_gen['attributes'] );
 			// and then insert img content above
 		} elseif ( $a ) {
 			// just the a tag in content
@@ -841,6 +846,12 @@ class FML implements FMLConstants
 		
 		//    e. restore and return
 		return $this->_shortcode_return( $replace, $content, $needle, $post->ID, $atts );
+	}
+	private static function _merge_attribute ( $att1, $att2 ) {
+		return implode( ' ', array_unique( array_merge(
+			explode( ' ', $att1 ),
+			explode( ' ', $att2 )
+		) ) );
 	}
 	/**
 	 * Format shortcode return
