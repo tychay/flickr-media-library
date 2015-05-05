@@ -445,6 +445,9 @@ class FMLAdmin
 				case 'media_default_class_size':
 				case 'media_default_class_id':
 				case 'shortcode_default_link':
+				case 'shortcode_default_rel_post':
+				case 'shortcode_default_rel_post_id':
+				//case 'image_default_class_size':
 					$options[$key] = $value;
 					break;
 			}

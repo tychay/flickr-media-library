@@ -349,8 +349,12 @@ class FML implements FMLConstants
 			'media_default_class_size'        => 'size-',
 			'media_default_class_id'          => 'wp-image-',
 			'shortcode_default_link'          => 'flickr',
+			'shortcode_default_rel_post'      => 'attachment',
+			'shortcode_default_rel_post_id'   => 'wp-att-',
+			'shortcode_default_rel_flickr'    => 'flickr',
 			'shortcode_extract_flickr_id'     => true,
 			'shortcode_generate_custom_post'  => true,
+			//'image_default_class_size'        => 'attachment-',
 			'image_use_css_crop'              => true,
 		);
 
@@ -709,8 +713,10 @@ class FML implements FMLConstants
 		$alt   = $atts['alt'];
 		$title = $atts['title'];
 		$align = $atts['align'];
-		$size  = $atts['size'];
+		$size  = str_replace( ' ', '_', $atts['size'] );
 		$rel   = $atts['rel'];
+
+		$settings = $this->settings;
 
 		// 2. Generate HTML output from shortcode (and extract attributes)
 		
@@ -727,16 +733,21 @@ class FML implements FMLConstants
 		// or map sizes to internal strings.
 		$iatts = array();
 		$classes = array();
-		if ( is_string( $size ) ) {
-			$classes[] = 'attachment-'.str_replace( ' ', '_', $size );
+		/*
+		if ( $settings['image_default_class_size'] ) {
+			$classes[] = esc_attr( $settings['shortcode_default_class_size'] . str_replace( ' ', '_', $size ) );
 		}
-		$classes[] = 'wp-image-'.$id;
+		if ( $settings['image_default_class_id'] ) {
+			$classes[] = esc_attr( $settings['shortcode_default_class_id'] . $id );
+		}
+		*/
+		return implode( ' ', $classes );
 		// This seems weird but is correct (WordPress is wrong). Title should be
 		// the title of the image, and alt should be a description provided for
 		// accessibility (screen readers). You can/should have both.
 		if ( $alt )   { $iatts['alt']   = $alt; }
 		if ( $title ) { $iatts['title'] = $title; }
-		if ( $align ) { $classes[] = 'align'.$align; }
+		//if ( $align ) { $classes[] = 'align'.$align; }
 		// always need to override class, but there is emulation above
 		if ( !empty( $classes ) ) {
 			$iatts['class'] = implode( ' ', $classes );
@@ -795,6 +806,7 @@ class FML implements FMLConstants
 		foreach ( $img_gen['attributes'] as $key=>$value ) {
 			// special case, class should be merged, not overwritten
 			if ( $key == 'class' && !empty( $img['attributes']['class'] ) ) {
+				// TODO think about how to filter align* attributes??
 				$img['attributes'][$key] = implode( ' ', array_unique( array_merge(
 					explode( ' ', $value ),
 					explode( ' ', $img['attributes'][$key] )
@@ -895,6 +907,7 @@ class FML implements FMLConstants
 	 */
 	private function _shortcode_attrs( $raw_atts, $content ) {
 		global $wp_version;
+		$settings = $this->settings;
 
 		// 1. Extract img and a tags + attributes from $content. Must be
 		//    <a><img /></a> or <img />
@@ -933,7 +946,7 @@ class FML implements FMLConstants
 			'size'      => '',       // LEAVE BLANK: transformed from image-size
 			'align'     => '',       // editor default may be none, but ours is
 			                         // no attribute/class
-			'link'      => apply_filters( 'fml_shortcode_default_attr_link', $this->settings['shortcode_default_link'] ), // because of TOS
+			'link'      => apply_filters( 'fml_shortcode_default_attr_link', $settings['shortcode_default_link'] ), // because of TOS
 			'url'       => apply_filters( 'fml_shortcode_default_attr_url', '' ),
 			'forcehw'   => apply_filters(' fml_shortcode_default_attr_forcehw', false ),
 			//'rel'                  // internally applied based on link and url
@@ -979,7 +992,7 @@ class FML implements FMLConstants
 		// 5. Try to grab a flickr_id if there is no id or flickr_id given
 		if ( $atts['id'] == 0
 		  && $atts['flickr_id'] == 0
-		  && $this->settings['shortcode_extract_flickr_id']
+		  && $settings['shortcode_extract_flickr_id']
 		  ) {
 			if ( $a && !empty( $a['attributes']['href'] ) ) {
 				$atts['flickr_id'] = self::extract_flickr_id( $a['attributes']['href'] );
@@ -1022,7 +1035,7 @@ class FML implements FMLConstants
 		}
 		if ( $atts['id'] == 0 ) {
 			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
-			if ( !$post && $this->settings['shortcode_generate_custom_post'] ) {
+			if ( !$post && $settings['shortcode_generate_custom_post'] ) {
 				// generate FML media automatically
 				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
 				// Could extract size from img src but we already check width
@@ -1065,11 +1078,18 @@ class FML implements FMLConstants
 				break;
 				case 'post':
 				$atts['url'] = get_permalink( $post );
-				$atts['rel'] = 'attachment-flickr wp-att-'.$post->ID;
+				$rels = array();
+				if ( $settings['shortcode_default_rel_post'] ) {
+					$rels[] = $settings['shortcode_default_rel_post'];
+				}
+				if ( $settings['shortcode_default_rel_post_id'] ) {
+					$rels[] = $settings['shortcode_default_rel_post_id'].$post->ID;
+				}
+				$atts['rel'] = implode(' ',$rels);
 				break;
 				case 'flickr':
 				$atts['url'] = self::get_flickr_link( $post );
-				$atts['rel'] = 'flickr';
+				$atts['rel'] = $settings['shortcode_default_rel_flickr'];
 				break;
 				case 'custom': //if 'custom' with no URL, ignore it
 				$atts['link'] = '';

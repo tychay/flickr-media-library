@@ -213,6 +213,23 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 					<p class="description"><?php printf( __('Set to <code>flickr</code> to force compliance with %s.', FML::SLUG), $flickr_tos ); ?></p>
 				</td>
 			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
+				<?php _page_settings_th( $form_id, 'shortcode_default_rel_post', __('link=post "rel"',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'shortcode_default_rel_post', $settings['shortcode_default_rel_post'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'attachment' ); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
+				<?php _page_settings_th( $form_id, 'shortcode_default_rel_post_id', __('link=post "rel" w/ID',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'shortcode_default_rel_post_id', $settings['shortcode_default_rel_post_id'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-att-' ); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
+				<?php _page_settings_th( $form_id, 'shortcode_default_rel_flickr', __('link=flickr "rel"',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'shortcode_default_rel_flickr', $settings['shortcode_default_rel_flickr'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+				</td>
+			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_perf', $this )?>">
 				<th scope="row"><?php _e('Performance',FML::SLUG); ?></th>
 				<td>
@@ -229,6 +246,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 				<td>
 					<?php _page_settings_cb( $form_id, 'image_use_css_crop', $settings['image_use_css_crop'], false, __('Use CSS cropping',FML::SLUG) );  ?>
 				</td>
+			</tr>
 		</table>
 		<?php submit_button(__('Save Changes')); ?>
 	</form>
