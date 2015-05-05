@@ -41,6 +41,18 @@ function _page_settings_input( $form_id, $input_name, $input_value, $disabled ) 
 		( $disabled) ? ' disabled="disabled"' : ''
 	);
 }
+function _page_settings_cb( $form_id, $input_name, $input_value, $disabled, $label ) {
+	printf(
+		'<input type="hidden" id="%1$s-%2$s-hidden" name="%2$s" value="%3$s"%4$s /> <label for="%1$s-%2$s"><input type="checkbox" id="%1$s-%2$s" name="cb-%2$s" class="bound_checkbox"%5$s /> %6$s</label>',
+		esc_attr($form_id),
+		esc_attr($input_name),
+		( $input_value ) ? 'on'                   : 'off',
+		( $disabled )    ? ' disabled="disabled"' : '',
+		( $input_value ) ? ' checked="checked"'   : '',
+		$label
+	);
+
+}
 function _page_settings_hidden_class( $screen_option_id, $that ) {
 	$return = 'display_'.esc_attr( $screen_option_id);
 	if ( $that->options_column_is_hidden( $screen_option_id ) ) $return .= ' hidden';
@@ -199,6 +211,14 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 				<?php _page_settings_th( $form_id, 'shortcode_default_link', __('Default link',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'shortcode_default_link', $settings['shortcode_default_link'], false );  ?>
 					<p class="description"><?php printf( __('Set to <code>flickr</code> to force compliance with %s.', FML::SLUG), $flickr_tos ); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_perf', $this )?>">
+				<th scope="row"><?php _e('Performance',FML::SLUG); ?></th>
+				<td>
+					<?php _page_settings_cb( $form_id, 'shortcode_extract_flickr_id', $settings['shortcode_extract_flickr_id'], $this->options_column_is_hidden( 'fml_show_perf' ), __('Extract flickr ID from content',FML::SLUG) );  ?>
+					<br />
+					<?php _page_settings_cb( $form_id, 'shortcode_generate_custom_post', $settings['shortcode_generate_custom_post'], $this->options_column_is_hidden( 'fml_show_perf' ), __('Shortcode generates missing Flickr Media custom posts',FML::SLUG) );  ?>
 				</td>
 			</tr>
 		</table>

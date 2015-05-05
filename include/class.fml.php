@@ -1024,7 +1024,7 @@ class FML implements FMLConstants
 		}
 		if ( $atts['id'] == 0 ) {
 			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
-			if ( !$post && $this->settings['shortcode_should_generate_media'] ) {
+			if ( !$post && $this->settings['shortcode_generate_custom_post'] ) {
 				// generate FML media automatically
 				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
 				// Could extract size from img src but we already check width

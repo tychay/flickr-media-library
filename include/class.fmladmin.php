@@ -95,6 +95,7 @@ class FMLAdmin
 			'fml_show_apikey' => __( 'Flickr API Key and Secret', FML::SLUG ),
 			'fml_show_rels'   => __( 'Link "rel" attributes', FML::SLUG ),
 			'fml_show_classes'=> __( 'Image "class" attributes', FML::SLUG ),
+			'fml_show_perf'   => __( 'Performance-related options', FML::SLUG ),
 		);
 		$this->_aligns = array(
 			'left'   => __( 'Left' ),
@@ -428,6 +429,14 @@ class FMLAdmin
 						$options[$key] = $value;
 					}
 					break;
+				case 'shortcode_generate_custom_post':
+				case 'shortcode_extract_flickr_id':
+					if ( $value == 'on' ) {
+						$options[$key] = true;
+					} elseif ( $value == 'off' ) {
+						$options[$key] = false;
+					}
+					break;
 				case 'media_default_size':
 				case 'media_default_rel_post':
 				case 'media_default_rel_post_id':
@@ -439,7 +448,9 @@ class FMLAdmin
 					break;
 			}
 		}
+		//var_dump($options);die;
 		$this->_options_update_settings($options);
+		//var_dump($this->_fml->settings);die;
 	}
 	/**
 	 * Utility function to update fml::settings and then report it to UI

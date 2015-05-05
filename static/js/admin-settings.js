@@ -18,6 +18,19 @@
 			}
 		});
 
+		// bind form checkboxes to hidden inputs
+		$('.bound_checkbox').change( function(ev) {
+			var $this = $(this),
+			       id = $this.attr('id'),
+			  $target = $('#'+id+'-hidden');
+			if ( $this.prop('checked') ) {
+				$target.val('on');
+			} else {
+				$target.val('off');
+			}
+
+		});
+
 		// handle showing warnings
 		$('#flickr-media-library-cpt_options-post_date_map').change(function(ev) {
 			var $this = $(this);
