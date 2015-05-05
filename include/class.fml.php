@@ -349,6 +349,7 @@ class FML implements FMLConstants
 			'media_default_class_size'        => 'size-',
 			'media_default_class_id'          => 'wp-image-',
 			'shortcode_default_link'          => 'flickr',
+			'shortcode_default_keephw'        => true,
 			'shortcode_default_rel_post'      => 'attachment',
 			'shortcode_default_rel_post_id'   => 'wp-att-',
 			'shortcode_default_rel_flickr'    => 'flickr',
@@ -753,12 +754,7 @@ class FML implements FMLConstants
 		}
 		$html = wp_get_attachment_image( $id, $size, false, $iatts);
 		$img_gen = self::extract_html_attributes( $html );
-		//     Strip out generated image_hwstring if running with scissors (picturefill.wp)
-		if ( !$atts['forcehw'] ) {
-			unset( $img_gen['attributes']['height'] );
-			unset( $img_gen['attributes']['width'] );
-			//$html = self::build_html_attributes( $img_gen );
-		}
+
 		if ( $atts['url'] ) {
 			$a_gen = array(
 				'element'    => 'a',
@@ -799,7 +795,17 @@ class FML implements FMLConstants
 		//       $a_gen and $img_gen when we generated it
 		//    b. no need to run regex processing on content (or save the match)
 		//       because we've done that above
-		//    c. iterate through img tag of content injecting the generated attrs
+		//    c. Strip out generated image_hwstring if the target image has them
+		//       and we requested keephw
+		if ( $atts['keephw'] ) {
+			if ( !empty( $img['attributes']['height']) ) {
+				unset( $img_gen['attributes']['height'] );
+			}
+			if ( !empty( $img['attributes']['width']) ) {
+				unset( $img_gen['attributes']['width'] );
+			}
+		}
+		//    d. iterate through img tag of content injecting the generated attrs
 		//       (there must always be an $img or we wouldn't have reached this
 		//       point in the code)
 		foreach ( $img_gen['attributes'] as $key=>$value ) {
@@ -815,7 +821,7 @@ class FML implements FMLConstants
 		$img = apply_filters( 'fml_shortcode_image_attributes', $img, $post->ID, $atts );
 		$replace = self::build_html_attributes( $img );
 
-		//    d. iterate through a tag (if so) injecting that stuff inside
+		//    e. iterate through a tag (if so) injecting that stuff inside
 		$do_link = true;
 		if ( $a && $a_gen ) {
 			// nothing special, just merge
@@ -844,7 +850,7 @@ class FML implements FMLConstants
 			$replace = self::build_html_attributes( $a );
 		}
 		
-		//    e. restore and return
+		//    f. restore and return
 		return $this->_shortcode_return( $replace, $content, $needle, $post->ID, $atts );
 	}
 	private static function _merge_attribute ( $att1, $att2 ) {
@@ -890,7 +896,8 @@ class FML implements FMLConstants
 	 *   - align: alignment (not really used except in class names)
 	 *   - link: the link type (or 'custom')
 	 *   - url: the url to link (if link is custom)
-	 *   - forcehw: overwrite height and width attributes with generated ones
+	 *   - keephw: do not overwrite existing height and width attributes if
+	 *             content has provided them
 	 *
 	 * 1. Extract img and a tags + attributes from $content. Must be <img />
 	 *    or <a><img /></a>.
@@ -958,7 +965,7 @@ class FML implements FMLConstants
 			                         // no attribute/class
 			'link'      => apply_filters( 'fml_shortcode_default_attr_link', $settings['shortcode_default_link'] ), // because of TOS
 			'url'       => apply_filters( 'fml_shortcode_default_attr_url', '' ),
-			'forcehw'   => apply_filters(' fml_shortcode_default_attr_forcehw', false ),
+			'keephw'    => apply_filters(' fml_shortcode_default_attr_keephw', $settings['shortcode_default_keephw'] ),
 			//'rel'                  // internally applied based on link and url
 			//'post_excerpt' => '',  // caption not used in a or img
 		);
@@ -1060,7 +1067,7 @@ class FML implements FMLConstants
 
 		// 7. Process other attributes
 		//    Format flags
-		$atts['forcehw'] = self::shortcode_bool( $atts['forcehw'] );
+		$atts['keephw'] = self::shortcode_bool( $atts['keephw'] );
 		//    Set missing size
 		if ( !$atts['size'] ) {
 			$atts['size'] = apply_filters( 'fml_shortcode_attr_size', 'Medium' );
