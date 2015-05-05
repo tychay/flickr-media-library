@@ -14,8 +14,14 @@ namespace FML;
             <div class="media-toolbar-secondary">
                 <label for="<?php echo FML::SLUG ?>-select-main" class="screen-reader-text"><?php _e('Filter by type'); ?></label>
                 <select id="<?php echo FML::SLUG ?>-select-main" class="attachment-filters">
+<?php
+if ( $is_auth_with_flickr ) :
+?>
                     <option value="self"><?php _e('Your Photos',FML::SLUG); ?></option>
                     <option value="sets"><?php _e('Your Sets',FML::SLUG); ?></option>
+<?php
+endif;
+?>
                     <option value="all"><?php _e('Everyone&rsquo;s Photos', FML::SLUG); ?></option>
                 </select>
                 <label for="<?php echo FML::SLUG ?>-select-filtersort" class="screen-reader-text"><?php _e('Filter by date'); ?></label>

@@ -842,6 +842,7 @@ class FMLAdmin
 		$admin_img_dir_url = admin_url( 'images/' );
 		// set where the close box goes
 		$list_url = admin_url( 'edit.php?post_type='.FML::POST_TYPE );
+		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 		include $this->_fml->template_dir.'/page.add_media.php';
 	}
 	/**
@@ -934,6 +935,12 @@ class FMLAdmin
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'flickr_id' );
 				$post = FML::create_media_from_flickr_id($_POST['flickr_id']);
+				if ( !$post ) {
+					$this->_send_json_fail( -102, sprintf(
+						__('Failed to create Media from flickr_id=%s', FML::SLUG ),
+						$_POST['flickr_id']
+					) );
+				}
 				$update = array();
 				if ( !empty( $_POST['caption'] ) ) {
 					$update['post_excerpt'] = $_POST['caption'];
@@ -1232,6 +1239,7 @@ class FMLAdmin
 	public function show_media_upload_form() {
 		$settings = $this->_fml->settings;
 		$admin_img_dir_url = admin_url( 'images/' );
+		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 
 		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
 	}
@@ -1300,6 +1308,7 @@ class FMLAdmin
 	public function show_post_thumbnail_insert_form() {
 		$settings = $this->_fml->settings;
 		$admin_img_dir_url = admin_url( 'images/' );
+		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 
 		include $this->_fml->template_dir.'/iframe.post-thumbnail-form.php';
 	}
@@ -1391,12 +1400,6 @@ class FMLAdmin
 				'interestingness-desc' => __('Interestingness (desc)', FML::SLUG),
 				'relevance'            => __('Relevance', FML::SLUG),
 			),
-			//'plugin_uri' => 
-			//'plugin_img_uri' =>
-			//'msg_pages'          => __('(%1$s / %2$s page(s), %3$s photo(s))', FML::SLUG),
-			//'setting_photo_link' => 1,
-			//'setting_link_rel'   => 'testrel',
-			//'setting_link_class' => 'testclass',
 			'flickr_errors'      => array(
 				0 => __('No photos found', FML::SLUG),
 				1 => __('Too many tags in ALL query', FML::SLUG),
@@ -1411,6 +1414,9 @@ class FMLAdmin
 				999 => __('Unknonw error', FML::SLUG),
 			),
 		);
+		if ( !$this->_fml->is_flickr_authenticated() ) {
+			$constants['flickr_api_key'] = $settings['flickr_api_key'];
+		}
 		if ( $post_id ) {
 			$post = get_post($post_id);
 			$hier = $post && is_post_type_hierarchical( $post->post_type );

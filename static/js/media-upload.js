@@ -714,34 +714,52 @@
       params.format = 'json';
       params.nojsoncallback = 1;  // don't want give us JSONP response
 
-      // first let's sign the request
-      self.callApi(
-        'sign_flickr_request',
-        { request_data: JSON.stringify(params) },
-        function(data) {
-          // FML API error
-          if (data.status != 'ok') {
-            return self.handle_fml_error( data );
-          } 
-          //console.log(data.signed.params);
-          // …now we call flickr
-          $.ajax( data.signed.url, {
-            //async: true, //ajax is already async
-            timeout: 10000,
-            type: 'POST',
-            data: data.signed.params,
-            dataType: 'json',
-            success: function(data) {
-              if ('undefined' !== typeof data.stat && 'ok' !== data.stat) {
-                return self.handle_flickr_error(data.code || '', data.message || 'Flickr API returned an unknown error');
-              }
-              successCallback.call(self, data);
-            },
-            error: self.handle_ajax_error
-          });
-        },
-        false //error is default
-      );
+      if ( constants.flickr_user_id ) {
+        // first let's sign the request
+        self.callApi(
+          'sign_flickr_request',
+          { request_data: JSON.stringify(params) },
+          function(data) {
+            // FML API error
+            if (data.status != 'ok') {
+              return self.handle_fml_error( data );
+            } 
+            //console.log(data.signed.params);
+            // …now we call flickr
+            $.ajax( data.signed.url, {
+              //async: true, //ajax is already async
+              timeout: 10000,
+              type: 'POST',
+              data: data.signed.params,
+              dataType: 'json',
+              success: function(data) {
+                if ('undefined' !== typeof data.stat && 'ok' !== data.stat) {
+                  return self.handle_flickr_error(data.code || '', data.message || 'Flickr API returned an unknown error');
+                }
+                successCallback.call(self, data);
+              },
+              error: self.handle_ajax_error
+            });
+          },
+          false //error is default
+        );
+      } else {
+        params.api_key = constants.flickr_api_key;
+        $.ajax( 'https://api.flickr.com/services/rest', {
+          //async: true, //ajax is already async
+          timeout: 10000,
+          type: 'POST',
+          data: params,
+          dataType: 'json',
+          success: function(data) {
+            if ('undefined' !== typeof data.stat && 'ok' !== data.stat) {
+              return self.handle_flickr_error(data.code || '', data.message || 'Flickr API returned an unknown error');
+            }
+            successCallback.call(self, data);
+          },
+          error: self.handle_ajax_error
+        });
+      }
     };
     
     /**

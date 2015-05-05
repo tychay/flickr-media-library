@@ -1597,6 +1597,9 @@ class FML implements FMLConstants
 	 * @todo  think of moving this into the metadata field
 	 */
 	static private function _wp_read_image_metadata( $flickr_data ) {
+		if ( empty( $flickr_data['exif'] ) ) {
+			return array();
+		}
 		// prevent undefined functione error if using shortcode to generate this
 		require_once(ABSPATH . 'wp-admin/includes/image.php');
 
@@ -2169,7 +2172,7 @@ class FML implements FMLConstants
 			'photo_id' => $flickr_id,
 		);
 		// https://www.flickr.com/services/api/flickr.photos.getInfo.html
-		$result = $flickr_api->call('flickr.photos.getInfo', $params);
+		$result = $flickr_api->call('flickr.photos.getInfo', $params, $self->is_flickr_authenticated() );
 		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
 			$return = $result['photo'];
 		}
@@ -2177,11 +2180,12 @@ class FML implements FMLConstants
 		if ( $last_updated && ( $return['dates']['lastupdate'] <= $last_updated ) ) {
 			return array();
 		}
-		$result = $flickr_api->call('flickr.photos.getSizes', $params);
+		/* */
+		$result = $flickr_api->call('flickr.photos.getSizes', $params, $self->is_flickr_authenticated() );
 		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
 			$return['sizes'] = $result['sizes'];
 		}
-		$result = $flickr_api->call('flickr.photos.getExif', $params);
+		$result = $flickr_api->call('flickr.photos.getExif', $params, $self->is_flickr_authenticated() );
 		if ( !empty($result['stat']) && ($result['stat'] == 'ok') ) {
 			$return = array_merge($return, $result['photo']);
 		}
