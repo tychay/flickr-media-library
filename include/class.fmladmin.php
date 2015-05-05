@@ -434,6 +434,7 @@ class FMLAdmin
 				case 'media_default_rel_flickr':
 				case 'media_default_class_size':
 				case 'media_default_class_id':
+				case 'shortcode_default_link':
 					$options[$key] = $value;
 					break;
 			}

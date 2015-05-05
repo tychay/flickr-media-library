@@ -16,6 +16,7 @@
  */
 namespace FML;
 
+$flickr_tos = __('<a href="https://www.flickr.com/help/guidelines">Flickr Community Guidelines</a>',FML::SLUG);
 function _page_settings_th( $form_id, $select_name, $label ) {
 	printf(
 		'<th scope="row"><label for="%s-%s">%s</label></th>',
@@ -68,7 +69,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 	switch ( $active_tab ):
 		case 'flickr_options':
 ?>
-	<h3><?php _e('Flickr authorization', FML::SLUG); ?></h3>
+	<h3 class="title"><?php _e('Flickr authorization', FML::SLUG); ?></h3>
 	<form method="post" id="flickr_auth_form">
 <?php if ($is_auth_with_flickr): ?>
 		<?php wp_nonce_field($form_ids['flickr_deauth'].'-verify'); ?>
@@ -121,7 +122,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 	<form method="post" id="cpt_options_form">
 		<?php wp_nonce_field($form_ids['cpt_options'].'-verify'); ?>
 		<input type="hidden" name="action" value="<?php echo $form_ids['cpt_options']; ?>" />
-		<h3><?php _e('Custom Post Type Options', FML::SLUG); ?></h3>
+		<h3 class="title"><?php _e('Custom Post Type Options', FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
 				<?php _page_settings_th( $form_id, 'post_date_map', __('Post date Alignment',FML::SLUG) ); ?>
@@ -141,7 +142,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 	<form method="post" id="output_options_form">
 		<?php wp_nonce_field($form_ids['output_options'].'-verify'); ?>
 		<input type="hidden" name="action" value="<?php echo $form_ids['output_options']; ?>" />
-		<h3><?php _e('Editor Options', FML::SLUG); ?></h3>
+		<h3 class="title"><?php _e('Editor Options', FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
 				<?php _page_settings_th( $form_id, 'media_default_align', __('Default Alignment',FML::SLUG) ); ?>
@@ -152,7 +153,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 				<?php _page_settings_th( $form_id, 'media_default_link', __('Default Link To',FML::SLUG) ); ?>
 				<td><?php _page_input_select
 			( $form_id, 'media_default_link', $select_links, $settings['media_default_link'] ); ?>
-					<p class="description hidden" id="media_default_link_description"><?php _e('Remember <a href="https://www.flickr.com/help/guidelines">Flickr Community Guidelines</a> state that you link back to Flickr when you post Flickr content elsewhere.',FML::SLUG); ?></p>
+					<p class="description hidden" id="media_default_link_description"><?php printf( __('Remember %s state that you link back to Flickr when you post Flickr content elsewhere.', FML::SLUG), $flickr_tos ); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -165,13 +166,13 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_rel_post', __('Attachment "rel"',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_rel_post', $settings['media_default_rel_post'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
-					<p class="description"><?php _e('Use <code>attachment</code> to emulate attachments'); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'attachment' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_rel_post_id', __('Attachment "rel" w/ID',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_rel_post_id', $settings['media_default_rel_post_id'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
-					<p class="description"><?php _e('Use <code>wp-att-</code> to emulate attachments'); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-att-' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
@@ -182,13 +183,22 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_class_size', __('Image class for size',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_class_size', $settings['media_default_class_size'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
-					<p class="description"><?php _e('Use <code>size-</code> to emulate attachments'); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'size-' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_class_id', __('Image class for ID',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_class_id', $settings['media_default_class_id'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
-					<p class="description"><?php _e('Use <code>wp-image-</code> to emulate attachments'); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-image-' ); ?></p>
+				</td>
+			</tr>
+		</table>
+		<h3 class="title"><?php _e('Shortcode Options', FML::SLUG); ?></h3>
+		<table class="form-table">
+			<tr>
+				<?php _page_settings_th( $form_id, 'shortcode_default_link', __('Default link',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'shortcode_default_link', $settings['shortcode_default_link'], false );  ?>
+					<p class="description"><?php printf( __('Set to <code>flickr</code> to force compliance with %s.', FML::SLUG), $flickr_tos ); ?></p>
 				</td>
 			</tr>
 		</table>

@@ -350,6 +350,10 @@ class FML implements FMLConstants
 			'media_default_rel_flickr'        => 'flickr',
 			'media_default_class_size'        => 'size-',
 			'media_default_class_id'          => 'wp-image-',
+			'shortcode_default_link'          => 'flickr',
+			'shortcode_extract_flickr_id'     => true,
+			'shortcode_generate_custom_post'  => true,
+
 		);
 
 		// upgrade missing parameters (or initialize defaults if none)
@@ -586,9 +590,18 @@ class FML implements FMLConstants
 				// these are the same in both shortcode and form params
 				case 'id':
 				case 'align':
-				case 'link': 
-				case 'url': 
 				break;
+				case 'link': 
+				// if it's a custom, we don't need to tell it
+				if ( $value == 'custom' ) {
+					$key = '';
+				}
+				break;
+				case 'url': 
+				// don't pass through url if the link type is something special
+				if ( in_array( $attachment['link'], array('flickr','post','file') ) ) {
+					$key = '';
+				}
 				// these need to be transformed a bit
 				case 'image_alt': $key = 'alt'; break;
 				case 'image-size': $key = 'size'; break;
@@ -922,9 +935,9 @@ class FML implements FMLConstants
 			'size'      => '',       // LEAVE BLANK: transformed from image-size
 			'align'     => '',       // editor default may be none, but ours is
 			                         // no attribute/class
-			'link'      => apply_filters( 'fml_shortcode_attr_link', 'flickr' ), // because of TOS
-			'url'       => apply_filters( 'fml_shortcode_attr_url', '' ),
-			'forcehw'   => apply_filters(' fml_shortcode_attr_forcehw', false ),
+			'link'      => apply_filters( 'fml_shortcode_default_attr_link', $this->settings['shortcode_default_link'] ), // because of TOS
+			'url'       => apply_filters( 'fml_shortcode_default_attr_url', '' ),
+			'forcehw'   => apply_filters(' fml_shortcode_default_attr_forcehw', false ),
 			//'rel'                  // internally applied based on link and url
 			//'post_excerpt' => '',  // caption not used in a or img
 		);
@@ -968,7 +981,7 @@ class FML implements FMLConstants
 		// 5. Try to grab a flickr_id if there is no id or flickr_id given
 		if ( $atts['id'] == 0
 		  && $atts['flickr_id'] == 0
-		  && apply_filters( 'fml_shortcode_should_extract_flickr_id', true )
+		  && $this->settings['shortcode_extract_flickr_id']
 		  ) {
 			if ( $a && !empty( $a['attributes']['href'] ) ) {
 				$atts['flickr_id'] = self::extract_flickr_id( $a['attributes']['href'] );
@@ -1011,7 +1024,7 @@ class FML implements FMLConstants
 		}
 		if ( $atts['id'] == 0 ) {
 			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
-			if ( !$post && apply_filters( 'fml_shortcode_should_generate_media', true ) ) {
+			if ( !$post && $this->settings['shortcode_should_generate_media'] ) {
 				// generate FML media automatically
 				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
 				// Could extract size from img src but we already check width
@@ -1048,7 +1061,7 @@ class FML implements FMLConstants
 				//Flickr community guidelines: link the download page
 				$downsize = image_downsize( $post->ID, 'full' );
 				$atts['url'] = $downsize[0];
-				$atts['rel'] = 'original';
+				//$atts['rel'] = 'original';
 				//$atts['url'] = self::get_flickr_link( $post ).'sizes/';
 				//$atts['rel'] = 'flickr-download';
 				break;
@@ -1060,19 +1073,22 @@ class FML implements FMLConstants
 				$atts['url'] = self::get_flickr_link( $post );
 				$atts['rel'] = 'flickr';
 				break;
-				case 'custom': //if 'custom' with no URL, then it means flickr link
+				case 'custom': //if 'custom' with no URL, ignore it
+				$atts['link'] = '';
+				/*
 				if ( !$atts['url'] ) {
 					$atts['url'] = self::get_flickr_link( $post );
 					//$atts['link'] = 'flickr';
 					$rel = 'flickr';
 				}
 				$atts['link'] = '';
+				*/
 				break;
 				case '': // preserve URL default
 				break;
 				default: // unknown
 				$atts['link'] = '';
-				$atts['url']  = ''; //clear URL field just in case
+				//$atts['url']  = ''; //clear URL field just in case
 			}
 		}
 		return array( $atts, $post, $a, $img, $needle );
