@@ -5,7 +5,7 @@
  */
 (function ($, window, constants) {
   var sprintf = window.sprintf;
-  //console.log(constants);
+  console.log(constants);
 
   /**
    * + Convert HTTPS URL into HTTP.
@@ -543,6 +543,7 @@
             alt: $('label[data-setting=alt] input').val(),
             caption: $('label[data-setting=caption] textarea').val()
           },
+          //function(data) { console.log(data); },
           self.callbackFMLPostSuccess, //Return looks exactly like a if exists query on a match
           function(XHR, status, errorThrown) {
             self.guessRenderAddButton(0);

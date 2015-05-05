@@ -13,7 +13,6 @@ class FMLAdmin
 	 * A hash containing ids to html elements, pages, scripts, etc. that are
 	 * used in multiple places in the object.
 	 *
-	 * - page_add_media: the page: Media > Add Flickr
 	 * - page_options: the page: Settings > Flickr Media Library
 	 * - forms: array consisting of action names for various option forms
 	 * - ajax_action: action name for FML ajax API (all ajax apis are merged into
@@ -59,7 +58,6 @@ class FMLAdmin
 	public function __construct($fml) {
 		$this->_fml                       = $fml;
 		$this->_ids = array(
-			'page_add_media'   => FML::SLUG.'-add-flickr',
 			'page_options'     => FML::SLUG.'-settings',
 			'permalink_slug'   => FML::SLUG.'-base',
 			'forms'            => array(
@@ -146,7 +144,7 @@ class FMLAdmin
 
 		// ADDMEDIA: Add tab to Media upload button
 		add_filter( 'media_upload_tabs', array( $this, 'filter_media_upload_tabs' ) );
-		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array( $this, 'get_media_upload_iframe' ) );
+		add_action( 'media_upload_'.$this->_ids['tab_media_upload'], array($this,'media_upload_get_iframe') );
 		//add_action( 'wp_enqueue_media', array( $this, 'wp_enqueue_media') );
 		//add_action( 'image_send_to_editor', array($this,'addmedia_send_to_editor') );
 
@@ -193,17 +191,6 @@ class FMLAdmin
 		);
 		if ( $_options_suffix ) {
 			add_action( 'load-'.$_options_suffix, array( $this, 'options_loading' ) );
-		}
-		// CUSTOMPOST: Add menu to media page
-		$_add_media_suffix = add_media_page(
-			__( 'Add New Flickr Media', FML::SLUG ),
-			__( 'Add Flickr', FML::SLUG ),
-			'edit_posts',
-			$this->_ids['page_add_media'],
-			array( $this, 'show_add_media_page' )
-		);
-		if ( $_add_media_suffix ) {
-			add_action( 'load-'.$_add_media_suffix, array( $this, 'loading_add_media' ) );
 		}
 	}
 	//
@@ -816,35 +803,7 @@ class FMLAdmin
 		$alt_text = get_post_meta( $post->ID, '_wp_attachment_image_alt', true );
 		include $this->_fml->template_dir.'/metabox.alt_text.php';
 	}
-	// ADD NEW (post-new.php -> upload.php?page=flickr-media-library-add-flickr)
-	/**
-	 * Enqueue styles and scripts needed to handle the add flickr form.
-	 * 
-	 * @return [type] [description]
-	 */
-	public function loading_add_media() {
-		$this->_enqueue_media( 'admin_menu' );
-		wp_enqueue_style(
-			FML::SLUG.'-emulate-thickbox',
-			$this->_fml->static_url.'/css/emulate-media-thickbox.css',
-			'media-views'
-			// ver
-			// media
-		);
-	}
-	/**
-	 * Render the add flickr form (as a modal page because of styling difficulty)
-	 * @return [type] [description]
-	 */
-	public function show_add_media_page() {
-		// set settings
-		$settings = $this->_fml->settings;
-		$admin_img_dir_url = admin_url( 'images/' );
-		// set where the close box goes
-		$list_url = admin_url( 'edit.php?post_type='.FML::POST_TYPE );
-		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
-		include $this->_fml->template_dir.'/page.add_media.php';
-	}
+	// ADD NEW (post-new.php -> media-upload.php?chromeless=1&tab=flickr_media_library_insert_flickr&for=admin_menu)
 	/**
 	 * Triggers on clicking "add new" for custom post -> redirect to real add new page
 	 * 
@@ -854,7 +813,12 @@ class FMLAdmin
 		$screen = get_current_screen();
 		// ONLY OPERATE ON FLICKR MEDIA
 		if ( $screen->post_type != FML::POST_TYPE ) { return; }
-		wp_redirect( admin_url( 'upload.php?page=' . esc_attr( $this->_ids['page_add_media'] ) ) );
+		//http://terrychay.dev/wp-admin/media-upload.php?chromeless=1&tab=flickr_media_library_insert_flickr&for=admin_menu
+		wp_redirect( sprintf(
+			'media-upload.php?chromeless=1&tab=%s&for=admin_menu',
+			esc_attr( $this->_ids['tab_media_upload'] )
+		));
+		//wp_redirect( admin_url( 'upload.php?page=' . esc_attr( $this->_ids['page_add_media'] ) ) );
 		//wp_die('TODO: Need to add flickr importer');
 		// Adding to current post
 	}
@@ -886,7 +850,7 @@ class FMLAdmin
 		$this->_require_ajax_post( 'method' );
 		switch ( $_POST['method'] ) {
 			case 'sign_flickr_request':
-				// This nonce is created in the page.flickr-upload-form.php template
+				// This nonce is created in the form.flickr-upload.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'request_data' ); //the API call to sign
 				$json = @json_decode(stripslashes($_POST['request_data']));
@@ -910,7 +874,7 @@ class FMLAdmin
 				);
 				break;
 			case 'get_media_by_flickr_id':
-				// This nonce is created in the page.flickr-upload-form.php template
+				// This nonce is created in the form.flickr-upload.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'flickr_id' );
 				$post = FML::get_media_by_flickr_id( $_POST['flickr_id'] );
@@ -931,7 +895,7 @@ class FMLAdmin
 				}
 				break;
 			case 'new_media_from_flickr_id':
-				// This nonce is created in the page.flickr-upload-form.php template
+				// This nonce is created in the form.flickr-upload.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'flickr_id' );
 				$post = FML::create_media_from_flickr_id($_POST['flickr_id']);
@@ -1205,43 +1169,34 @@ class FMLAdmin
 	 * @return string
 	 * @todo  remove this and replace with the new backbonejs/underscoresjs model
 	 */
-	public function get_media_upload_iframe() {
-		if ( !empty( $_GET['for'] ) && ( $_GET['for'] == 'post_thumbnail' ) ) {
-			return $this->get_post_thumbnail_insert_iframe();
-		}
-		/*
-		if ( empty($_GET['post_id']) ) {
-			wp_enqueue_media();
-		} else {
-			wp_enqueue_media( array( 'post' => (int) $_GET['post_id'] ) );
-
-		}
-		// has some constants to make our lives easier
-		wp_enqueue_script('media-views');
-		*/
+	public function media_upload_get_iframe() {
 		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
-		// see wp_enqueue_media()
-		$this->_enqueue_media( 'media_button', $post_id );
+		if ( empty ($_GET['for'] ) ) {
+			$_GET['for'] = 'media_button';
+		}
+		$this->_enqueue_media( $_GET['for'], $post_id );
 		wp_enqueue_style(
-			FML::SLUG.'-old-media-form-style',
-			$this->_fml->static_url.'/css/media-upload-basic.css',
+			FML::SLUG.'-old-media',
+			$this->_fml->static_url.'/css/emulate-media-thickbox.css',
 			'media-views',
 			FML::VERSION
 			// media
 		);
-		return wp_iframe( array( $this, 'show_media_upload_form' ) );
+		// see wp_enqueue_media()
+		return wp_iframe( array($this,'media_upload_show_iframe_content') );
 	}
 	/**
-	 * render the iframe content for upload form
+	 * render iframe content (in thickbox if needed) for flickr media 
+	 * upload and insertion.
 	 * 
 	 * @return void
 	 */
-	public function show_media_upload_form() {
+	public function media_upload_show_iframe_content() {
 		$settings = $this->_fml->settings;
 		$admin_img_dir_url = admin_url( 'images/' );
 		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
 
-		include $this->_fml->template_dir.'/iframe.flickr-upload-form.php';
+		include $this->_fml->template_dir.'/iframe.flickr-upload.php';
 	}
 	//
 	// POST THUMBNAIL STUFF
@@ -1282,35 +1237,6 @@ class FMLAdmin
 		);
 		//<a class="thickbox" id="set-post-thumbnail" href="http://terrychay.dev/wp-admin/media-upload.php?post_id=6209&amp;type=image&amp;TB_iframe=1" title="Set featured image">Set featured image</a>
 		return $html;
-	}
-	/**
-	 * Just like geet_media_upload_iframe() but for post thumbnail injection
-	 * @return [type] [description]
-	 */
-	function get_post_thumbnail_insert_iframe() {
-		$post_id = ( empty( $_GET['post_id'] ) ) ? 0 : (int) $_GET['post_id'];
-		$this->_enqueue_media( 'post_thumbnail', $post_id );
-		// the css from add_flickr seems to work just fine here. :-D
-		wp_enqueue_style(
-			FML::SLUG.'-emulate-thickbox',
-			$this->_fml->static_url.'/css/emulate-media-thickbox.css',
-			'media-views',
-			FML::VERSION
-			// media
-		);
-		return wp_iframe( array($this,'show_post_thumbnail_insert_form') );
-	}
-	/**
-	 * render the thickbox content for post thumbnail insert
-	 * 
-	 * @return void
-	 */
-	public function show_post_thumbnail_insert_form() {
-		$settings = $this->_fml->settings;
-		$admin_img_dir_url = admin_url( 'images/' );
-		$is_auth_with_flickr = $this->_fml->is_flickr_authenticated();
-
-		include $this->_fml->template_dir.'/iframe.post-thumbnail-form.php';
 	}
 	//
 	// UTILITY FUNCTIONS

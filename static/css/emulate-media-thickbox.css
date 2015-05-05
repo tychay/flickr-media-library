@@ -2,9 +2,10 @@
 .media-frame-content, .media-frame-title {
     /* emulate hide menu*/
     left: 0;
+    top: 0;
 }
-.media-frame-content {
-    /* height is off */
+.media-modal .media-frame-content {
+    /* height is off in thickbox */
     top: 50px;
 }
 .media-toolbar {
