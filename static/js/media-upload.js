@@ -1086,10 +1086,10 @@
         }).removeAttr('readonly');
       }
       // description
-      //   instead of photo_data.description use photo_data.id because 
+      //   instead of photo_data.description when checking, use photo_data.id because 
       //   description can be empty
       if ( photo_data.id ) {
-        $('label[data-setting="description"] textarea',$attach_details).attr({ readonly: 'readonly' }).html(photo_data.caption);
+        $('label[data-setting="description"] textarea',$attach_details).attr({ readonly: 'readonly' }).html(photo_data.description);
       } else {
         $('label[data-setting="description"] textarea',$attach_details).removeAttr('readonly').html('');
       }
