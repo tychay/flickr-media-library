@@ -51,6 +51,13 @@ class FML implements FMLConstants
 	 * accessible publicly as $post_metas (but not writeable).
 	 */
 	private $_post_metas = array();
+	/**
+	 * Set this temporarily to block picturefill sizes from being executed
+	 * until later.
+	 * 
+	 * @var boolean
+	 */
+	private $_picturefill_delay_sizes_transient = false;
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
@@ -331,6 +338,8 @@ class FML implements FMLConstants
 					$this->_load_settings();
 				}
 				return $this->_settings;
+			case 'use_picturefill':
+				return apply_filters( 'fml_image_support_picturefill', $this->settings['image_use_picturefill'] ); 
 			case 'picturefill_sizes':
 				return $this->_picturefill_sizes;
 			case 'picturefill_size_map':
@@ -341,8 +350,6 @@ class FML implements FMLConstants
 				return $this->_flickr_callback;
 			case 'post_metas':
 				return $this->_post_metas;
-			case 'use_picturefill':
-				return apply_filters( 'fml_image_support_picturefill', $this->settings['image_use_picturefill'] ); 
 			default:
 				trigger_error(sprintf('Property %s does not exist',$name));
 				return null;
@@ -662,7 +669,7 @@ class FML implements FMLConstants
 			'size' => 'Medium',
 			'link' => 'flickr',
 		) );
-		$p = $this->shortcode( $shortcode_attrs, $shortcode_content );
+		$p = $this->shortcode( $shortcode_attrs, $shortcode_content, 'prepend_media' );
 		// append caption if available
 		if ( $caption_text = $post->post_excerpt ) {
 			list( $img_src, $width, $height ) = image_downsize( $post->ID, $shortcode_attrs['size'] );
@@ -812,13 +819,14 @@ class FML implements FMLConstants
 	 * @todo  add setting for extraacting content to flickrid
 	 * @todo  add option for auto-adding missing media
 	 */
-	public function shortcode( $raw_atts, $content='' ) {
+	public function shortcode( $raw_atts, $content='', $context='' ) {
 		// 1. Process shortcode attributes (and get attachment)
 		list ( $atts, $post, $a, $img, $needle ) = $this->_shortcode_attrs( $raw_atts, $content );
 		if ( !$post || ( $post->post_type != self::POST_TYPE ) ) {
 			$post_id = ( $post ) ? $post->ID : 0;
 			return $this->_shortcode_return( '', $content, '', $post_id, $atts );
 		}
+		if ( $context ) { $atts['_context'] = $context; }
 
 		$id    = $post->ID;
 		$alt   = $atts['alt'];
@@ -862,7 +870,10 @@ class FML implements FMLConstants
 		if ( !empty( $classes ) ) {
 			$iatts['class'] = implode( ' ', $classes );
 		}
+
+		$this->_picturefill_delay_sizes_transient = true;
 		$html = wp_get_attachment_image( $id, $size, false, $iatts);
+		$this->_picturefill_delay_sizes_transient = false;
 		$img_gen = self::extract_html_attributes( $html );
 
 		if ( $atts['url'] ) {
@@ -888,6 +899,7 @@ class FML implements FMLConstants
 		//if ( !$content ) { return apply_filters( 'fml_shortcode', $html, $post->ID, $atts ); }
 		if ( !$a && !$img ) {
 			// make sure to trigger all the filters
+			$img_gen['attributes'] = $this->_image_inject_sizes( $img_gen['attributes'], $post, $size, $atts );
 			$img = apply_filters( 'fml_shortcode_image_attributes', $img_gen, $post->ID, $atts );
 			$html = self::build_html_attributes( $img );
 			if ( $a_gen )  {
@@ -928,6 +940,7 @@ class FML implements FMLConstants
 			// overwrite
 			$img['attributes'][$key] = $value;
 		}
+		$img['attributes'] = $this->_image_inject_sizes( $img['attributes'], $post, $size, $atts );
 		$img = apply_filters( 'fml_shortcode_image_attributes', $img, $post->ID, $atts );
 		$replace = self::build_html_attributes( $img );
 
@@ -1450,12 +1463,7 @@ class FML implements FMLConstants
 		}
 
 		// 4. Figure out sizes if not set already
-		$desired_width = $width;
-		if ( empty( $attr['sizes'] ) ) {
-			// TODO: Emulate "sizes-*" class attribute here
-			$sizes_string = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
-			$attr['sizes'] = apply_filters( 'fml_image_sizes_attribute', $sizes_string, $attr, $post, $size );
-		}
+		$attr = $this->_image_inject_sizes( $attr, $post, $size );
 
 		// Don't remove width and height since stylesheets will override as
 		// these have priority 0. Keeping them will help with initial rendering
@@ -1471,6 +1479,70 @@ class FML implements FMLConstants
 
 		// 6. Return image
 		return $attr;
+	}
+	/**
+	 * Add $attr['sizes'] to image when called
+	 *
+	 * 0. Only run if picturefill is active
+	 * 1. Check to see if we're temporarily blocking it (will be called
+	 * 2. Check to see if sizes is already applied
+	 * 3. If sizes-* class is there, priortize that
+	 * 4. If size-* or attachment-* is there (using more reliable $size passed in)
+	 * 5. Make "best guess"
+	 * 6. do filter and return
+	 * 
+	 * @param  [type] $attr           [description]
+	 * @param  [type] $post           [description]
+	 * @param  [type] $size           [description]
+	 * @param  array  $shortcode_atts [description]
+	 * @return array                  $attr with sizes added
+	 */
+	private function _image_inject_sizes( $attr, $post, $size, $shortcode_atts=array() ) {
+		// 0. Only run if picturefill is active
+		if ( !$this->use_picturefill ) { return $attr; }
+		// 1. Check to see if we're temporarily blocking it (will be called
+		//    again later)
+		if ( $this->_picturefill_delay_sizes_transient ) { return $attr; }
+		// 2. Check to see if sizes is already applied
+		if ( !empty($attr['sizes'] ) ) {
+			return apply_filters( 'fml_image_inject_sizes_fail', $attr, $post, $size, $shortcode_atts );
+		}
+
+		$picturefill_sizes = $this->_picturefill_sizes;
+		// 3. If sizes-* class is there, priortize that
+		$sizes_string = '';
+		if ( !empty($attr['class'] ) ) {
+			$sizes = '';
+			$classes = explode(' ', $attr['class'] );
+			foreach ( $classes as $class_name ) {
+				if ( strpos( 'sizes-', $class_name ) === 0 ) {
+					$sizes = substr( $class_name, 6 );
+					break;
+				}
+			}
+			if ( $sizes && array_key_exists( $sizes, $picturefill_sizes ) ) {
+					$sizes_string= $picturefill_sizes[$sizes];
+			}
+		}
+
+		// 4. If size-* or attachment-* is there (check size passed in)
+		$size_string = ( is_array($size) ) ? implode( 'x', $size ) : $size;
+		$picturefill_size_map = $this->_picturefill_size_map;
+		if ( !$sizes_string && array_key_exists( $size_string, $picturefill_size_map ) ) {
+			$sizes_string= $picturefill_sizes[ $picturefill_size_map[$size_string] ];
+		}
+
+		// 5. Make "best guess"
+		if ( !$sizes_string && $post && $size ) {
+			list ( $src, $width, $height, $is_intermediate ) = image_downsize( $post->ID, $size );
+			$sizes_string = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $width );
+		}
+		
+		// 6. do filter and return
+		if ( $sizes_string) {
+			$attr['sizes'] = $sizes_string;
+		}
+		return apply_filters( 'fml_image_inject_sizes', $attr, $post, $size, $shortcode_atts );
 	}
 	//
 	// CROP SUPPORT
