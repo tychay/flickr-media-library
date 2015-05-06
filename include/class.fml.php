@@ -38,8 +38,17 @@ class FML implements FMLConstants
 	 */
 	public $flickr_sizes = array();
 	/**
+	 * List of all Flickr Photo Licenses.
+	 *
+	 * Putting it here saves on an API call
+	 * 
+	 * @see https://help.yahoo.com/kb/flickr/safesearch-sln14917.html
+	 * @var array
+	 */
+	public $flickr_licenses = array();
+	/**
 	 * @var array store the post_meta names of FML-specific metadata. This is
-	 * accessible publicly (but not writeable).
+	 * accessible publicly as $post_metas (but not writeable).
 	 */
 	private $_post_metas = array();
 	/**
@@ -89,6 +98,44 @@ class FML implements FMLConstants
 			'Large 1600'   => __('Large 1600', self::SLUG),
 			'Large 2048'   => __('Large 2048', self::SLUG),
 			'Original'     => __('Original', self::SLUG),
+		);
+		$this->flickr_licenses = array(
+			0 => array(
+				'name' => __('All Rights Reserved',FML::SLUG),
+				'url'  => '',
+			),
+			1 => array(
+				'name' => __('Attribution-NonCommercial-ShareAlike License',FML::SLUG),
+				'url' => 'http://creativecommons.org/licenses/by-nc-sa/2.0/',
+			),
+			2 => array(
+				'name' => __('Attribution-NonCommercial License',FML::SLUG),
+				'url' => 'http://creativecommons.org/licenses/by-nc/2.0/',
+			),
+			3 => array(
+				'name' => __('Attribution-NonCommercial-NoDerivs License',FML::SLUG),
+				'url' => 'http://creativecommons.org/licenses/by-nc-nd/2.0/',
+			),
+			4 => array(
+				'name' => __('Attribution License',FML::SLUG),
+				'url' => 'http://creativecommons.org/licenses/by/2.0/',
+			),
+			5 => array(
+				'name' => __('Attribution-ShareAlike License',FML::SLUG),
+				'url' => 'http://creativecommons.org/licenses/by-sa/2.0/',
+			),
+			6 => array(
+				'name' => __('Attribution-NoDerivs License',FML::SLUG),
+				'url' => 'http://creativecommons.org/licenses/by-nd/2.0/',
+			),
+			7 => array(
+				'name' => __('No known copyright restrictions',FML::SLUG),
+				'url' => 'http://flickr.com/commons/usage/',
+			),
+			8 => array(
+				'name' => __('United States Government Work',FML::SLUG),
+				'url' => 'http://www.usa.gov/copyright.shtml',
+			),
 		);
 		// $settings and $flickr are lazy loaded
 	}
@@ -193,7 +240,7 @@ class FML implements FMLConstants
 	 */
 	public function register_post_type() {
 		// https://codex.wordpress.org/Function_Reference/register_post_type
-		register_post_type(self::POST_TYPE, array(
+		register_post_type( self::POST_TYPE, array(
 			'labels'              => array(
 				// name of post type in plural and singualr form
 				'name'               => _x( 'Flickr Media', 'plural', self::SLUG ),
@@ -250,9 +297,8 @@ class FML implements FMLConstants
 			),
 			//'query_var'           => '', default query var
 			//'can_export'          => true, // can be exported
-		));
+		) );
 	}
-
 	//
 	// OVERLOAD PROPERTIES
 	// 
@@ -315,6 +361,11 @@ class FML implements FMLConstants
 	 * - flickr_api_secret: the api secret for the key
 	 * - Flickr::*: various flickr-specific variables like user name, access token, etc.
 	 * - post-date_map: what the custom post date maps onto (only: posted, taken, lastupdate, none)
+	 * - flickr_search_*: restrict flickr API search (done on the client)
+	 * - media_default_*: defaults related to "add media" button in editor
+	 * - shortcode_default*: defaults related to the [fmlmedia] shortcode
+	 * - shortcode_*: features related to the [fmlmedia] shortcode
+	 * - image_*: features related to flickr media image rendering (attachment emulation)
 	 * @var array Plugin blog options
 	 */
 	private $_settings = array();
@@ -330,6 +381,8 @@ class FML implements FMLConstants
 	private function _load_settings() {
 		$settings_changed = false;
 		$settings = get_option( self::SLUG, array() );
+		// setting an attribute into false may mean that the actual default will
+		// be set later
 		$_default_settings = array(
 			'flickr_api_key'                  => self::_FLICKR_API_KEY,
 			'flickr_api_secret'               => self::_FLICKR_SECRET,
@@ -339,7 +392,9 @@ class FML implements FMLConstants
 			Flickr::OAUTH_ACCESS_TOKEN        => '',
 			Flickr::OAUTH_ACCESS_TOKEN_SECRET => '',
 			'permalink_slug'                  => self::_DEFAULT_BASE,
-			'post_date_map'                   => 'taken',  // map post date to flickr date taken
+			'post_date_map'                   => 'taken',
+			'flickr_search_safe_search'       => true,
+			'flickr_search_license'           => '1,2,3,4,5,6,7,8', //everything but all rights reserved
 			'media_default_link'              => false,
 			'media_default_align'             => false,
 			'media_default_size'              => false,

@@ -5,7 +5,7 @@
  */
 (function ($, window, constants) {
   var sprintf = window.sprintf;
-  console.log(constants);
+  //console.log(constants);
 
   /**
    * + Convert HTTPS URL into HTTP.
@@ -84,6 +84,8 @@
      * @return {boolean} false
      */
     this.searchPhoto = function(paging) {
+      var safe_search = 0,
+              license = '';
       if ( paging === 0 ) {
         self.page = 1;
         switch ( self.$select_main.val() ) {
@@ -105,6 +107,13 @@
             self.photoset_id = null;
             self.sort_by = self.getFilterValue('sort');
             self.query = self.$search_query.val();
+            safe_search = ( constants.flickr_search.safe_search ) ? 1 : 3;
+            license = constants.flickr_search.license;
+            // note that safe_search=0 chooses user preferred search patterns.
+            // This is untested if the user is under 18 (because I am not).
+            // Hopefully the flickr API knows to set it to 2 if requesting can't
+            // do 3. I'm not going to test this myself because I'm lazy and I
+            // really prefer not to see a lot of dick pix.
             break;
         }
         self.clearItems(true);
@@ -118,6 +127,12 @@
         media: 'photos'//,
         //extras: 'url_s,url_q,url_n,url_z'
       };
+      if ( safe_search ) {
+        query.safe_search = safe_search;
+      }
+      if ( license ) {
+        query.license = license;
+      }
       if ( self.query ) {
         query.text = self.query;
       }

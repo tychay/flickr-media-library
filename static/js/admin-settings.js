@@ -6,6 +6,15 @@
 
 	/* onReady: Handle Settings page for Flickr Media Library. */
 	$( function() {
+		// Full screen thickboxes
+		// https://codex.wordpress.org/Javascript_Reference/ThickBox
+		$('a.TB_fullscreen').click( function(e) {
+			var $this = $(this), $window = $(window);
+			// save true href the first time
+			if ( !$this._href ) { $this._href = $this.attr('href'); }
+			$this.attr('href', $this._href+'?TB_iframe=true&width='+($window.width()-100)+'&height='+($window.height()-100) ).addClass('thickbox');
+			// do not prevent default
+		});
 		// bind the checkboxes to hide/show display_<cbox_id> classes
 		$('.hide-column-tog', '#adv-settings').change( function() {
 			var $this = $(this), id = $this.val();
@@ -22,7 +31,7 @@
 		$('.bound_checkbox').change( function(ev) {
 			var $this = $(this),
 			       id = $this.attr('id'),
-			  $target = $('#'+id+'-hidden');
+			  $target = $('#hidden-'+id);
 			if ( $this.prop('checked') ) {
 				$target.val('on');
 			} else {

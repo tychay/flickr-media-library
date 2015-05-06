@@ -43,7 +43,7 @@ function _page_settings_input( $form_id, $input_name, $input_value, $disabled ) 
 }
 function _page_settings_cb( $form_id, $input_name, $input_value, $disabled, $label ) {
 	printf(
-		'<input type="hidden" id="%1$s-%2$s-hidden" name="%2$s" value="%3$s"%4$s /> <label for="%1$s-%2$s"><input type="checkbox" id="%1$s-%2$s" name="cb-%2$s" class="bound_checkbox"%5$s /> %6$s</label>',
+		'<input type="hidden" id="hidden-%1$s-%2$s" name="%2$s" value="%3$s"%4$s /> <label for="%1$s-%2$s"><input type="checkbox" id="%1$s-%2$s" name="cb-%2$s" class="bound_checkbox"%5$s /> %6$s</label>',
 		esc_attr($form_id),
 		esc_attr($input_name),
 		( $input_value ) ? 'on'                   : 'off',
@@ -83,7 +83,7 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 ?>
 	<h3 class="title"><?php _e('Flickr authorization', FML::SLUG); ?></h3>
 	<form method="post" id="flickr_auth_form">
-<?php if ($is_auth_with_flickr): ?>
+<?php if ( $is_auth_with_flickr ): ?>
 		<?php wp_nonce_field($form_ids['flickr_deauth'].'-verify'); ?>
 		<input type="hidden" name="action" value="<?php echo $form_ids['flickr_deauth']; ?>" />
 		<table class="form-table">
@@ -126,15 +126,52 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 		<?php submit_button(__('Authorize with Flickr', FML::SLUG)); ?>
 <?php endif; ?>
 	</form>
+	<form method="post" id="flickr_options_form">
+<?php
+			$form_id = $form_ids['flickr_options'];
+?>
+		<?php wp_nonce_field($form_id.'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $form_id; ?>" />
+		<h3 class="title"><?php _e('Flickr API Options',FML::SLUG); ?></h3>
+		<table class="form-table">
+			<tr>
+				<th scope="row"><?php _e('Search options',FML::SLUG); ?></th>
+				<td>
+					<?php
+			if ( $is_auth_with_flickr ) {
+				_page_settings_cb( $form_id, 'flickr_search_safe_search', $settings['flickr_search_safe_search'], false, __('Enable SafeSearch',FML::SLUG).' <a target="_blank" class="TB_fullscreen" href="https://help.yahoo.com/kb/flickr/safesearch-sln14917.html">(?)</a><br />' );
+				// see above: we insert an extra br to separate it from the licenses
+			}
+			$settings_licenses = explode( ',', $settings['flickr_search_license'] );
+			add_thickbox();
+			foreach ( $cb_licenses as $id=>$license ) {
+				echo '<br />';
+				// these bastages block iframes! :-(
+				$allow_tb =  ( !in_array( $id, array( 7, 8 ) ) );
+				$description = ($license['url'])
+					? sprintf(
+						'%1$s <a href="%2$s" target="_blank"%3$s>(?)</a>',
+						esc_attr($license['name']),
+						esc_html($license['url']),
+						( $allow_tb ) ? ' class="TB_fullscreen"' : ''
+					)
+				    : esc_html($license['name']);
+				_page_settings_cb( $form_id, 'flickr_search_license-'.$id, in_array( $id, $settings_licenses ), false, $description );
+			}
+					?>
+				</td>
+			</tr>
+		</table>
+		<?php submit_button(__('Save Changes')); ?>
 <?php
 			break;
 		case 'cpt_options':
 			$form_id = $form_ids['cpt_options'];
 ?>
 	<form method="post" id="cpt_options_form">
-		<?php wp_nonce_field($form_ids['cpt_options'].'-verify'); ?>
-		<input type="hidden" name="action" value="<?php echo $form_ids['cpt_options']; ?>" />
-		<h3 class="title"><?php _e('Custom Post Type Options', FML::SLUG); ?></h3>
+		<?php wp_nonce_field($form_id.'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $form_id; ?>" />
+		<h3 class="title"><?php _e('Custom Post Type Options',FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
 				<?php _page_settings_th( $form_id, 'post_date_map', __('Post date Alignment',FML::SLUG) ); ?>

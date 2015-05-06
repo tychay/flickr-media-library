@@ -371,8 +371,32 @@ class FMLAdmin
 	 */
 	public function options_handle_flickr_options() {
 		check_admin_referer( $this->_ids['forms']['flickr_options'] . '-verify' );
-		//var_dump($_POST);die;
 		$options = array();
+		foreach( $_POST as $key=>$value ) {
+			switch( $key ) {
+				case 'flickr_search_safe_search':
+					if ( $value == 'on' ) {
+						$options[$key] = true;
+					} elseif ( $value == 'off' ) {
+						$options[$key] = false;
+					}
+					break;
+			}
+		}
+		// flickr licenses are a special case
+		if ( !empty($_POST['flickr_search_license-0']) ) {
+			$license_array = array();
+			for ( $i=0; $i<9; ++$i ) {
+				if ( $_POST['flickr_search_license-'.$i] == 'on' ) {
+					$license_array[] = $i;
+				}
+			}
+			// There can never be a search for nothing, set to No known restrictions
+			if ( empty($license_array) ) {
+				$license_array[] = 7;
+			}
+			$options['flickr_search_license'] = implode( ',', $license_array );
+		}
 		$this->_options_update_settings($options);
 	}
 	/**
@@ -501,6 +525,7 @@ class FMLAdmin
 		$select_links        = $this->_links;
 		$select_aligns       = $this->_aligns;
 		$select_sizes        = $this->_fml->flickr_sizes;
+		$cb_licenses         = $this->_fml->flickr_licenses;
 		// add "full" size
 		$select_sizes['full'] = __('Full',FML::SLUG);
 
@@ -1297,6 +1322,10 @@ class FMLAdmin
 			'slug'               => FML::SLUG,
 			'page_type'          => $page_type,
 			'flickr_user_id'     => $settings[Flickr::USER_NSID],
+			'flickr_search'      => array(
+				'safe_search' => $settings['flickr_search_safe_search'],
+				'license'     => $settings['flickr_search_license'],
+			),
 			'ajax_url'           => admin_url( 'admin-ajax.php' ),
 			'ajax_action_call'   => $this->_ids['ajax_action'],
 			'edit_url_format'    => admin_url( 'post.php?post=%d&action=edit' ),
