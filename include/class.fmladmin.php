@@ -860,8 +860,7 @@ class FMLAdmin
 	 */
 	public function handle_alt_meta_box_form( $post_id ) {
 		if ( isset( $_POST['image_alt_text'] ) ) {
-			// TODO replace with utility function and wp_unslash()
-			update_post_meta( $post_id, '_wp_attachment_image_alt', $_POST['image_alt_text'] );
+			FML::set_image_alt( $post_id, wp_unslash( $_POST['image_alt_text'] ) );
 		}
 	}
 	/**
@@ -871,7 +870,7 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function alt_meta_box( $post ) {
-		$alt_text = get_post_meta( $post->ID, '_wp_attachment_image_alt', true );
+		$alt_text = FML::get_image_alt( $post );
 		include $this->_fml->template_dir.'/metabox.alt_text.php';
 	}
 	// ADD NEW (post-new.php -> media-upload.php?chromeless=1&tab=flickr_media_library_insert_flickr&for=admin_menu)
@@ -981,13 +980,12 @@ class FMLAdmin
 					$update['post_excerpt'] = wp_unslash( $_POST['caption'] );
 				}
 				if ( !empty( $_POST['alt']) ) {
-					// TODO replace this with a function and wp_unslash()
-					update_post_meta( $post->ID, '_wp_attachment_image_alt', $_POST['alt'] );
+					FML::set_image_alt( $post, wp_unslash( $_POST['alt'] ) );
 				}
 				if ( !empty($update) ) {
 					$update['ID'] = $post->ID;
 					$post_id = wp_update_post( $update );
-					// data's been changed.
+					// data has been been changed.
 					$post = get_post($post->ID);
 				}
 				$return = array(

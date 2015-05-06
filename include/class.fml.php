@@ -1134,7 +1134,7 @@ class FML implements FMLConstants
 		}
 		//    Inject alt if missing/not provided
 		if ( !$atts['alt'] ) {
-			$atts['alt'] = trim( get_post_meta( $post->ID, '_wp_attachment_image_alt', true ) );
+			$atts['alt'] = trim( self::get_image_alt( $post ) );
 		}
 		//    Find url to link if any
 		$atts['rel'] = '';
@@ -2118,7 +2118,7 @@ class FML implements FMLConstants
 		$self = self::get_instance();
 
 		// flickr post metas
-		update_post_meta( $post_id, $self->post_metas['api_data'], $flickr_data );
+		update_post_meta( $post_id, wp_slash( $self->post_metas['api_data'] ), $flickr_data );
 		update_post_meta( $post_id, $self->post_metas['flickr_id'], $flickr_data['id'] );
 
 		// emulated post metas
@@ -2128,7 +2128,29 @@ class FML implements FMLConstants
 		$meta = array(
 			'image_meta' => self::_wp_read_image_metadata( $flickr_data )
 		);
-		update_post_meta( $post_id, '_wp_attachment_metadata', $meta );
+		update_post_meta( $post_id, '_wp_attachment_metadata', wp_slash( $meta ) );
+	}
+	/**
+	 * Accessor for getting image alt to deal with the confusion between where
+	 * and when wp_slash()/wp_unslash() is done.
+	 * 
+	 * @param  mixed  $post can be post or post_id (post_id is preferrd)
+	 * @return string       the alt attribute
+	 */
+	static public function get_image_alt($post) {
+ 		$post_id = ( is_object( $post ) ) ? $post->ID : $post;
+		return get_post_meta( $post_id, '_wp_attachment_image_alt', true );
+	}
+	/**
+	 * Accessor for setting image alt to deal with the fact update_post_meta
+	 * has stripslashes() built in (yes, it does, can you beleive??)
+	 * 
+	 * @param  mixed  $post  can be post or post_id (post_id is preferrd)
+	 * @param  string $value the value to store (unslashed).
+	 */
+	static public function set_image_alt( $post, $value ) {
+ 		$post_id = ( is_object( $post ) ) ? $post->ID : $post;
+		update_post_meta( $post_id, '_wp_attachment_image_alt', wp_slash( $value ) );
 	}
 	/**
 	 * Get the Flickr API data from post meta
