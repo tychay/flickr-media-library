@@ -24,7 +24,8 @@
     width: 100px; /* used fixed widths for flickr sq thumbnails */
 }
 .attachment-info .thumbnail, .attachment-info .thumbnail img {
-    max-width: 240px; /* default is 120px, but let's make it larger because we can */
+    /* default is 120px, but let's make it larger because we can */
+    /* max-width: 240px; */ /* Don't do this part because of picturefill */
     max-height: 240px;
 }
 .attachments-browser .attachments {
