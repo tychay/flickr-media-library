@@ -51,12 +51,18 @@ function _page_settings_cb( $form_id, $input_name, $input_value, $disabled, $lab
 		( $input_value ) ? ' checked="checked"'   : '',
 		$label
 	);
-
 }
 function _page_settings_hidden_class( $screen_option_id, $that ) {
 	$return = 'display_'.esc_attr( $screen_option_id);
 	if ( $that->options_column_is_hidden( $screen_option_id ) ) $return .= ' hidden';
 	echo $return;
+}
+function _page_settings_get_info_link( $url, $use_thickbox=true ) {
+	return sprintf(
+		'<a target="_blank" href="%s"%s>(?)</a>',
+		esc_attr($url),
+		( $use_thickbox ) ? ' class="TB_fullscreen"' : ''
+	);
 }
 ?>
 <div class="wrap">
@@ -139,23 +145,18 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 				<td>
 					<?php
 			if ( $is_auth_with_flickr ) {
-				_page_settings_cb( $form_id, 'flickr_search_safe_search', $settings['flickr_search_safe_search'], false, __('Enable SafeSearch',FML::SLUG).' <a target="_blank" class="TB_fullscreen" href="https://help.yahoo.com/kb/flickr/safesearch-sln14917.html">(?)</a><br />' );
+				_page_settings_cb( $form_id, 'flickr_search_safe_search', $settings['flickr_search_safe_search'], false, __('Enable SafeSearch',FML::SLUG).' '. _page_settings_get_info_link('https://help.yahoo.com/kb/flickr/safesearch-sln14917.html', true) );
 				// see above: we insert an extra br to separate it from the licenses
+				echo '<br />';
 			}
 			$settings_licenses = explode( ',', $settings['flickr_search_license'] );
 			add_thickbox();
 			foreach ( $cb_licenses as $id=>$license ) {
 				echo '<br />';
 				// these bastages block iframes! :-(
-				$allow_tb =  ( !in_array( $id, array( 7, 8 ) ) );
-				$description = ($license['url'])
-					? sprintf(
-						'%1$s <a href="%2$s" target="_blank"%3$s>(?)</a>',
-						esc_attr($license['name']),
-						esc_html($license['url']),
-						( $allow_tb ) ? ' class="TB_fullscreen"' : ''
-					)
-				    : esc_html($license['name']);
+				$description = ( $license['url'] )
+						? esc_html( $license['name'] ) . ' ' . _page_settings_get_info_link( $license['url'], $license['iframe'] )
+					    : esc_html($license['name']);
 				_page_settings_cb( $form_id, 'flickr_search_license-'.$id, in_array( $id, $settings_licenses ), false, $description );
 			}
 					?>
@@ -281,7 +282,13 @@ function _page_settings_hidden_class( $screen_option_id, $that ) {
 			<tr>
 				<th scope="row"><?php _e('Javascript routines',FML::SLUG); ?></th>
 				<td>
-					<?php _page_settings_cb( $form_id, 'image_use_css_crop', $settings['image_use_css_crop'], false, __('Use CSS cropping',FML::SLUG) );  ?>
+					<?php
+			$description = __('Use CSS cropping',FML::SLUG);
+			_page_settings_cb( $form_id, 'image_use_css_crop', $settings['image_use_css_crop'], false, $description );
+			echo '<br />';
+			$description = __('Use Picturefill 2',FML::SLUG) . ' ' . _page_settings_get_info_link( 'http://scottjehl.github.io/picturefill/', false );
+			_page_settings_cb( $form_id, 'image_use_picturefill', $settings['image_use_picturefill'], false, $description );
+					?>
 				</td>
 			</tr>
 		</table>

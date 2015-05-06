@@ -51,12 +51,6 @@ class FML implements FMLConstants
 	 * accessible publicly as $post_metas (but not writeable).
 	 */
 	private $_post_metas = array();
-	/**
-	 * Should we support picturefill?
-	 * 
-	 * @var  bool
-	 */
-	private $_support_picturefill = false;
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
@@ -103,38 +97,47 @@ class FML implements FMLConstants
 			0 => array(
 				'name' => __('All Rights Reserved',FML::SLUG),
 				'url'  => '',
+				'iframe' => false, //whether or not it's thickbox'ble
 			),
 			1 => array(
 				'name' => __('Attribution-NonCommercial-ShareAlike License',FML::SLUG),
 				'url' => 'http://creativecommons.org/licenses/by-nc-sa/2.0/',
+				'iframe' => true,
 			),
 			2 => array(
 				'name' => __('Attribution-NonCommercial License',FML::SLUG),
 				'url' => 'http://creativecommons.org/licenses/by-nc/2.0/',
+				'iframe' => true,
 			),
 			3 => array(
 				'name' => __('Attribution-NonCommercial-NoDerivs License',FML::SLUG),
 				'url' => 'http://creativecommons.org/licenses/by-nc-nd/2.0/',
+				'iframe' => true,
 			),
 			4 => array(
 				'name' => __('Attribution License',FML::SLUG),
 				'url' => 'http://creativecommons.org/licenses/by/2.0/',
+				'iframe' => true,
 			),
 			5 => array(
 				'name' => __('Attribution-ShareAlike License',FML::SLUG),
 				'url' => 'http://creativecommons.org/licenses/by-sa/2.0/',
+				'iframe' => true,
 			),
 			6 => array(
 				'name' => __('Attribution-NoDerivs License',FML::SLUG),
 				'url' => 'http://creativecommons.org/licenses/by-nd/2.0/',
+				'iframe' => true,
 			),
 			7 => array(
 				'name' => __('No known copyright restrictions',FML::SLUG),
 				'url' => 'http://flickr.com/commons/usage/',
+				'iframe' => false,
 			),
 			8 => array(
 				'name' => __('United States Government Work',FML::SLUG),
 				'url' => 'http://www.usa.gov/copyright.shtml',
+				'iframe' => false,
 			),
 		);
 		// $settings and $flickr are lazy loaded
@@ -188,9 +191,6 @@ class FML implements FMLConstants
 		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3 );
 		add_filter( 'get_image_tag_class', array($this,'filter_image_tag_class'), 10, 4 );
-		
-		// Don't worry, you can change this later,
-		$this->_support_picturefill = ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 	}
 	/**
 	 * Stuff to run on `init`
@@ -206,10 +206,17 @@ class FML implements FMLConstants
 
 		// move the code later to give filters a chance to change it in plugins_loaded
 		//$this->_support_picturefill = false;
-		if ( $this->_support_picturefill = apply_filters( 'fml_image_support_picturefill', $this->_support_picturefill ) ) {
+		if ( $this->use_picturefill ) {
 			// Add Picturefill.WP 2 emulation specific code here.
-			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
+			// yes, you're "supposed" to call this in wp_enqueue_script but
+			// that's b.s. for two reaons:
+			// 1) My code should override picturefill.js.wp because it's version
+			//    2 (needed), it's up-to-date, and has better support
+			// 2) picturefill.js can be registered anywhere to allow you to use
+			//    it on admin or login pages without having to add 3 actions
+			$this->register_picturefill_script();
 			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
+			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
 		}
 		if ( apply_filters( 'fml_image_use_css_crop', $this->settings['image_use_css_crop'] ) ) {
 			wp_register_script(
@@ -328,6 +335,8 @@ class FML implements FMLConstants
 				return $this->_flickr_callback;
 			case 'post_metas':
 				return $this->_post_metas;
+			case 'use_picturefill':
+				return apply_filters( 'fml_image_support_picturefill', $this->settings['image_use_picturefill'] ); 
 			default:
 				trigger_error(sprintf('Property %s does not exist',$name));
 				return null;
@@ -413,6 +422,7 @@ class FML implements FMLConstants
 			'shortcode_generate_custom_post'  => true,
 			//'image_default_class_size'        => 'attachment-',
 			'image_use_css_crop'              => true,
+			'image_use_picturefill'           => false,
 		);
 
 		// upgrade missing parameters (or initialize defaults if none)
@@ -425,35 +435,40 @@ class FML implements FMLConstants
 				if ( $value === false ) {
 					switch ( $option) {
 						case 'media_default_link':
-						$value = get_option( 'image_default_link_type' ); // db default 'file'
-						if (!$value) {
-							$value = 'flickr'; // comply with flickr TOS
-						}
-						break;
+							$value = get_option( 'image_default_link_type' ); // db default 'file'
+							if (!$value) {
+								$value = 'flickr'; // comply with flickr TOS
+							}
+							break;
 						case 'media_default_align':
-						$value  = get_option( 'image_default_align' ); //empty default
-						if (!$value) { $value = 'none'; }
-						break;
+							$value  = get_option( 'image_default_align' ); //empty default
+							if (!$value) { $value = 'none'; }
+							break;
 						case 'media_default_size':
-						$value = ucfirst( 'image_default_size' ); //empty default
-						switch ( $value ) {
-							case 'thumb':
-							case 'thumbnail': // normally 150x150 square
-							$value = 'Large Square';
+							$value = ucfirst( 'image_default_size' ); //empty default
+							switch ( $value ) {
+								case 'thumb':
+								case 'thumbnail': // normally 150x150 square
+								$value = 'Large Square';
+								break;
+								case 'medium': //normally 300 max
+								$value = 'Small';
+								break;
+								case 'large': //normally 640 max
+								$value = 'Medium 640';
+								break;
+								case 'full': //original
+								$value = 'full';
+								break;
+								default:
+								$value = 'Medium';
+							}
 							break;
-							case 'medium': //normally 300 max
-							$value = 'Small';
+						case 'image_use_picturefill':
+							// basically, prefer false, but if picturefill.wp 2
+							// is installed then default true
+							$value = ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 							break;
-							case 'large': //normally 640 max
-							$value = 'Medium 640';
-							break;
-							case 'full': //original
-							$value = 'full';
-							break;
-							default:
-							$value = 'Medium';
-						}
-						break;
 					}
 				}
 				$settings[$option] = $value;
@@ -1239,6 +1254,30 @@ class FML implements FMLConstants
 	//
 	// PICTUREFILL SUPPORT
 	//
+	/**
+	 * A better picturefill.js version 2 script registration
+	 */
+	public function register_picturefill_script() {
+      // For safety, don't use cdn on admin pages
+      if ( apply_filters( 'picturefill_wp_use_cdn', false ) && !is_admin() ) {
+        $picturefill_url =  sprintf(
+          apply_filters( 'picturefill_wp_cdn_urlstring', 'http%s://cdnjs.cloudflare.com/ajax/libs/picturefill/%s/picturefill%s.js' ),
+          ( is_ssl() ) ? 's' : '',
+          self::PICTUREFILL_JS_VERSION,
+          ( WP_DEBUG ) ? '' : '.min'
+        );
+        $version = null; // no need to append querystring if going to a CDN
+      } else {
+        $picturefill_url = sprintf(
+          '%s/js/picturefill%s.js',
+          $this->static_url,
+          ( WP_DEBUG ) ? '' : '.min'
+        );
+        $version = self::PICTUREFILL_JS_VERSION;
+      }
+
+      wp_register_script( 'picturefill', $picturefill_url, array(), $version, true );
+	}
 	/**
 	 * Inject the srcset and srcs for fmlmedia into shortcode
 	 *

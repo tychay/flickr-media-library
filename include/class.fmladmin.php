@@ -443,6 +443,7 @@ class FMLAdmin
 				case 'shortcode_generate_custom_post':
 				case 'shortcode_extract_flickr_id':
 				case 'image_use_css_crop':
+				case 'image_use_picturefill':
 					if ( $value == 'on' ) {
 						$options[$key] = true;
 					} elseif ( $value == 'off' ) {
@@ -1368,9 +1369,8 @@ class FMLAdmin
 			'71d33bf', // version
 			true // in footer?
 		);
-		// for it to queue properly, picturefill.js needs to be patched.
-		// still it's not rendering 1x, 2x properly in firefox
-		if( defined('PICTUREFILL_WP_VERSION') ) {
+		// for it to support retina, picturefill.js needs to be loaded
+		if ( $this->_fml->use_picturefill ) {
 			wp_enqueue_script( 'picturefill' );
 		}
 		// Need the WPSetAsThumbnail script in post thumbnail handling

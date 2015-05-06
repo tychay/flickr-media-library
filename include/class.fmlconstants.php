@@ -8,7 +8,11 @@ interface FMLConstants
     /**
      * The version of the plugin
      */
-    const VERSION = 0.1;
+    const VERSION = '0.1';
+    /**
+     * The version of picturefill.js bundled
+     */
+    const PICTUREFILL_JS_VERSION = '2.3.1';
     /**
      * Used for ids and also the text domain of plugin
      */
