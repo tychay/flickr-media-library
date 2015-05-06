@@ -1000,7 +1000,8 @@ class FMLAdmin
 				// post type is hard coded
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'attachment', array('id',) );
-				$attachment = $_POST['attachment']; //wp_unslash is outdated
+				$attachment = $_POST['attachment']; //wp_unslash is outdated :-(
+				//$attachment = wp_unslash( $_POST['attachment'] );
 				$settings = $this->_fml->settings;
 				$id = intval( $attachment['id'] );
 				if ( ! $post = get_post( $id ) ) {
@@ -1012,13 +1013,15 @@ class FMLAdmin
 				}
 				if ( $post->post_type != FML::POST_TYPE ) {
 					$this->_send_json_fail( -101, sprintf(
-						__('Incorrect parameter %s=%s', FML::SLUG ),
+						__('Incorrect post type %s=%s', FML::SLUG ),
 						'attachment[id]',
 						$id
 					) );
 				}
 				// If this attachment is unattached, attach it. Primarily a back compat thing.
 				if ( current_user_can( 'edit_post', $id ) ) {
+					// just in case…
+					if ( empty( $_POST['post_id'] ) ) { $_POST['post_id'] = 0; }
 					if ( 0 == $post->post_parent && $insert_into_post_id = intval( $_POST['post_id'] ) ) {
 						wp_update_post( array( 'ID' => $id, 'post_parent' => $insert_into_post_id ) );
 					}
@@ -1073,6 +1076,40 @@ class FMLAdmin
 				if ( !empty( $_POST['post_id'] ) ) {
 					$return['post_id'] = $_POST['post_id'];
 				}
+				break;
+			case 'maybe_attach_media_to_post':
+				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
+				$this->_require_ajax_post( 'attachment', array('id',) );
+				$this->_require_ajax_post( 'post_id' );
+				$attachment = $_POST['attachment'];
+				$id = intval( $attachment['id'] );
+				if ( ! $post = get_post( $id ) ) {
+					$this->_send_json_fail( -100, sprintf(
+						__('Incorrect parameter %s=%s',FML::SLUG),
+						'attachment[id]',
+						$id
+					) );
+				}
+				if ( $post->post_type != FML::POST_TYPE ) {
+					$this->_send_json_fail( -101, sprintf(
+						__('Incorrect post type %s=%s',FML::SLUG),
+						'attachment[id]',
+						$id
+					) );
+				}
+				$attached = false;
+				if ( current_user_can( 'edit_post', $id ) ) {
+					if ( 0 == $post->post_parent && $insert_into_post_id = intval( $_POST['post_id'] ) ) {
+						wp_update_post( array( 'ID' => $id, 'post_parent' => $insert_into_post_id ) );
+						$attached = true;
+					}
+				}
+				$return = array(
+					'status'        => 'ok',
+					'attached'      => $attached,
+					'post_id'       => $_POST['post_id'],
+					'attachment_id' => $id,
+				);
 				break;
 			default:
 				$this->_send_json_fail( 406, sprintf( //HTTP Method Not Allowed

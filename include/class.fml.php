@@ -282,6 +282,7 @@ class FML implements FMLConstants
 				//'comments',        // TODO
 				//'revisions',       // TODO
 				//'page-attributes', // assign parent if hierarchical is true, sets menu order
+						// TODO: The above doesn't work because it assumes linked to same post type
 				//'post-formats',    // TODO
 			),
 			//'register_meta_box_cb'=> //TODO: callback function when setting up metaboxes

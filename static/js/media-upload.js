@@ -2,6 +2,8 @@
  * Old-style media upload handler for Flickr
  *
  * This is going to be janky!
+ *
+ * @todo  figure out where tb_close is, strict?
  */
 (function ($, window, constants) {
   var sprintf = window.sprintf;
@@ -523,7 +525,7 @@
           'attachment[link]'        : $('[data-setting=link]', $sidebar).val(),
           'attachment[linkUrl]'     : $('[data-setting=linkUrl]', $sidebar).val()
         };
-        if ( constants.post_id ) { params.post_id = post_id; }
+        if ( constants.post_id ) { params.post_id = constants.post_id; }
         //console.log(params);
         self.callApi(
           'send_attachment_to_editor',
@@ -589,14 +591,38 @@
           return;
       }
 
-      var id         = $this.attr('data-id'),
+      var id         = $this.attr('data-id'), //flickr id
           photo_data = self.photo_data[id];
 
       if ( photo_data.id ) {
-        //It's already in library: Call function to set as thumbnail (and get HTML)
-        WPSetAsThumbnail( photo_data.id, constants.nonce_set_thumbnail );
-        tb_close();
-        return true;
+        //It's already in library: Call function to set as thumbnail (and$ get HTML)
+        if ( constants.post_id ) {
+          // try to attach media to post (if not already attached), but no matter what
+          // consider it a success!
+          self.callApi(
+            'maybe_attach_media_to_post',
+            {
+              'attachment[id]' : photo_data.id,
+              'post_id'        : constants.post_id
+            },
+            function() {
+              window.WPSetAsThumbnail( photo_data.id, constants.nonce_set_thumbnail );
+              tb_close();
+              return true;
+            },
+            function() {
+              window.WPSetAsThumbnail( photo_data.id, constants.nonce_set_thumbnail );
+              tb_close();
+              return true;
+            }
+          );
+          return false;
+        } else {
+          // this shouldn't happen, but let's not cry over it, it's still a success
+          window.WPSetAsThumbnail( photo_data.id, constants.nonce_set_thumbnail );
+          tb_close();
+          return true;
+        }
       } else {
         // Not in library yet
         // disable button and rename
