@@ -9,13 +9,15 @@ namespace FML;
  * Normally run() this would be in plugins_loaded and constructor would be
  * in the plugin.php file.
  *
- * Note that `$fml_plugin_file` is "passed in" from the bootstrap code.
+ * Note that `$fml_plugin_file` is "passed in" from the bootstrap code and
+ * is the absolute path to the plugin php file.
  */
 
-$fml = new FML($fml_plugin_file);
+$fml = FML::get_instance($fml_plugin_file);
 $fml->run();
 // Load admin page functions if in the admin page
 if (is_admin()) {
 	$fmla = new FMLAdmin($fml);
 	$fmla->run();
 }
+include_once dirname( $fml_plugin_file ) . '/include/functions.fml.php';

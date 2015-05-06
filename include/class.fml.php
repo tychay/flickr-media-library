@@ -55,7 +55,7 @@ class FML implements FMLConstants
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
 	/**
-	 * Plugin Initialization
+	 * Plugin Initialization (called from get_instance())
 	 *
 	 * Note that currently this is not called until `plugins_loaded` has been
 	 * fired, but in the future, it'd be created directly on the main page.
@@ -64,7 +64,7 @@ class FML implements FMLConstants
 	 * 
 	 * @param  string $pluginFile __FILE__ for the plugin file
 	 */
-	function __construct($pluginFile) {
+	private function __construct($pluginFile) {
 		$this->plugin_dir         = dirname($pluginFile);
 		$this->template_dir       = $this->plugin_dir . '/templates';
 		$this->static_url         = plugins_url('static',$pluginFile);
@@ -145,7 +145,9 @@ class FML implements FMLConstants
 	/**
 	 * Returns instance.
 	 *
-	 * Used for static method calls
+	 * Used for static method calls. The first time it is called (in bootstrap)
+	 * it should be provided the $plugin_file so it can properly initialize
+	 * itself.
 	 * 
 	 * @param  string $plugin_file pass to constructor (on creation)
 	 * @return [type]              [description]
@@ -329,6 +331,10 @@ class FML implements FMLConstants
 					$this->_load_settings();
 				}
 				return $this->_settings;
+			case 'picturefill_sizes':
+				return $this->_picturefill_sizes;
+			case 'picturefill_size_map':
+				return $this->_picturefill_size_map;
 			case 'flickr':
 				return $this->_get_flickr();
 			case 'flickr_callback':
@@ -353,6 +359,9 @@ class FML implements FMLConstants
 			case 'settings':
 				trigger_error( 'Set plugin settings through update_settings()' );
 				break;
+			case 'picturefill_sizes':
+			case 'picturefill_size_map':
+				trigger_error( sprintf( 'Set %s through fml_register_sizes() or FML::register_sizes()', $name ) );
 			case 'flickr':
 				trigger_error( sprintf( 'Not allowed to externally set flickr API.', $name ) );
 				break;
@@ -500,6 +509,36 @@ class FML implements FMLConstants
 			}
 		}
 		update_option(self::SLUG, $this->_settings);
+	}
+	// PROPERTIES: Picturefill
+	/**
+	 * List of sizes strings indexed by handle
+	 * @var array
+	 */
+	private $_picturefill_sizes = array();
+	/**
+	 * Maps image size to a "sizes" handle
+	 * @var array
+	 */
+	private $_picturefill_size_map = array();
+	/**
+	 * Emulate picturefill_wp_register_sizes()
+	 *
+	 * Register a sizes for use for flickr media. This will make calls into the
+	 * emulated if it exists.
+	 * 
+	 * @param  string $handle       name of the class "sizes-$handle" to attach to
+	 * @param  string $sizes_string the sizes attribute to write out
+	 * @param  mixed  $attach_to    single image size (or list of images) to auto apply to
+	 * @return void
+	 */
+	public function register_sizes( $handle, $sizes_string, $attach_to='') {
+		$this->_picturefill_sizes[$handle] = $sizes_string;
+		if ( empty( $attach_to ) ) { return; }
+		if ( !is_array( $attach_to ) ) { $attach_to = array( $attach_to ); }
+		foreach ( $attach_to as $size ) {
+			$this->_picturefill_size_map[$size] = $handle;
+		}
 	}
 	// PROPERTIES: Flickr
 	/**

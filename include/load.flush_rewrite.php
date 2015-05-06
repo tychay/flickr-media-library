@@ -7,7 +7,7 @@ namespace FML;
  * @see  https://codex.wordpress.org/Function_Reference/register_post_type#Flushing_Rewrite_on_Activation
  */
 
-$fml = new FML($fml_plugin_file);
+$fml = FML::get_instance($fml_plugin_file);
 
 // First, we "add" the custom post type via the above written function.
 // Note: "add" is written with quotes, as CPTs don't get added to the DB,
