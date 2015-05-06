@@ -860,6 +860,7 @@ class FMLAdmin
 	 */
 	public function handle_alt_meta_box_form( $post_id ) {
 		if ( isset( $_POST['image_alt_text'] ) ) {
+			// TODO replace with utility function and wp_unslash()
 			update_post_meta( $post_id, '_wp_attachment_image_alt', $_POST['image_alt_text'] );
 		}
 	}
@@ -977,9 +978,10 @@ class FMLAdmin
 				}
 				$update = array();
 				if ( !empty( $_POST['caption'] ) ) {
-					$update['post_excerpt'] = $_POST['caption'];
+					$update['post_excerpt'] = wp_unslash( $_POST['caption'] );
 				}
 				if ( !empty( $_POST['alt']) ) {
+					// TODO replace this with a function and wp_unslash()
 					update_post_meta( $post->ID, '_wp_attachment_image_alt', $_POST['alt'] );
 				}
 				if ( !empty($update) ) {
@@ -1000,8 +1002,8 @@ class FMLAdmin
 				// post type is hard coded
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'attachment', array('id',) );
-				$attachment = $_POST['attachment']; //wp_unslash is outdated :-(
-				//$attachment = wp_unslash( $_POST['attachment'] );
+				// WordPress core (in wp-init.php/wp_magic_quotes) adds magic_quotes to GPC. WTF? Right?!!
+				$attachment = wp_unslash( $_POST['attachment'] );
 				$settings = $this->_fml->settings;
 				$id = intval( $attachment['id'] );
 				if ( ! $post = get_post( $id ) ) {
