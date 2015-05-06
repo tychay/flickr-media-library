@@ -666,11 +666,12 @@ class FMLAdmin
 	 */
 	public function filter_manage_post_columns( $cols ) {
 		$return = array(
-			'cb' => $cols['cb'],
-			'icon' => '', // core has already this to be 80px wide
-			'title' => $cols['title'],
-			'tags' => $cols['tags'],
-			'date' => $cols['date'],
+			'cb'     => $cols['cb'],
+			'icon'   => '', // core has already this to be 80px wide
+			'title'  => $cols['title'],
+			'tags'   => $cols['tags'],
+			'parent' => _x( 'Uploaded to', 'column name' ), // from class-wp-media-list-table.php
+			'date'   => $cols['date'],
 		);
 		return $return;
 	}
@@ -683,13 +684,57 @@ class FMLAdmin
 	 * @todo  consider making it easier to get Large Square and sizing it down
 	 */
 	public function manage_posts_custom_column( $column, $post_id ) {
+		$post = get_post( $post_id );
+		if ( !$post ) { return; }
 		switch ( $column ) {
 			case 'icon':
-			// no need to get alt or title as there are other columns
-			//echo get_image_tag( $post_id, '', '', 'center', 'Square');
-			list( $img_src, $width, $height ) = image_downsize( $post_id, 'Large Square' );
-			printf('<img src="%s" alt="" width="75" height="75" />', $img_src );
-			break;
+				// no need to get alt or title as there are other columns
+				//echo get_image_tag( $post_id, '', '', 'center', 'Square');
+				list( $img_src, $width, $height ) = image_downsize( $post_id, 'Large Square' );
+				printf('<img src="%s" alt="" width="75" height="75" />', $img_src );
+				break;
+			case 'parent':
+				$parent = ( $post->post_parent > 0 ) ? get_post( $post->post_parent ) : false;
+				$user_can_edit = $user_can_edit = current_user_can( 'edit_post', $post_id );
+				if ( $parent ) {
+					$title = _draft_or_post_title( $post->post_parent );
+					$parent_type = get_post_type_object( $parent->post_type );
+					if ( $parent_type && $parent_type->show_ui && current_user_can( 'edit_post', $post->post_parent ) ) {
+						$post_string = '<strong><a href="%2$s">%1$s</a></strong>, %3$s<br />';
+					} else {
+						$post_string = '<strong>%1$s</strong>, %3$s<br />';
+					}
+					printf(
+						$post_string,
+						$title,
+						get_edit_post_link( $post->post_parent ),
+						get_the_time( __('Y/m/d'), $parent )
+					);
+					if ( $user_can_edit ) {
+						$detach_url = add_query_arg( array(
+							'post_type'      => $post->post_type, // right edit page
+							'parent_post_id' => $post->post_parent,
+							'post[]'         => $post->ID,
+							'_wpnonce'       => wp_create_nonce( 'bulk-'.$parent_type->labels->name ),
+						), 'edit.php' );
+						printf(
+							'<a class="hide-if-no-js detach-from-jjparent" href="%s">%s</a>',
+							$detach_url,
+							__( 'Detach' )
+						);
+					}
+				} else {
+					_e( '(Unattached)' );
+					echo '<br />';
+					if ( $user_can_edit ) {
+						printf(
+							'<a class="hide-if-no-js" onclick="findPosts.open( \'post[]\',\'%d\'); return false;" href="#the-list">%s</a>',
+							$post->ID,
+							__( 'Attach' )
+						);
+					}
+				}
+				break;
 		}
 	}
 	// EDIT (post.php)
@@ -972,7 +1017,12 @@ class FMLAdmin
 						$id
 					) );
 				}
-				// TODO: don't attach unnattached attachment for flickr media
+				// If this attachment is unattached, attach it. Primarily a back compat thing.
+				if ( current_user_can( 'edit_post', $id ) ) {
+					if ( 0 == $post->post_parent && $insert_into_post_id = intval( $_POST['post_id'] ) ) {
+						wp_update_post( array( 'ID' => $id, 'post_parent' => $insert_into_post_id ) );
+					}
+				}
 				$url = '';
 				$rel = false;
 				if ( !empty( $attachment['link'] ) ) {
