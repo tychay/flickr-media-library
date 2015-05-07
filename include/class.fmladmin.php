@@ -459,6 +459,8 @@ class FMLAdmin
 				case 'shortcode_default_link':
 				case 'shortcode_default_rel_post':
 				case 'shortcode_default_rel_post_id':
+				case 'shortcode_default_class_size':
+				case 'shortcode_default_class_id':
 				//case 'image_default_class_size':
 					$options[$key] = $value;
 					break;
@@ -1152,7 +1154,7 @@ class FMLAdmin
 					$rels[] = $settings['media_default_rel_post'];
 				}
 				if ( $settings['media_default_rel_post_id'] ) {
-					$rels[] = $settings['media_default_rel_post_id'].$id;
+					$rels[] = sprintf( $settings['media_default_rel_post_id'], $id );
 				}
 				$rel = implode(' ',$rels);
 			}

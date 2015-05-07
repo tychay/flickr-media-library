@@ -222,7 +222,7 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_rel_post_id', __('Attachment "rel" w/ID',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_rel_post_id', $settings['media_default_rel_post_id'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
-					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-att-' ); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-att-%d' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
@@ -233,13 +233,13 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_class_size', __('Image class for size',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_class_size', $settings['media_default_class_size'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
-					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'size-' ); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'size-%s' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
 				<?php _page_settings_th( $form_id, 'media_default_class_id', __('Image class for ID',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'media_default_class_id', $settings['media_default_class_id'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
-					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-image-' ); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-image-%d' ); ?></p>
 				</td>
 			</tr>
 		</table>
@@ -260,12 +260,24 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
 				<?php _page_settings_th( $form_id, 'shortcode_default_rel_post_id', __('link=post "rel" w/ID',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'shortcode_default_rel_post_id', $settings['shortcode_default_rel_post_id'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
-					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-att-' ); ?></p>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-att-%d' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_rels', $this )?>">
 				<?php _page_settings_th( $form_id, 'shortcode_default_rel_flickr', __('link=flickr "rel"',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'shortcode_default_rel_flickr', $settings['shortcode_default_rel_flickr'], $this->options_column_is_hidden( 'fml_show_rels' ) )  ?>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
+				<?php _page_settings_th( $form_id, 'shortcode_default_class_size', __('Image class for size',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'shortcode_default_class_size', $settings['shortcode_default_class_size'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'attachment-%s' ); ?></p>
+				</td>
+			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_classes', $this )?>">
+				<?php _page_settings_th( $form_id, 'shortcode_default_class_id', __('Image class for ID',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'shortcode_default_class_id', $settings['shortcode_default_class_id'], $this->options_column_is_hidden( 'fml_show_classes' ) )  ?>
+					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), '' ); ?></p>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_perf', $this )?>">

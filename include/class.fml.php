@@ -425,18 +425,19 @@ class FML implements FMLConstants
 			'media_default_align'             => false,
 			'media_default_size'              => false,
 			'media_default_rel_post'          => 'attachment',
-			'media_default_rel_post_id'       => 'wp-att-',
+			'media_default_rel_post_id'       => 'wp-att-%d',
 			'media_default_rel_flickr'        => 'flickr',
-			'media_default_class_size'        => 'size-',
-			'media_default_class_id'          => 'wp-image-',
+			'media_default_class_size'        => 'size-%s',
+			'media_default_class_id'          => 'wp-image-%d',
 			'shortcode_default_link'          => 'flickr',
 			'shortcode_default_keephw'        => true,
 			'shortcode_default_rel_post'      => 'attachment',
 			'shortcode_default_rel_post_id'   => 'wp-att-',
 			'shortcode_default_rel_flickr'    => 'flickr',
+			'shortcode_default_class_size'    => 'attachment-%s',
+			'shortcode_default_class_id'      => '',
 			'shortcode_extract_flickr_id'     => true,
 			'shortcode_generate_custom_post'  => true,
-			//'image_default_class_size'        => 'attachment-',
 			'image_use_css_crop'              => true,
 			'image_use_picturefill'           => false,
 		);
@@ -744,10 +745,10 @@ class FML implements FMLConstants
 		$settings = $this->settings;
 		$classes = array( 'align'.esc_attr($align) );
 		if ( $settings['media_default_class_size'] ) {
-			$classes[] = esc_attr( $settings['media_default_class_size'] . $size );
+			$classes[] = esc_attr( sprintf( $settings['media_default_class_size'], str_replace( ' ', '_', $size ) ) );
 		}
 		if ( $settings['media_default_class_id'] ) {
-			$classes[] = esc_attr( $settings['media_default_class_id'] . $id );
+			$classes[] = esc_attr( sprintf( $settings['media_default_class_id'], $id ) );
 		}
 		return implode( ' ', $classes );
 	}
@@ -852,24 +853,29 @@ class FML implements FMLConstants
 		// or map sizes to internal strings.
 		$iatts = array();
 		$classes = array();
-		/*
-		if ( $settings['image_default_class_size'] ) {
-			$classes[] = esc_attr( $settings['shortcode_default_class_size'] . str_replace( ' ', '_', $size ) );
+		// Default class id is empty in the case of emulating this function
+		if ( $settings['shortcode_default_class_id'] ) {
+			$classes[] = esc_attr( sprintf( $settings['shortcode_default_class_id'], $id ) );
 		}
-		if ( $settings['image_default_class_id'] ) {
-			$classes[] = esc_attr( $settings['shortcode_default_class_id'] . $id );
+		// The default class size (fancy emulation of the one in
+		// wp_get_attachment_image where the string is attachment-%s )
+		if ( $settings['shortcode_default_class_size'] ) {
+			$size_string = ( is_array( $size ) )
+			             ? implode( 'x', $size )
+			             : str_replace( ' ', '_', $size );
+			$classes[] = esc_attr( sprintf( $settings['shortcode_default_class_size'], $size_string ) );
 		}
-		*/
+		if ( $atts['sizes'] ) {
+			$classes[] = 'sizes-' . $atts['sizes'];
+		}
 		// This seems weird but is correct (WordPress is wrong). Title should be
 		// the title of the image, and alt should be a description provided for
 		// accessibility (screen readers). You can/should have both.
 		if ( $alt )   { $iatts['alt']   = $alt; }
 		if ( $title ) { $iatts['title'] = $title; }
 		//if ( $align ) { $classes[] = 'align'.$align; }
-		// always need to override class, but there is emulation above
-		if ( !empty( $classes ) ) {
-			$iatts['class'] = implode( ' ', $classes );
-		}
+		// always override the class class, but there is emulation above
+		$iatts['class'] = implode( ' ', $classes );
 
 		$this->_picturefill_delay_sizes_transient = true;
 		$html = wp_get_attachment_image( $id, $size, false, $iatts);
@@ -1084,6 +1090,7 @@ class FML implements FMLConstants
 			'alt'       => '',
 			'title'     => '',
 			'size'      => '',       // LEAVE BLANK: transformed from image-size
+			'sizes'     => '',       // allows injection of sizes (picturefill)
 			'align'     => '',       // editor default may be none, but ours is
 			                         // no attribute/class
 			'link'      => apply_filters( 'fml_shortcode_default_attr_link', $settings['shortcode_default_link'] ), // because of TOS
@@ -1223,7 +1230,7 @@ class FML implements FMLConstants
 					$rels[] = $settings['shortcode_default_rel_post'];
 				}
 				if ( $settings['shortcode_default_rel_post_id'] ) {
-					$rels[] = $settings['shortcode_default_rel_post_id'].$post->ID;
+					$rels[] = sprintf( $settings['shortcode_default_rel_post_id'], $post->ID );
 				}
 				$atts['rel'] = implode(' ',$rels);
 				break;
