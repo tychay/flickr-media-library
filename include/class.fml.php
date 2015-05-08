@@ -1449,8 +1449,8 @@ class FML implements FMLConstants
 		// 2. Generate srcset
 		$metadata = wp_get_attachment_metadata( $post->ID );
 		$srcsets = array();
-		foreach ( $metadata['sizes'] as $size=>$size_data ) {
-			if ( in_array( $size, $icon_sizes ) ) {
+		foreach ( $metadata['sizes'] as $sizename=>$size_data ) {
+			if ( in_array( $sizename, $icon_sizes ) ) {
 				if ( $is_icon ) {
 					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
 				}
