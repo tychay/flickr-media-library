@@ -1673,9 +1673,14 @@ class FML implements FMLConstants
 				}
 			}
 		}
+		// no image was big enough…
 		$img = self::_get_largest_image( $flickr_data );
-		$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
-		return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+		if ( apply_filters( 'fml_image_downsize_can_crop', false ) )  {
+			$ratio = min( $img['width']/$size['width'], $img['height']/$size['height'] );
+		} else {
+			$ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
+		}
+		return array( $img['source'], intval($img['width']/$ratio), intval($img['height']/$ratio), true );
 	}
 	/**
 	 * This will strip the upload_dir() from the path by re-running the same
