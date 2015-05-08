@@ -335,7 +335,7 @@ class FML implements FMLConstants
 		switch( $name ) {
 			case 'settings':
 				if ( empty( $this->_settings ) ) {
-					$this->_load_settings();
+					$this->_settings_load();
 				}
 				return $this->_settings;
 			case 'use_picturefill':
@@ -364,7 +364,7 @@ class FML implements FMLConstants
 	public function __set($name, $value) {
 		switch( $name ) {
 			case 'settings':
-				trigger_error( 'Set plugin settings through update_settings()' );
+				trigger_error( 'Set plugin settings through settings_update()' );
 				break;
 			case 'picturefill_sizes':
 			case 'picturefill_size_map':
@@ -383,15 +383,17 @@ class FML implements FMLConstants
 	/**
 	 * The indexes are the following:
 	 *
+	 * - permalink_slug: the slug used to prepend URLs to flickr media
 	 * - flickr_api_key: the api key to use
 	 * - flickr_api_secret: the api secret for the key
 	 * - Flickr::*: various flickr-specific variables like user name, access token, etc.
-	 * - post-date_map: what the custom post date maps onto (only: posted, taken, lastupdate, none)
 	 * - flickr_search_*: restrict flickr API search (done on the client)
+	 * - post-date_map: what the custom post date maps onto (only: posted, taken, lastupdate, none)
 	 * - media_default_*: defaults related to "add media" button in editor
 	 * - shortcode_default*: defaults related to the [fmlmedia] shortcode
 	 * - shortcode_*: features related to the [fmlmedia] shortcode
 	 * - image_*: features related to flickr media image rendering (attachment emulation)
+	 * 
 	 * @var array Plugin blog options
 	 */
 	private $_settings = array();
@@ -404,12 +406,42 @@ class FML implements FMLConstants
 	 * The options array is stored in the blog options using the SLUG as the
 	 * key
 	 */
-	private function _load_settings() {
+	private function _settings_load() {
 		$settings_changed = false;
 		$settings = get_option( self::SLUG, array() );
 		// setting an attribute into false may mean that the actual default will
 		// be set later
+		$_default_settings = $this->_settings_defaults();
+
+		// upgrade missing parameters (or initialize defaults if none)
+		// cannot do a straight array_merge because we're looking for if we
+		// need to update the blog options.
+		foreach ( $_default_settings as $option=>$value ) {
+			if ( !array_key_exists( $option, $settings ) ) {
+				// values that may involve calls to dB are put here to resolve
+				// defaults only on a new/upgrade of setting
+				if ( $value === false ) {
+					$value = $this->_settings_default_special( $option );
+				}
+				$settings[$option] = $value;
+			}
+			$settings_changed = true;
+		}
+		$this->_settings = $settings;
+		if ( $settings_changed ) {
+			$this->settings_update();
+		}
+	}
+	/**
+	 * Get the settings array default
+	 * 
+	 * @param  boolean $translated By default false values may need to be
+	 *         interpreted into actual values later. Set to true to false.
+	 * @return array               Default settings values
+	 */
+	private function _settings_defaults( $translated=false ) {
 		$_default_settings = array(
+			'permalink_slug'                  => self::_DEFAULT_BASE,
 			'flickr_api_key'                  => self::_FLICKR_API_KEY,
 			'flickr_api_secret'               => self::_FLICKR_SECRET,
 			Flickr::USER_FULL_NAME            => '',
@@ -417,10 +449,9 @@ class FML implements FMLConstants
 			Flickr::USER_NSID                 => '',
 			Flickr::OAUTH_ACCESS_TOKEN        => '',
 			Flickr::OAUTH_ACCESS_TOKEN_SECRET => '',
-			'permalink_slug'                  => self::_DEFAULT_BASE,
-			'post_date_map'                   => 'taken',
 			'flickr_search_safe_search'       => true,
 			'flickr_search_license'           => '1,2,3,4,5,6,7,8', //everything but all rights reserved
+			'post_date_map'                   => 'taken',
 			'media_default_link'              => false,
 			'media_default_align'             => false,
 			'media_default_size'              => false,
@@ -441,61 +472,61 @@ class FML implements FMLConstants
 			'image_use_css_crop'              => true,
 			'image_use_picturefill'           => false,
 		);
-
-		// upgrade missing parameters (or initialize defaults if none)
-		// cannot do a straight array_merge because we're looking for if we
-		// need to update the blog options.
-		foreach ( $_default_settings as $option=>$value ) {
-			if ( !array_key_exists( $option, $settings ) ) {
-				// values that may involve calls to dB are put here to resolve
-				// defaults only on a new/upgrade of setting
-				if ( $value === false ) {
-					switch ( $option) {
-						case 'media_default_link':
-							$value = get_option( 'image_default_link_type' ); // db default 'file'
-							if (!$value) {
-								$value = 'flickr'; // comply with flickr TOS
-							}
-							break;
-						case 'media_default_align':
-							$value  = get_option( 'image_default_align' ); //empty default
-							if (!$value) { $value = 'none'; }
-							break;
-						case 'media_default_size':
-							$value = ucfirst( 'image_default_size' ); //empty default
-							switch ( $value ) {
-								case 'thumb':
-								case 'thumbnail': // normally 150x150 square
-								$value = 'Large Square';
-								break;
-								case 'medium': //normally 300 max
-								$value = 'Small';
-								break;
-								case 'large': //normally 640 max
-								$value = 'Medium 640';
-								break;
-								case 'full': //original
-								$value = 'full';
-								break;
-								default:
-								$value = 'Medium';
-							}
-							break;
-						case 'image_use_picturefill':
-							// basically, prefer false, but if picturefill.wp 2
-							// is installed then default true
-							$value = ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
-							break;
-					}
-				}
-				$settings[$option] = $value;
+		if ( $translated ) {
+			$iterate_settings = array(
+				'media_default_link',
+				'media_default_align',
+				'media_default_size',
+				'image_use_picturefill',
+			);
+			foreach ( $iterate_settings as $setting_name ) {
+				$_default_settings[ $setting_name ] = $this->_settings_default_special( $setting_name );
 			}
-			$settings_changed = true;
 		}
-		$this->_settings = $settings;
-		if ( $settings_changed ) {
-			$this->update_settings();
+		return $_default_settings;
+	}
+	/**
+	 * Do the extra processing necessary to set the default values.
+	 * 
+	 * This only returns the right value if the default value is normally false
+	 * (no checking is done).
+	 * @param  [type] $option [description]
+	 * @return [type]         [description]
+	 */
+	private function _settings_default_special( $option ) {
+		switch ( $option) {
+			case 'media_default_link':
+				$value = get_option( 'image_default_link_type' ); // db default 'file'
+				return ( $value ) ? $value : 'flickr'; // comply with flickr TOS
+			case 'media_default_align':
+				$value  = get_option( 'image_default_align' ); //empty default
+				return ( $value ) ? $value : 'none'; // comply with flickr TOS
+			case 'media_default_size':
+				$value = ucfirst( 'image_default_size' ); //empty default
+				switch ( $value ) {
+					case 'thumb':
+					case 'thumbnail': // normally 150x150 square
+					return 'Large Square';
+					break;
+					case 'medium': //normally 300 max
+					return 'Small';
+					break;
+					case 'large': //normally 640 max
+					return 'Medium 640';
+					break;
+					case 'full': //original
+					return 'full';
+					break;
+					default:
+					return 'Medium';
+				}
+				break;
+			case 'image_use_picturefill':
+				// basically, prefer false, but if picturefill.wp 2
+				// is installed then default true
+				return ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 		}
+		return false;
 	}
 	/**
 	 * Change any settings and save to blog options
@@ -504,9 +535,9 @@ class FML implements FMLConstants
 	 *        the existing options, just don't provide any settings here.
 	 * @return void
 	 */
-	public function update_settings( $settings=array() ) {
+	public function settings_update( $settings=array() ) {
 		// Make sure we have settings loaded before we start "overwriting" them
-		if ( empty($this->_settings) ) { $this->_load_settings(); }
+		if ( empty($this->_settings) ) { $this->_settings_load(); }
 		foreach ( $settings as $key=>$value ) {
 			$this->_settings[$key] = $value;
 		}
@@ -517,6 +548,16 @@ class FML implements FMLConstants
 			}
 		}
 		update_option(self::SLUG, $this->_settings);
+	}
+	/**
+	 * Reset all settings to their default values.
+	 *
+	 * I only use this for testing currently, because it's so destructive.
+	 * 
+	 * @return void
+	 */
+	public function settings_reset() {
+		$this->settings_update( $this->_settings_defaults( true ) );
 	}
 	// PROPERTIES: Picturefill
 	/**
@@ -606,7 +647,7 @@ class FML implements FMLConstants
 	 */
 	public function save_flickr_authentication()
 	{
-		$this->update_settings(array(
+		$this->settings_update(array(
 			Flickr::USER_FULL_NAME            => $this->_flickr->getOauthData(Flickr::USER_FULL_NAME),
 			Flickr::USER_NAME                 => $this->_flickr->getOauthData(Flickr::USER_NAME),
 			Flickr::USER_NSID                 => $this->_flickr->getOauthData(Flickr::USER_NSID),
@@ -621,7 +662,7 @@ class FML implements FMLConstants
 	public function clear_flickr_authentication()
 	{
 		$this->flickr->signout();
-		$this->update_settings(array(
+		$this->settings_update(array(
 			Flickr::USER_FULL_NAME            => '',
 			Flickr::USER_NAME                 => '',
 			Flickr::USER_NSID                 => '',

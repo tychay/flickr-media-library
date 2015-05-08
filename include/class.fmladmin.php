@@ -209,7 +209,7 @@ class FMLAdmin
 	public function permalink_handle_form() {
 		if ( !empty( $_POST[$this->_ids['permalink_slug']] ) ) {
 			check_admin_referer('update-permalink');
-			$this->_fml->update_settings( array(
+			$this->_fml->settings_update( array(
 				'permalink_slug' => $_POST[$this->_ids['permalink_slug']]
 			) );
 		}
@@ -338,7 +338,7 @@ class FMLAdmin
 			} elseif ( !empty( $_POST['flickr_apisecret'] ) ) {
 				$settings['flickr_api_secret'] = $_POST['flickr_apisecret'];
 			}
-			$this->_fml->update_settings($settings);
+			$this->_fml->settings_update($settings);
 			// Just in case the flickr object has already been initialized....
 			$this->_fml->reset_flickr();
 		}
@@ -478,7 +478,7 @@ class FMLAdmin
 	 */
 	private function _options_update_settings( $settings ) {
 		if ( !empty($settings) ) {
-			$this->_fml->update_settings($settings);
+			$this->_fml->settings_update($settings);
 			add_settings_error('general', 'settings_updated', __('Settings saved.'), 'updated');
 		}
 	}
