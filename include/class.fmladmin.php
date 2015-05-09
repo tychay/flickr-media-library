@@ -415,6 +415,9 @@ class FMLAdmin
 				case 'post_date_map':
 					$options[$key] = $value;
 					break;
+				case 'post_excerpt_default':
+					$options[$key] = wp_unslash( $value );
+					break;
 			}
 		}
 		$this->_options_update_settings($options);
@@ -971,8 +974,8 @@ class FMLAdmin
 				// This nonce is created in the form.flickr-upload.php template
 				$this->_verify_ajax_nonce( FML::SLUG.'-flickr-search-verify', '_ajax_nonce' );
 				$this->_require_ajax_post( 'flickr_id' );
-				$post = FML::create_media_from_flickr_id($_POST['flickr_id']);
-				if ( !$post ) {
+				$post_id = FML::create_media_from_flickr_id($_POST['flickr_id']);
+				if ( !$post_id ) {
 					$this->_send_json_fail( -102, sprintf(
 						__('Failed to create Media from flickr_id=%s', FML::SLUG ),
 						$_POST['flickr_id']
@@ -983,14 +986,14 @@ class FMLAdmin
 					$update['post_excerpt'] = wp_unslash( $_POST['caption'] );
 				}
 				if ( !empty( $_POST['alt']) ) {
-					FML::set_image_alt( $post, wp_unslash( $_POST['alt'] ) );
+					FML::set_image_alt( $post_id, wp_unslash( $_POST['alt'] ) );
 				}
 				if ( !empty($update) ) {
-					$update['ID'] = $post->ID;
+					$update['ID'] = $post_id;
 					$post_id = wp_update_post( $update );
-					// data has been been changed.
-					$post = get_post($post->ID);
 				}
+				// data may have been been changed.
+				$post = get_post($post_id);
 				$return = array(
 					'status'    => 'ok',
 					'flickr_id' => $_POST['flickr_id'],

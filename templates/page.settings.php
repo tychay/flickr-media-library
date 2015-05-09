@@ -41,6 +41,15 @@ function _page_settings_input( $form_id, $input_name, $input_value, $disabled ) 
 		( $disabled) ? ' disabled="disabled"' : ''
 	);
 }
+function _page_textarea( $form_id, $input_name, $input_value, $disabled=false ) {
+	printf(
+		'<textarea id="%1$s-%2$s" name="%2$s" rows="4" class="large-text code"%4$s>%3$s</textarea>',
+		esc_attr($form_id),
+		esc_attr($input_name),
+		esc_textarea($input_value),
+		( $disabled) ? ' disabled="disabled"' : ''
+	);
+}
 function _page_settings_cb( $form_id, $input_name, $input_value, $disabled, $label ) {
 	printf(
 		'<input type="hidden" id="hidden-%1$s-%2$s" name="%2$s" value="%3$s"%4$s /> <label for="%1$s-%2$s"><input type="checkbox" id="%1$s-%2$s" name="cb-%2$s" class="bound_checkbox"%5$s /> %6$s</label>',
@@ -175,12 +184,14 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<h3 class="title"><?php _e('Custom Post Type Options',FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
-				<?php _page_settings_th( $form_id, 'post_date_map', __('Post date Alignment',FML::SLUG) ); ?>
-				<td><?php _page_input_select
-			( $form_id, 'post_date_map', $select_post_dates, $settings['post_date_map'] ); ?>
+				<?php _page_settings_th( $form_id, 'post_date_map', __('Post date alignment',FML::SLUG) ); ?>
+				<td><?php _page_input_select( $form_id, 'post_date_map', $select_post_dates, $settings['post_date_map'] ); ?>
 					<p class="description hidden" id="post_date_map_description"><?php _e( 'It is not recommended to map the date to flickr’s last modified time as it may change the post date arbitrarily.', FML::SLUG); ?></p>
 				</td>
 			</tr>
+			<tr>
+				<?php _page_settings_th( $form_id, 'post_excerpt_default', __('Caption template',FML::SLUG) ); ?>
+				<td><?php _page_textarea( $form_id, 'post_excerpt_default', $settings['post_excerpt_default'] ); ?>
 		</table>
 		<?php submit_button(__('Save Changes')); ?>
 	</form>

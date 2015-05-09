@@ -459,6 +459,7 @@ class FML implements FMLConstants
 			'flickr_search_safe_search'       => true,
 			'flickr_search_license'           => '1,2,3,4,5,6,7,8', //everything but all rights reserved
 			'post_date_map'                   => 'taken',
+			'post_excerpt_default'            => '[fmldata template="attribution"]',
 			'media_default_link'              => false,
 			'media_default_align'             => false,
 			'media_default_size'              => false,
@@ -1236,7 +1237,8 @@ class FML implements FMLConstants
 			$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
 			if ( !$post && $settings['shortcode_generate_custom_post'] ) {
 				// generate FML media automatically
-				$post = self::create_media_from_flickr_id( $atts['flickr_id'] )	;
+				$post_id = self::create_media_from_flickr_id( $atts['flickr_id'] );
+				$post = get_post( $post_id );
 				// Could extract size from img src but we already check width
 				// and height and class so let's just use the default at this point
 			}
@@ -2369,7 +2371,7 @@ class FML implements FMLConstants
 	 * Adds an image from flickr into the flickr media library
 	 * 
 	 * @param  string $flickr_id the flickr ID of the image
-	 * @return WP_Post|false     the post created (or false if not)
+	 * @return int|false     the post id created (or false if not)
 	 */
 	static public function create_media_from_flickr_id( $flickr_id ) {
 		// Check to see it's not already added, if so return that
@@ -2382,7 +2384,7 @@ class FML implements FMLConstants
 			return false;
 		}
 		$post_id = self::_new_post_from_flickr_data( $data );
-		return get_post($post_id);
+		return $post_id;
 	}
 	/**
 	 * Attempts to get post stored by flickr_id
@@ -2425,9 +2427,9 @@ class FML implements FMLConstants
 
 		// update post
 		$post_id = wp_update_post( $post_data );
-		self::_update_flickr_post_meta( $post->ID, $flickr_data );
+		self::_update_flickr_post_meta( $post_id, $flickr_data );
 
-		return get_post( $post->ID );
+		return $post_id;
 	}
 	/**
 	 * Update post_meta fields managed by flickr (or emulated for attachments)
