@@ -479,10 +479,7 @@ class FML implements FMLConstants
 			'image_use_css_crop'              => true,
 			'image_use_picturefill'           => false,
 			'template_default'                => '',
-			'templates'                       => array(
-				'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="website flickr">flickr</span>',
-				'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
-			),
+			'templates'                       => false,
 		);
 		if ( $translated ) {
 			$iterate_settings = array(
@@ -490,6 +487,7 @@ class FML implements FMLConstants
 				'media_default_align',
 				'media_default_size',
 				'image_use_picturefill',
+				'templates',
 			);
 			foreach ( $iterate_settings as $setting_name ) {
 				$_default_settings[ $setting_name ] = $this->_settings_default_special( $setting_name );
@@ -537,6 +535,11 @@ class FML implements FMLConstants
 				// basically, prefer false, but if picturefill.wp 2
 				// is installed then default true
 				return ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
+			case 'templates':
+				return apply_filters( 'fml_templates_default', array(
+					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="website flickr">flickr</span>',
+					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
+				) );
 		}
 		return false;
 	}
@@ -1382,7 +1385,7 @@ class FML implements FMLConstants
 		$default_atts = array(
 			'id'        => 0,
 			'flickr_id' => 0,
-			'template'  => apply_filters( 'fml_template_default', '', $raw_atts )
+			'template'  => apply_filters( 'fml_template_shortcode_default', '', $raw_atts ),
 		);
 		$atts = shortcode_atts( $default_atts, $raw_atts, self::TEMPLATE_SHORTCODE );
 		// Try to deduce what post the template is for
