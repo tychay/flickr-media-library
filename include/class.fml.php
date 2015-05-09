@@ -538,7 +538,7 @@ class FML implements FMLConstants
 			case 'templates':
 				return apply_filters( 'fml_templates_default', array(
 					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="website flickr">flickr</span>',
-					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
+					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE,photo}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
 				) );
 		}
 		return false;
@@ -1417,14 +1417,14 @@ class FML implements FMLConstants
 		if ( $html === false ) { return false; }
 		do {
 			$html_old = $html;
-			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+)\}\}!', array($this,'template_replace_variable'), $html );
+			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+),?(\w*)\}\}!', array($this,'template_replace_variable'), $html );
 		} while ( $html != $html_old );
 		return apply_filters( 'fml_template_process', $html, $post, $template_name );
 	}
 	public function template_replace_variable( $matches ) {
 		$filter = $matches[1];
 		$return = $this->_template_variable( $matches[2] );
-		if ( $return !== false && $filter ) {
+		if ( ( $return !== false ) && $filter ) {
 			switch ( $filter ) {
 				case 'html':     return esc_html( $return );
 				case 'attr':     return esc_attr( $return );
@@ -1434,6 +1434,9 @@ class FML implements FMLConstants
 				case 'url':      return esc_url( $return );
 				case 'var':      return str_replace( ' ', '_', $return );
 			}
+		}
+		if ( !$return  && $matches[3] ) {
+			$return = $matches[3];
 		}
 		return $return;
 	}
@@ -2743,7 +2746,6 @@ class FML implements FMLConstants
 			default: return 500;
 		}
 	}
-
 	/**
 	 * Turn a flickr photo into an image tag.
 	 *
