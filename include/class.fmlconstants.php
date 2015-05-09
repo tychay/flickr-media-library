@@ -25,6 +25,10 @@ interface FMLConstants
      * Shortcode
      */
     const SHORTCODE = 'fmlmedia';
+    /**
+     * Shortcode for template injection
+     */
+    const TEMPLATE_SHORTCODE = 'fmldata';
 
     /**
      * The default flickr API key of this plugin. This can be changed at runtime.

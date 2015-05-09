@@ -15,7 +15,8 @@ class FML implements FMLConstants
 	 */
 	public $plugin_dir;
 	/**
-	 * @var string Cache the location of plugin templates directory
+	 * @var string Cache the location of plugin templates directory (different
+	 * from the templates stuff below :-()
 	 */
 	public $template_dir;
 	/**
@@ -58,6 +59,11 @@ class FML implements FMLConstants
 	 * @var boolean
 	 */
 	private $_picturefill_delay_sizes_transient = false;
+	/**
+	 * FML Media Post of the template being processed
+	 * @var WP_Post|false
+	 */
+	private $_template_post = false;
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
@@ -193,6 +199,7 @@ class FML implements FMLConstants
 		// placeholder for strip_shortcodes() to work
 		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
 		add_shortcode( self::SHORTCODE, '__return_false' );
+		add_shortcode( self::TEMPLATE_SHORTCODE, array( $this, 'template_shortcode') );
 
 		add_filter( 'image_downsize', array( $this, 'filter_image_downsize'), 10, 3 );
 		add_filter( 'get_attached_file', array( get_class($this), 'filter_get_attached_file'), 10, 2 );
@@ -471,6 +478,11 @@ class FML implements FMLConstants
 			'shortcode_generate_custom_post'  => true,
 			'image_use_css_crop'              => true,
 			'image_use_picturefill'           => false,
+			'template_default'                => '',
+			'templates'                       => array(
+				'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="website flickr">flickr</span>',
+				'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
+			),
 		);
 		if ( $translated ) {
 			$iterate_settings = array(
@@ -671,7 +683,7 @@ class FML implements FMLConstants
 		));
 	}
 	//
-	// SHORTCODE HANDLING
+	// FMLMEDIA SHORTCODE HANDLING
 	//
 	/**
 	 * Filter to duplicate behavior of prepend_attachment but for flickr media.
@@ -855,7 +867,9 @@ class FML implements FMLConstants
 	 * 
 	 * @see  FML\FML::run_shortcode() Process handler to run shortcode earlier
 	 * @param  array  $atts    shortcode attributes {@see FML\FML::_shortcode_attrs()}
-	 * @param  string $content content shortcode wrapss
+	 * @param  string $content content shortcode wraps
+	 * @param  string $context Most of the time it's FML::SHORTCODE, but if
+	 *                         called directly, it can be something different.
 	 * @return string          HTML output corrected to embed FML asset correctly
 	 * @todo   inject plugin defaults for attributes
 	 * @todo  add setting for extraacting content to flickrid
@@ -1023,12 +1037,6 @@ class FML implements FMLConstants
 		//    f. restore and return
 		return $this->_shortcode_return( $replace, $content, $needle, $post->ID, $atts );
 	}
-	private static function _merge_attribute ( $att1, $att2 ) {
-		return implode( ' ', array_unique( array_merge(
-			explode( ' ', $att1 ),
-			explode( ' ', $att2 )
-		) ) );
-	}
 	/**
 	 * Format shortcode return
 	 *
@@ -1174,7 +1182,7 @@ class FML implements FMLConstants
 			$atts = shortcode_atts( $default_atts, $raw_atts );
 			$atts = apply_filters( 'shortcode_atts_fmlmedia', $atts, $default_atts, $raw_atts );
 		} else {
-			$atts = shortcode_atts( $default_atts, $raw_atts, 'fmlmedia' );
+			$atts = shortcode_atts( $default_atts, $raw_atts, self::SHORTCODE );
 		}
 
 		// 5. Try to grab a flickr_id if there is no id or flickr_id given
@@ -1351,6 +1359,111 @@ class FML implements FMLConstants
 			return $return . ' />';
 		}
 	}
+	private static function _merge_attribute ( $att1, $att2 ) {
+		return implode( ' ', array_unique( array_merge(
+			explode( ' ', $att1 ),
+			explode( ' ', $att2 )
+		) ) );
+	}
+	//
+	// TEMPLATING
+	//
+	/**
+	 * Handle template injection of flickr data
+	 * 
+	 * @param  [type] $raw_atts [description]
+	 * @param  string $content  [description]
+	 * @param  string $context  [description]
+	 * @return mixed            actually returns (false) if there is no matching
+	 *                          template (or data missing)
+	 */
+	public function template_shortcode( $raw_atts, $content='', $context='') {
+		$settings = $this->settings;
+		$default_atts = array(
+			'id'        => 0,
+			'flickr_id' => 0,
+			'template'  => apply_filters( 'fml_template_default', '', $raw_atts )
+		);
+		$atts = shortcode_atts( $default_atts, $raw_atts, self::TEMPLATE_SHORTCODE );
+		// Try to deduce what post the template is for
+		$post = false;
+		if ( !$atts['id'] ) {
+			if ( $atts['flickr_id'] ) {
+				$post = self::get_media_by_flickr_id( $atts['flickr_id'] );
+			}
+			if ( !$post ) {
+				$post = get_post();
+			}
+		} else {
+			$post = get_post( $atts['id'] );
+		}
+		return apply_filters( 'fml_template_shortcode', $this->template_process( $post, $atts['template'], ( $content ) ? $content : false ), $atts, $content, $context );
+	}
+	public function template_process( $post, $template_name='', $html=false ) {
+		//$this->settings_reset(); var_dump($this->settings);
+		if ( !is_object( $post ) ) {
+			$post = get_post( $post );
+		}
+		if ( !$post || ( $post->post_type != self:: POST_TYPE ) ) { return false; }
+		$this->_template_post = $post;
+		$settings = $this->settings;
+		if ( $template_name && array_key_exists( $template_name, $settings['templates'] ) ) {
+			$html = $settings['templates'][$template_name];
+		}
+		// If there is no template to process, send back "false"
+		if ( $html === false ) { return false; }
+		do {
+			$html_old = $html;
+			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+)\}\}!', array($this,'template_replace_variable'), $html );
+		} while ( $html != $html_old );
+		return apply_filters( 'fml_template_process', $html, $post, $template_name );
+	}
+	public function template_replace_variable( $matches ) {
+		$filter = $matches[1];
+		$return = $this->_template_variable( $matches[2] );
+		if ( $return !== false && $filter ) {
+			switch ( $filter ) {
+				case 'html':     return esc_html( $return );
+				case 'attr':     return esc_attr( $return );
+				case 'js':       return esc_js( $return );
+				case 'sql':      return esc_sql( $return );
+				case 'textarea': return esc_textarea( $return );
+				case 'url':      return esc_url( $return );
+				case 'var':      return str_replace( ' ', '_', $return );
+			}
+		}
+		return $return;
+	}
+	private function _template_variable( $variable, $flickr_data = false, $metadata = false ) {
+		if ( !$this->_template_post ) { return false; }
+		$post = $this->_template_post;
+		if ( !$flickr_data ) {
+			$flickr_data = self::get_flickr_data( $post );
+		}
+		if ( !$metadata ) {
+			$metadata = wp_get_attachment_metadata( $post->ID );
+		}
+
+		switch ( $variable ) {
+			case 'POST_TITLE':
+				return $post->post_title;
+			case 'FLICKR_PHOTO_URL':
+			case 'FLICKR_PHOTOPAGE':
+				return self::get_flickr_link( $post );
+			case 'FLICKR_OWNER_REALNAME':
+				return $flickr_data['owner']['realname'];
+			case 'FLICKR_OWNER_PEOPLE_URL':
+				// TODO better formatting here, also good idea to check if
+				// I need to use NSID (does flickr ever return empty/missing username?)
+				return 'https://flickr.com/people/'.$flickr_data['owner']['username'];
+			case 'FLICKR_OWNER_PHOTOS_URL':
+				return 'https://flickr.com/photos/'.$flickr_data['owner']['username'];
+		}
+		//var_dump(array($metadata,$flickr_data));
+		// Maybe it's a template??
+		return $this->template_process( $post, $variable ); //can be recursive :-(
+	}
+
 	//
 	// PICTUREFILL SUPPORT
 	//
