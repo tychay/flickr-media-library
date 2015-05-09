@@ -785,8 +785,10 @@ class FMLAdmin
 		add_action( 'edit_form_after_title', array( $this, 'edit_insert_post_content' ), 10, 1 );
 
 		add_action( 'add_meta_boxes', array( $this, 'adding_edit_meta_boxes' ) );
-		// register alt_text meta box handler
-		add_action( 'save_post', array( $this, 'handle_alt_meta_box_form' ) );
+		// register alt_text meta box handler (can be universal, but lets play safe)
+		add_action( 'save_post_'.FML::POST_TYPE, array( $this, 'handle_alt_meta_box_form' ) );
+		// register caption template metabox handler
+		add_action( 'save_post_'.FML::POST_TYPE, array( $this, 'handle_caption_template_meta_box_form' ) );
 	}
 	/**
 	 * Handle form request to refresh flickr media custom post from flickr
@@ -857,7 +859,37 @@ class FMLAdmin
 	 * @return void
 	 */
 	public function post_excerpt_meta_box( $post ) {
+		$use_template = true;
+		$post = get_post();
+		$caption = ( $use_template )
+		         ? FML::caption_read($post)
+		         : $post->post_excerpt;
 		include $this->_fml->template_dir.'/metabox.post_excerpt.php';
+	}
+	/**
+	 * Handle saving of caption template meta box
+	 * @param  int   $post_id the post id of the flickr media
+	 * @return void
+	 */
+	public function handle_caption_template_meta_box_form( $post_id ) {
+		if ( isset( $_POST['post_excerpt_template'] ) ) {
+			FML::caption_update( $post_id, wp_unslash( $_POST['post_excerpt_template'] ), true );
+		}
+	}
+	/**
+	* put here so it doesn't trigger everywhere, slightly more efficient than the above
+	* add_action( 'pre_post_update', array( $this, 'do_caption_update' ), 10, 2 );
+	* add_filter( 'wp_insert_post_data', )
+	 *  @deprecated unfinished and wrong hook (andin wrong object)
+	 */
+	public function do_caption_update( $post_id, $data ) {
+		$post = get_post( $post_id );
+		if ( $post->post_type !== FML::POST_TYPE ) { return; }
+		if ( isset( $_POST['post_excerpt_template'] ) ) {
+			$data['post_excerpt'] = $this->parse_template( $post, $this->_fml->caption_get_template);
+		}
+		//return $
+		//var_dump( $post_id, $data ); die;
 	}
 	/**
 	 * Handle saving of image alt text meta box
@@ -983,14 +1015,10 @@ class FMLAdmin
 				}
 				$update = array();
 				if ( !empty( $_POST['caption'] ) ) {
-					$update['post_excerpt'] = wp_unslash( $_POST['caption'] );
+					$this->_fml->caption_update( $post_id, wp_unslash( $_POST['caption'] ) );
 				}
 				if ( !empty( $_POST['alt']) ) {
 					FML::set_image_alt( $post_id, wp_unslash( $_POST['alt'] ) );
-				}
-				if ( !empty($update) ) {
-					$update['ID'] = $post_id;
-					$post_id = wp_update_post( $update );
 				}
 				// data may have been been changed.
 				$post = get_post($post_id);
@@ -1406,9 +1434,10 @@ class FMLAdmin
 	private function _media_upload_constants( $page_type, $post_id=0 ) {
 		$settings = $this->_fml->settings;
 		$props = array(
-			'link'  => $settings['media_default_link'],
-			'align' => $settings['media_default_align'],
-			'size'  => $settings['media_default_size'],
+			'link'    => $settings['media_default_link'],
+			'align'   => $settings['media_default_align'],
+			'size'    => $settings['media_default_size'],
+			'caption' => $settings['post_excerpt_default'],
 		);
 		$constants = array(
 			'slug'               => FML::SLUG,

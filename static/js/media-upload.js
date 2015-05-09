@@ -1069,6 +1069,10 @@
         }
       }
       // caption
+      //   if it's an image not in database, insert default caption template
+      if ( !photo_data.id ) {
+        photo_data.caption = constants.default_props.caption;
+      }
       if ( disable_form ) {
         $('label[data-setting="caption"] textarea',$attach_details).attr({ readonly: 'readonly' }).html(photo_data.caption);
       } else {

@@ -89,8 +89,9 @@ class FML implements FMLConstants
 			);
 		$this->plugin_basename    = plugin_basename($pluginFile);
 		$this->_post_metas        = array(
-			'api_data' => '_'.str_replace('-','_',self::SLUG).'_api_data',
-			'flickr_id' => '_flickr_id',
+			'flickr_id'        => '_flickr_id',
+			'api_data'         => '_'.str_replace('-','_',self::SLUG).'_api_data',
+			'caption_template' => '_post_excerpt_template',
 		);
 		$this->flickr_sizes = array(
 			'Square'       => __('Square', self::SLUG),
@@ -1471,7 +1472,98 @@ class FML implements FMLConstants
 		// Maybe it's a template??
 		return $this->template_process( $post, $variable ); //can be recursive :-(
 	}
+	//
+	// CAPTION TEMPLATE SUPPORT
+	//
+	/**
+	 * Saves the default caption values
+	 * 
+	 * @param  mixed  $post 
+	 * @return void
+	 */
+	static public function caption_create( $post ) {
+		$self = self::get_instance();
+		$self->caption_set_template( $post, $self->settings['post_excerpt_default'] );
+	}
+	static public function caption_read( $post ) {
+		$self = self::get_instance();
+		return $self->caption_get_template( $post );
+	}
+	/**
+	 * [refresh_caption description]
+	 * 
+	 * @param  mixed $post_id          WP_Post or integer
+	 * @param  mixed $caption_template if !false then save the captiont emplate
+	 * @return void
+	 */
+	static public function caption_update( $post, $caption_template = false ) {
+		if ( !is_object( $post ) ) {
+			$post = get_post( $post );
+		}
+		if ( !$post || ( $post->post_type != self:: POST_TYPE ) ) { return false; }
 
+		$self = self::get_instance();
+
+		if ( $caption_template === false ) {
+			$caption_template = $self->caption_get_template( $post );
+		}
+		$self->caption_set_template( $post, $caption_template );
+	}
+	/**
+	 * Remember, getting the caption is just post_excerpt
+	 * @param  mixed  $post_id WP_Post or post ID
+	 * @return string          the caption template HTML
+	 */
+	public function caption_get_template( $post ) {
+		if ( !is_object( $post ) ) {
+			$post = get_post( $post );
+		}
+		if ( !$post || ( $post->post_type != self:: POST_TYPE ) ) { return false; }
+		
+		return get_post_meta( $post->ID, $this->_post_metas['caption_template'], true );
+	}
+	public function caption_set_template( $post, $caption_template ) {
+		if ( !is_object( $post ) ) {
+			$post = get_post( $post );
+		}
+		if ( !$post || ( $post->post_type != self:: POST_TYPE ) ) { return; }
+		
+		update_post_meta( $post->ID, $this->_post_metas['caption_template'], $caption_template );
+		// also update post_excerpt
+		$caption = $this->parse_template( $post, $caption_template );
+		/* // cannot do because of recursion
+		$update = array(
+			'ID'           => $post->ID,
+			'post_excerpt' => $caption,
+		);
+		wp_update_post( $update );
+		*/
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_excerpt' => $caption ), array( 'ID' => $post->ID ) );
+		clean_post_cache( $post->ID );
+	}
+	public function parse_template( $post, $template ) {
+		// set context
+		if ( $post ) {
+			if ( !is_object( $post ) ) {
+				$post = get_post( $post );
+			}
+
+			if ( isset( $GLOBALS['post'] ) ) {
+				$_global_post = $GLOBALS['post'];
+				$GLOBALS['post'] = $post;
+				$caption = do_shortcode( $template );
+				$GLOBALS['post'] = $_global_post;
+			} else {
+				$GLOBALS['post'] = $post;
+				$caption = do_shortcode( $template );
+				unset($GLOBALS['post']);
+			}
+		} else {
+			$caption = do_shortcode( $template );
+		}
+		return $caption;
+	}
 	//
 	// PICTUREFILL SUPPORT
 	//
@@ -2384,6 +2476,10 @@ class FML implements FMLConstants
 			return false;
 		}
 		$post_id = self::_new_post_from_flickr_data( $data );
+
+		// you cannot create a capton until the post has been saved because
+		// template variables are built from the post data
+		self::caption_create( $post_id );
 		return $post_id;
 	}
 	/**
@@ -2503,7 +2599,9 @@ class FML implements FMLConstants
 	}
 	// PRIVATE METHODS
 	/**
-	 * Generates a new post from the flickr data given
+	 * Generates a new post from the flickr data given.
+	 *
+	 * Also updates caption (to save an extra db call)
 	 * @param  [type] $data [description]
 	 * @return [type]       [description]
 	 */
