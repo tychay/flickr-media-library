@@ -587,7 +587,7 @@ class FMLAdmin
 		$settings['templates']['__new__'] = '';
 
 		$template_selected='__new__';
-		if ( $_POST['template'] ) {
+		if ( !empty( $_POST['template'] ) ) {
 			if ( array_key_exists( $_POST['template'], $templates ) ) {
 				$template_selected = $_POST['template'];
 			}
