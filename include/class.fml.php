@@ -2093,7 +2093,7 @@ class FML implements FMLConstants
 	        'caption'           => '',
 	        'created_timestamp' => 0,
 	        'copyright'         => '',
-	        'focal_length'      => ( empty( $exif['Focal Length'] ) ) ? 0 : $exif['Focal Length']['raw'],
+	        'focal_length'      => ( empty( $exif['Focal Length'] ) ) ? 0 : floatval( $exif['Focal Length']['raw'] ),
 	        'iso'               => ( empty( $exif['ISO Speed'] ) ) ? 0 : intval($exif['ISO Speed']['raw']),
 	        'shutter_speed'     => ( empty( $exif['Exposure'] ) ) ? 0 : wp_exif_frac2dec( $exif['Exposure']['raw'] ),
 	        'title'             => '',
