@@ -539,7 +539,7 @@ class FML implements FMLConstants
 				return ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 			case 'templates':
 				return apply_filters( 'fml_templates_default', array(
-					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="website flickr">flickr</span>',
+					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="trademark flickr">flickr</span>',
 					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE,photo}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
 				) );
 		}
