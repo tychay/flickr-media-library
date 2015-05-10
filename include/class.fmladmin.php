@@ -676,7 +676,7 @@ class FMLAdmin
 			'icon'   => '', // core has already this to be 80px wide
 			'title'  => $cols['title'],
 			'tags'   => $cols['tags'],
-			'parent' => _x( 'Uploaded to', 'column name' ), // from class-wp-media-list-table.php
+			//'parent' => _x( 'Uploaded to', 'column name' ), // from class-wp-media-list-table.php
 			'date'   => $cols['date'],
 		);
 		return $return;
@@ -699,6 +699,7 @@ class FMLAdmin
 				list( $img_src, $width, $height ) = image_downsize( $post_id, 'Large Square' );
 				printf('<img src="%s" alt="" width="75" height="75" />', $img_src );
 				break;
+			/* // disabling parents
 			case 'parent':
 				$parent = ( $post->post_parent > 0 ) ? get_post( $post->post_parent ) : false;
 				$user_can_edit = $user_can_edit = current_user_can( 'edit_post', $post_id );
@@ -741,6 +742,7 @@ class FMLAdmin
 					}
 				}
 				break;
+			/* */
 		}
 	}
 	// EDIT (post.php)
@@ -874,6 +876,12 @@ class FMLAdmin
 	public function handle_caption_template_meta_box_form( $post_id ) {
 		if ( isset( $_POST['post_excerpt_template'] ) ) {
 			FML::caption_update( $post_id, wp_unslash( $_POST['post_excerpt_template'] ), true );
+		}
+		// TODO: clean out old post hiearchy tempoarily
+		if ( 0 != $post_id) {
+			global $wpdb;
+			$wpdb->update( $wpdb->posts, array( 'post_parent' => 0 ), array( 'ID' => $post_id ) );
+			clean_post_cache( $post_id );
 		}
 	}
 	/**
@@ -1056,9 +1064,11 @@ class FMLAdmin
 				if ( current_user_can( 'edit_post', $id ) ) {
 					// just in case…
 					if ( empty( $_POST['post_id'] ) ) { $_POST['post_id'] = 0; }
+					/* // disabling post hierarchy due to URL breakages
 					if ( 0 == $post->post_parent && $insert_into_post_id = intval( $_POST['post_id'] ) ) {
 						wp_update_post( array( 'ID' => $id, 'post_parent' => $insert_into_post_id ) );
 					}
+					*/
 				}
 				$url = '';
 				$rel = false;
@@ -1132,12 +1142,14 @@ class FMLAdmin
 					) );
 				}
 				$attached = false;
+				/* // This messes with URLs in an unintended manner
 				if ( current_user_can( 'edit_post', $id ) ) {
 					if ( 0 == $post->post_parent && $insert_into_post_id = intval( $_POST['post_id'] ) ) {
 						wp_update_post( array( 'ID' => $id, 'post_parent' => $insert_into_post_id ) );
 						$attached = true;
 					}
 				}
+				*/
 				$return = array(
 					'status'        => 'ok',
 					'attached'      => $attached,
