@@ -319,6 +319,44 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 	</form>
 <?php
 			break;
+		case 'template_options':
+			$form_id = $form_ids['template_options'];
+			$is_new = true;
+			if ( $is_new ) {
+				$new_class='';
+				$update_class=' hidden';
+			} else {
+				$new_class=' hidden';
+				$update_class='';
+			}
+?>
+	<form method="post" id="template_options_form">
+		<?php wp_nonce_field($form_ids['template_options'].'-verify'); ?>
+		<input type="hidden" name="action" value="<?php echo $form_ids['template_options']; ?>" />
+		<h3 class="title"><?php _e('Edit Templates', FML::SLUG); ?></h3>
+		<div>
+			<strong><label for="TODO"><?php _e('Select template to edit:'); ?> </label></strong>
+			<?php
+			_page_input_select( $form_id, 'template', $templates, '__new__' );
+			foreach( $settings['templates'] as $template_id=>$template_content ) {
+				printf(
+					'<input class="hidden" id="template_%1$s" name="templates[%1$s]" value="%2$s" />',
+					esc_attr($template_id),
+					esc_attr($template_content)
+				);
+			}
+			?>
+			<input id="new_template_name" name="new_template_name" value="" class="code<?php echo $new_class; ?>"/>
+		</div>
+		<div id="template">
+			<textarea cols="70" rows="30" name="content" id="content"></textarea>
+		</div>
+		<p class="submit">
+			<?php submit_button(__('Update Template'), 'primary'.$update_class, 'submit_update', false); ?>
+			<?php submit_button(__('Delete Template'), 'delete'.$update_class, 'submit_delete', false ); ?>
+			<?php submit_button(__('Create Template'), 'primary'.$new_class, 'submit_add', false ); ?>
+		</p>
+<?php
 	endswitch;
 
 	// Inject the hidden column table for screen options

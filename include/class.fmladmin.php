@@ -61,29 +61,33 @@ class FMLAdmin
 			'page_options'     => FML::SLUG.'-settings',
 			'permalink_slug'   => FML::SLUG.'-base',
 			'forms'            => array(
-				'flickr_auth'    => FML::SLUG.'-flickr-auth',
-				'flickr_deauth'  => FML::SLUG.'-flickr-deauth',
-				'flickr_options' => FML::SLUG.'-flickr_options',
-				'cpt_options'    => FML::SLUG.'-cpt_options',
-				'output_options' => FML::SLUG.'-output_options',
+				'flickr_auth'      => FML::SLUG.'-flickr-auth',
+				'flickr_deauth'    => FML::SLUG.'-flickr-deauth',
+				'flickr_options'   => FML::SLUG.'-flickr_options',
+				'cpt_options'      => FML::SLUG.'-cpt_options',
+				'output_options'   => FML::SLUG.'-output_options',
+				'template_options' => FML::SLUG.'-template_options',
 			),
 			'ajax_action'      => str_replace('-','_',FML::SLUG).'_api',
 			'tab_media_upload' => str_replace('-','_',FML::SLUG).'_insert_flickr',
 		);
 
 		$this->_options_tabs = array(
-			'flickr_options' => __( 'Flickr API', FML::SLUG ),
-			'cpt_options'    => __( 'Custom Post', FML::SLUG ),
-			'output_options' => __( 'Editing &amp; Output', FML::SLUG ),
+			'flickr_options'   => __( 'Flickr API', FML::SLUG ),
+			'cpt_options'      => __( 'Custom Post', FML::SLUG ),
+			'output_options'   => __( 'Editing &amp; Output', FML::SLUG ),
+			'template_options' => __( 'Templates', FML::SLUG ),
 		);
 		$this->_options_help_tabs = array(
-			'flickr_options' => array(
+			'flickr_options'   => array(
 				FML::SLUG.'-help-flickrauth' => __('Flickr authorization', FML::SLUG),
 			),
-			'cpt_options'    => array(
+			'cpt_options'      => array(
 				FML::SLUG.'-help-cptoptions' => __('Custom Post Type options', FML::SLUG),
 			),
-			'output_options'  => array(
+			'output_options'    => array(
+			),
+			'template_options'  => array(
 			),
 		);
 		// I am removing the verb and the period to standardize on columns
@@ -474,6 +478,43 @@ class FMLAdmin
 		//var_dump($this->_fml->settings);die;
 	}
 	/**
+	 * Form request ot handle options page for creating, updating, deleting templates
+	 * @return void
+	 */
+	public function options_handle_template_options() {
+		check_admin_referer( $this->_ids['forms']['template_options'] . '-verify' );
+		$templates = $this->_fml->settings['templates'];
+		$changed = false;
+		if ( empty( $_POST['template'] ) ) { return; }
+		if ( !empty($_POST['submit_update'] ) ) {
+			// don't allow empty content (template should be deleted instead)
+			if ( array_key_exists( $_POST['template'], $templates ) && !empty( $_POST['content'] ) ) {
+				$templates[ $_POST['template'] ] = wp_unslash( $_POST['content'] );
+				$changed = true;
+			}
+		} elseif ( !empty( $_POST['submit_delete'] ) ) {
+			// handle deletion
+			if ( array_key_exists( $_POST['template'], $templates ) ) {
+				unset( $templates[ $_POST['template'] ] );
+				$changed = true;
+				unset( $_POST['template'] ); // don't try to select it in UI
+			}
+		} elseif ( !empty( $_POST['submit_add'] ) ) {
+			if ( !empty( $_POST['new_template_name'] ) && !empty( $_POST['content'] ) ) {
+				$temp_name = preg_replace( '![^a-z0-9_]!ims', '', $_POST['new_template_name'] );
+				if ( $temp_name && !array_key_exists( $temp_name, $templates ) ) {
+					$templates[ $temp_name ] = wp_unslash( $_POST['content'] );
+					$changed = true;
+					$_POST['template'] = $temp_name; // select newly created template
+				}
+			}
+		}
+		//var_dump($_POST,$changed,$templates);die;
+		if ( $changed ) {
+			$this->_options_update_settings( array( 'templates' => $templates ) );
+		}
+	}
+	/**
 	 * Utility function to update fml::settings and then report it to UI
 	 * 
 	 * @param  array  $settings settings to change
@@ -534,6 +575,14 @@ class FMLAdmin
 		$cb_licenses         = $this->_fml->flickr_licenses;
 		// add "full" size
 		$select_sizes['full'] = __('Full',FML::SLUG);
+
+		$templates = array(
+			'__new__' => __('Add New Template'),
+		);
+		foreach ( $settings['templates'] as $name=>$value ) {
+			$templates[ $name ] = $name;
+		}
+		$settings['templates']['__new__'] = '';
 
 		include $this->_fml->template_dir.'/page.settings.php';
 	}

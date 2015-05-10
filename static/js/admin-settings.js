@@ -40,6 +40,25 @@
 
 		});
 
+		// handle template editing select box
+		$('#flickr-media-library-template_options-template').change( function(ev) {
+			var $this = $(this);
+			var content = $('#template_'+$this.val()).val();
+			$('#content').val( content );
+			if ( $this.val() == '__new__' ) {
+				$('#submit_update').addClass('hidden');
+				$('#submit_delete').addClass('hidden');
+				$('#submit_add').removeClass('hidden');
+				$('#new_template_name').removeClass('hidden');
+			} else {
+				$('#submit_update').removeClass('hidden');
+				$('#submit_delete').removeClass('hidden');
+				$('#submit_add').addClass('hidden');
+				$('#new_template_name').addClass('hidden');
+			}
+
+		});
+
 		// handle showing warnings
 		$('#flickr-media-library-cpt_options-post_date_map').change(function(ev) {
 			var $this = $(this);
