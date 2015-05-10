@@ -321,8 +321,7 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			break;
 		case 'template_options':
 			$form_id = $form_ids['template_options'];
-			$is_new = true;
-			if ( $is_new ) {
+			if ( !$template_selected || ( $template_selected == '__new__' ) ) {
 				$new_class='';
 				$update_class=' hidden';
 			} else {
@@ -337,7 +336,7 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<div>
 			<strong><label for="TODO"><?php _e('Select template to edit:'); ?> </label></strong>
 			<?php
-			_page_input_select( $form_id, 'template', $templates, '__new__' );
+			_page_input_select( $form_id, 'template', $edit_templates, $template_selected );
 			foreach( $settings['templates'] as $template_id=>$template_content ) {
 				printf(
 					'<input class="hidden" id="template_%1$s" name="templates[%1$s]" value="%2$s" />',
@@ -349,7 +348,7 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			<input id="new_template_name" name="new_template_name" value="" class="code<?php echo $new_class; ?>"/>
 		</div>
 		<div id="template">
-			<textarea cols="70" rows="30" name="content" id="content"></textarea>
+			<textarea cols="70" rows="30" name="content" id="content"><?php echo esc_textarea( $settings['templates'][$template_selected]); ?></textarea>
 		</div>
 		<p class="submit">
 			<?php submit_button(__('Update Template'), 'primary'.$update_class, 'submit_update', false); ?>

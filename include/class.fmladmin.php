@@ -576,13 +576,22 @@ class FMLAdmin
 		// add "full" size
 		$select_sizes['full'] = __('Full',FML::SLUG);
 
-		$templates = array(
+		$templates = array();
+		$edit_templates = array(
 			'__new__' => __('Add New Template'),
 		);
 		foreach ( $settings['templates'] as $name=>$value ) {
-			$templates[ $name ] = $name;
+			$templates[ $name ]      = $name;
+			$edit_templates[ $name ] = $name;
 		}
 		$settings['templates']['__new__'] = '';
+
+		$template_selected='__new__';
+		if ( $_POST['template'] ) {
+			if ( array_key_exists( $_POST['template'], $templates ) ) {
+				$template_selected = $_POST['template'];
+			}
+		}
 
 		include $this->_fml->template_dir.'/page.settings.php';
 	}
