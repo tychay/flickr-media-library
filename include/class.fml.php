@@ -542,6 +542,11 @@ class FML implements FMLConstants
 				return apply_filters( 'fml_templates_default', array(
 					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="trademark flickr">flickr</span></a>',
 					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE,photo}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
+					'terry_photo_format' => '<b>{{html:POST_TITLE,Untitled}}</b><br />
+{{?COUNTRY}}{{?_venue}}{{_venue}}, {{/?_venue}}{{?REGION}}{{REGION}}, {{/?REGION}}{{COUNTRY}}<br />{{/?COUNTRY}}
+<br />
+{{?CAMERA_CLEAN}}<i>{{CAMERA_CLEAN}}{{?LENS}}, {{LENS}}{{/?LENS}}<br />
+{{?EXPOSURE_CLEAN}}{{EXPOSURE_CLEAN}} @ {{/?EXPOSURE_CLEAN}}{{APERTURE_CLEAN}}{{?ISO}}, iso{{ISO}}{{/?ISO}}{{?FOCAL_LENGTH_CLEAN}}, {{FOCAL_LENGTH_CLEAN}}{{/?FOCAL_LENGTH_CLEAN}}{{?FOCAL_LENGTH_35}} ({{FOCAL_LENGTH_35}}){{/?FOCAL_LENGTH_35}}</i>{{/?CAMERA_CLEAN}}',
 				) );
 		}
 		return false;
