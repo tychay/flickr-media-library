@@ -1436,6 +1436,7 @@ class FML implements FMLConstants
 			$html = preg_replace_callback('!\{\{\?([a-zA-Z0-9_]+)\}\}(.+)\{\{\/\?\1\}\}!ms', array( $this, 'template_replace_condition' ), $html );
 			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+),?(\w*)\}\}!ms', array($this,'template_replace_variable'), $html );
 		} while ( $html != $html_old );
+		//var_dump($html); die;
 		return $html;
 	}
 	public function template_replace_variable( $matches ) {
@@ -1474,6 +1475,17 @@ class FML implements FMLConstants
 			$metadata = wp_get_attachment_metadata( $post->ID );
 		}
 
+		// check if it's a explicit call for parameter
+		if ( array_key_exists( $variable, $this->_template_params ) ) {
+			return $this->_template_params[$variable];
+		}
+		// allow parameters to override any variables/template, remember that
+		// params must be lower case due to limitation of shortcode processor
+		$maybe_param = '_'.strtolower($variable);
+		if ( array_key_exists( $maybe_param, $this->_template_params ) ) {
+			return $this->_template_params[$maybe_param];
+		}
+		//var_dump(array($metadata,$flickr_data));
 		switch ( $variable ) {
 			case 'POST_TITLE':
 				return $post->post_title;
@@ -1484,27 +1496,6 @@ class FML implements FMLConstants
 			case 'FILE':
 				$key = strtolower( $variable );
 				return ( array_key_exists( $key, $metadata ) ) ? $metadata[$key] : false;
-			case 'APERTURE':
-			case 'CREDIT':
-			case 'CAMERA':
-			case 'CREATED_TIMESTAMP':
-			case 'COPYRIGHT':
-			case 'FOCAL_LENGTH':
-			case 'ISO':
-			case 'SHUTTER_SPEED':
-			case 'TITLE':
-			case 'ORIENTATION':
-			case 'EXPOSURE_BIAS':
-			case 'FLASH':
-			case 'CAMERA_CLEAN':
-			case 'EXPOSURE_CLEAN':
-			case 'APERTURE_CLEAN':
-			case 'FOCAL_LENGTH_CLEAN':
-			case 'FOCAL_LENGTH_35':
-			case 'LENS':
-			case 'EXPOSURE_PROGRAM':
-				$key = strtolower( $variable );
-				return ( array_key_exists( $key, $metadata['image_meta'] ) ) ? $metadata['image_meta'][$key] : false;
 			case 'FLICKR_ID':
 			case 'FLICKR_SECRET':
 			case 'FLICKR_SERVER':
@@ -1541,11 +1532,14 @@ class FML implements FMLConstants
 			// TODO: DATES
 			// TODO: PERMISSIONS, VIEWS, EDITABILITY, PUBLIC EDITABILITY, USAGE, COMMENTS, NOTES, PEOPLE
 		}
-		// check if it's a parameter
-		if ( array_key_exists( $variable, $this->_template_params ) ) {
-			return $this->_template_params[$variable];
+		// Check image_meta
+		$maybe_imagemeta = strtolower( $variable );
+		if ( array_key_exists( $maybe_imagemeta, $metadata['image_meta'] ) ) {
+			if ( $maybe_imagemeta != '_flickr' ) {
+				return $metadata['image_meta'][$maybe_imagemeta];
+			}
 		}
-		//var_dump(array($metadata,$flickr_data));
+
 		// Maybe it's a template??
 		return $this->template_parse( $variable ); //can be recursive :-(
 	}
@@ -2240,22 +2234,59 @@ class FML implements FMLConstants
 	    if ( !empty( $flickr_data['camera'] ) ) {
 	    	$meta['camera_clean'] = $flickr_data['camera'];
 	    }
-	    if ( !empty( $exif['Exposure'] ) ) {
-	    	$meta['exposure_clean'] = $exif['Exposure']['clean'];
-	    }
 	    if ( !empty( $exif['Aperture'] ) ) {
 	    	$meta['aperture_clean'] = $exif['Aperture']['clean'];
 	    }
 	    if ( !empty( $exif['Date and Time (Origninal)'] ) ) {
 	    	$meta['created_timestamp_clean'] = $exif['Date and Time (Original)']['clean'];
 	    }
+	    if ( !empty( $exif['Exposure'] ) ) {
+	    	$meta['exposure_clean'] = $exif['Exposure']['clean'];
+	    }
 	    if ( !empty( $exif['Focal Length'] ) ) {
 	    	$meta['focal_length_clean'] = $exif['Focal Length']['clean'];
+	    }
+	    //    exposure_bias_clean = Exposure Bias Clean
+	    if ( !empty( $exif['Exposure Bias'] ) ) {
+	    	$meta['exposure_bias_clean'] = $exif['Exposure Bias']['clean'];
+	    }
+	    // ExposureMode
+	    //    Flickr handles it better and will auto extract it from EXIF
+	    //    so prefer that
+	    if ( !empty( $flickr_data['location'] ) ) {
+	    	if ( !empty( $flickr_data['location']['latitude'] ) ) {
+	    		$meta['latitude_clean'] = $flickr_data['location']['latitude'];
+	    	}
+	    	if ( !empty( $flickr_data['location']['longitude'] ) ) {
+	    		$meta['longitude_clean'] = $flickr_data['location']['longitude'];
+	    	}
+	    	if ( !empty( $flickr_data['location']['locality'] ) ) {
+	    		$meta['locality'] = $flickr_data['location']['locality']['_content'];
+	    	}
+	    	if ( !empty( $flickr_data['location']['county'] ) ) {
+	    		$meta['county'] = $flickr_data['location']['county']['_content'];
+	    	}
+	    	if ( !empty( $flickr_data['location']['region'] ) ) {
+	    		$meta['region'] = $flickr_data['location']['region']['_content'];
+	    	}
+	    	if ( !empty( $flickr_data['location']['country'] ) ) {
+	    		$meta['country'] = $flickr_data['location']['country']['_content'];
+	    	}
+	    }
+	    //    exposure_program = Exposure Program 
+	    if ( !empty( $exif['Exposure Program'] ) ) {
+	    	$meta['exposure_program'] = $exif['Exposure Program']['raw'];
 	    }
 	    //    focal_length_35 = Focal Length (35mm format)
 	    if ( !empty( $exif['Focal Length (35mm format)'] ) ) {
 	    	$meta['focal_length_35'] = $exif['Focal Length (35mm format)']['raw'];
 	    }
+	    // GPS Altitiude
+		// GPS Altitude Ref
+		// GPS Date Stamp
+		// GPS Speed
+		// GPS SPeed Ref
+		// GPS TIme Stamp
 		//     lens = Lens || Lens Make + Model
 		if ( !empty( $exif['Lens'] ) ) {
 			$meta['lens'] = $exif['Lens']['raw'];
@@ -2276,22 +2307,7 @@ class FML implements FMLConstants
 	    if ( !empty( $exif['Lens Info'] ) ) {
 	    	$meta['lens_info'] = $exif['Lens Info']['raw'];
 	    }
-	    // GPS Altitiude
-		// GPS Altitude Ref
-		// GPS Date Stamp
-		// GPS Speed
-		// GPS SPeed Ref
-		// GPS TIme Stamp
 	    // Metering Mode
-	    // ExposureMode
-	    //    exposure_program = Exposure Program 
-	    if ( !empty( $exif['Exposure Program'] ) ) {
-	    	$meta['exposure_program'] = $exif['Exposure Program']['raw'];
-	    }
-	    //    exposure_bias = Exposure Bias Clean
-	    if ( !empty( $exif['Exposure Bias'] ) ) {
-	    	$meta['exposure_bias'] = $exif['Exposure Bias']['clean'];
-	    }
 	    // City, Provice- State, Country- Primary Location Name
 	    $meta['_flickr'] = $exif;
 
