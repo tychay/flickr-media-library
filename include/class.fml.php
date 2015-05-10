@@ -64,6 +64,7 @@ class FML implements FMLConstants
 	 * @var WP_Post|false
 	 */
 	private $_template_post = false;
+	private $_template_params = array();
 	//
 	// CONSTRUCTORS AND DESTRUCTORS
 	//
@@ -1391,6 +1392,13 @@ class FML implements FMLConstants
 			'template'  => apply_filters( 'fml_template_shortcode_default', '', $raw_atts ),
 		);
 		$atts = shortcode_atts( $default_atts, $raw_atts, self::TEMPLATE_SHORTCODE );
+		// troll for template parameters
+		$params = array();
+		foreach ( $raw_atts as $key=>$value ) {
+			if ( substr($key,0,1) == '_' ) {
+				$params[$key] = $value;
+			}
+		}
 		// Try to deduce what post the template is for
 		$post = false;
 		if ( !$atts['id'] ) {
@@ -1403,15 +1411,20 @@ class FML implements FMLConstants
 		} else {
 			$post = get_post( $atts['id'] );
 		}
-		return apply_filters( 'fml_template_shortcode', $this->template_process( $post, $atts['template'], ( $content ) ? $content : false ), $atts, $content, $context );
+		return apply_filters( 'fml_template_shortcode', $this->template_process( $post, $atts['template'], $params, ( $content ) ? $content : false ), $atts, $content, $context );
 	}
-	public function template_process( $post, $template_name='', $html=false ) {
+	public function template_process( $post, $template_name='', $params=array(), $html=false ) {
 		//$this->settings_reset(); var_dump($this->settings);
 		if ( !is_object( $post ) ) {
 			$post = get_post( $post );
 		}
 		if ( !$post || ( $post->post_type != self:: POST_TYPE ) ) { return false; }
 		$this->_template_post = $post;
+		$this->_template_params = $params;
+		$html = $this->template_parse( $template_name, $html );
+		return apply_filters( 'fml_template_process', $html, $post, $template_name );
+	}
+	public function template_parse( $template_name, $html=false ) {
 		$settings = $this->settings;
 		if ( $template_name && array_key_exists( $template_name, $settings['templates'] ) ) {
 			$html = $settings['templates'][$template_name];
@@ -1420,9 +1433,10 @@ class FML implements FMLConstants
 		if ( $html === false ) { return false; }
 		do {
 			$html_old = $html;
-			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+),?(\w*)\}\}!', array($this,'template_replace_variable'), $html );
+			$html = preg_replace_callback('!\{\{\?([a-zA-Z0-9_]+)\}\}(.+)\{\{\/\?\1\}\}!ms', array( $this, 'template_replace_condition' ), $html );
+			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+),?(\w*)\}\}!ms', array($this,'template_replace_variable'), $html );
 		} while ( $html != $html_old );
-		return apply_filters( 'fml_template_process', $html, $post, $template_name );
+		return $html;
 	}
 	public function template_replace_variable( $matches ) {
 		$filter = $matches[1];
@@ -1443,6 +1457,13 @@ class FML implements FMLConstants
 		}
 		return $return;
 	}
+	public function template_replace_condition( $matches ) {
+		if ( $this->_template_variable( $matches[1] ) ) {
+			return $matches[2];
+		} else {
+			return '';
+		}
+	}
 	private function _template_variable( $variable, $flickr_data = false, $metadata = false ) {
 		if ( !$this->_template_post ) { return false; }
 		$post = $this->_template_post;
@@ -1456,21 +1477,77 @@ class FML implements FMLConstants
 		switch ( $variable ) {
 			case 'POST_TITLE':
 				return $post->post_title;
-			case 'FLICKR_PHOTO_URL':
-			case 'FLICKR_PHOTOPAGE':
-				return self::get_flickr_link( $post );
+			case 'POST_CONTENT':
+				return $post->post_content;
+			case 'WIDTH':
+			case 'HEIGHT':
+			case 'FILE':
+				$key = strtolower( $variable );
+				return ( array_key_exists( $key, $metadata ) ) ? $metadata[$key] : false;
+			case 'APERTURE':
+			case 'CREDIT':
+			case 'CAMERA':
+			case 'CREATED_TIMESTAMP':
+			case 'COPYRIGHT':
+			case 'FOCAL_LENGTH':
+			case 'ISO':
+			case 'SHUTTER_SPEED':
+			case 'TITLE':
+			case 'ORIENTATION':
+			case 'EXPOSURE_BIAS':
+			case 'FLASH':
+			case 'CAMERA_CLEAN':
+			case 'EXPOSURE_CLEAN':
+			case 'APERTURE_CLEAN':
+			case 'FOCAL_LENGTH_CLEAN':
+			case 'FOCAL_LENGTH_35':
+			case 'LENS':
+			case 'EXPOSURE_PROGRAM':
+				$key = strtolower( $variable );
+				return ( array_key_exists( $key, $metadata['image_meta'] ) ) ? $metadata['image_meta'][$key] : false;
+			case 'FLICKR_ID':
+			case 'FLICKR_SECRET':
+			case 'FLICKR_SERVER':
+			case 'FLICKR_FARM':
+			case 'FLICKR_DATEUPLOADED':
+			case 'FLICKR_ISFAVORITE':
+			case 'FLICKR_LICENSE':
+			case 'FLICKR_SAFETY_LEVEL':
+			case 'FLICKR_ROTATION':
+			case 'FLICKR_ORIGINALSECRET':
+			case 'FLICKR_ORIGINALFORMAT':
+			case 'FLICKR_VIEWS':
+				$key = strtolower( substr( $variable, 7 ) );
+				return ( array_key_exists( $key, $flickr_data ) ) ? $flickr_data[$key] : false;
+			case 'FLICKR_OWNER_NSID':
+			case 'FLICKR_OWNER_USERNAME':
 			case 'FLICKR_OWNER_REALNAME':
-				return $flickr_data['owner']['realname'];
+			case 'FLICKR_OWNER_LOCATION':
+			case 'FLICKR_OWNER_ICONSERVER':
+			case 'FLICKR_OWNER_ICONFARM':
+			case 'FLICKR_OWNER_PATH_ALIAS':
+				$key = strtolower( substr( $variable, 13 ) );
+				return ( array_key_exists( $key, $flickr_data['owner'] ) ) ? $flickr_data['owner'][$key] : false;
 			case 'FLICKR_OWNER_PEOPLE_URL':
 				// TODO better formatting here, also good idea to check if
 				// I need to use NSID (does flickr ever return empty/missing username?)
-				return 'https://flickr.com/people/'.$flickr_data['owner']['username'];
+				return 'https://flickr.com/people/'.$flickr_data['owner']['path_alias'];
 			case 'FLICKR_OWNER_PHOTOS_URL':
-				return 'https://flickr.com/photos/'.$flickr_data['owner']['username'];
+				return 'https://flickr.com/photos/'.$flickr_data['owner']['path_alias'];
+				//      'owner' => 
+			case 'FLICKR_PHOTO_URL':
+			case 'FLICKR_PHOTOPAGE':
+				return self::get_flickr_link( $post );
+			// TODO: DATES
+			// TODO: PERMISSIONS, VIEWS, EDITABILITY, PUBLIC EDITABILITY, USAGE, COMMENTS, NOTES, PEOPLE
+		}
+		// check if it's a parameter
+		if ( array_key_exists( $variable, $this->_template_params ) ) {
+			return $this->_template_params[$variable];
 		}
 		//var_dump(array($metadata,$flickr_data));
 		// Maybe it's a template??
-		return $this->template_process( $post, $variable ); //can be recursive :-(
+		return $this->template_parse( $variable ); //can be recursive :-(
 	}
 	//
 	// CAPTION TEMPLATE SUPPORT
@@ -2098,7 +2175,6 @@ class FML implements FMLConstants
 	        'shutter_speed'     => ( empty( $exif['Exposure'] ) ) ? 0 : wp_exif_frac2dec( $exif['Exposure']['raw'] ),
 	        'title'             => '',
 	        'orientation'       => ( empty( $exif['Orientation'] ) ) ? 0 : $exif['Orientation']['raw'],
-	        '_flickr'           => $exif
 	    );
 
 	    // 3. Handle more complex default meta
@@ -2160,11 +2236,30 @@ class FML implements FMLConstants
 	    // Lens was commented out
 
 	    // 5. Handle FML-specific meta
+	    //    camera_clean = flickr data
+	    if ( !empty( $flickr_data['camera'] ) ) {
+	    	$meta['camera_clean'] = $flickr_data['camera'];
+	    }
+	    if ( !empty( $exif['Exposure'] ) ) {
+	    	$meta['exposure_clean'] = $exif['Exposure']['clean'];
+	    }
+	    if ( !empty( $exif['Aperture'] ) ) {
+	    	$meta['aperture_clean'] = $exif['Aperture']['clean'];
+	    }
+	    if ( !empty( $exif['Date and Time (Origninal)'] ) ) {
+	    	$meta['created_timestamp_clean'] = $exif['Date and Time (Original)']['clean'];
+	    }
+	    if ( !empty( $exif['Focal Length'] ) ) {
+	    	$meta['focal_length_clean'] = $exif['Focal Length']['clean'];
+	    }
 	    //    focal_length_35 = Focal Length (35mm format)
 	    if ( !empty( $exif['Focal Length (35mm format)'] ) ) {
 	    	$meta['focal_length_35'] = $exif['Focal Length (35mm format)']['raw'];
 	    }
-		//     lens = Lens Make
+		//     lens = Lens || Lens Make + Model
+		if ( !empty( $exif['Lens'] ) ) {
+			$meta['lens'] = $exif['Lens']['raw'];
+		}
 	    if ( !empty( $exif['Lens Make'] ) ) {
 	    	$meta['lens'] = $exif['Lens Make']['raw'];
 	    }
@@ -2187,13 +2282,18 @@ class FML implements FMLConstants
 		// GPS Speed
 		// GPS SPeed Ref
 		// GPS TIme Stamp
-	    // Aperture clean
 	    // Metering Mode
 	    // ExposureMode
-	    // Exposure Program
-	    // Exposure Bias Clean
-	    // Exposure clean
+	    //    exposure_program = Exposure Program 
+	    if ( !empty( $exif['Exposure Program'] ) ) {
+	    	$meta['exposure_program'] = $exif['Exposure Program']['raw'];
+	    }
+	    //    exposure_bias = Exposure Bias Clean
+	    if ( !empty( $exif['Exposure Bias'] ) ) {
+	    	$meta['exposure_bias'] = $exif['Exposure Bias']['clean'];
+	    }
 	    // City, Provice- State, Country- Primary Location Name
+	    $meta['_flickr'] = $exif;
 
 	    // 6. Make all fields post safe (esp description)
 	    foreach ( $meta as $key=>$value ) {
