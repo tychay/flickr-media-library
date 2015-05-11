@@ -310,16 +310,31 @@ class FMLAdmin
 		add_filter( 'get_user_option_manage'.$screen->id.'columnshidden', array( $this, 'options_get_hidden_columns' ) );
 
 		// Enqueue Settings-specific Javascript (controls screenoptions)
-		wp_enqueue_script(
-			FML::SLUG.'-screen-settings', //handle
-			$this->_fml->static_url.'/js/admin-settings.js', //src
-			array( 'jquery' ), //dependencies ajax
-			FML::VERSION, //version
-			true //in footer?
-		);
-		
+		add_action( 'admin_enqueue_scripts', array($this,'options_enqueue_scripts') );
+
 		// debugging: clear options to test default
 		//delete_user_option( get_current_user_id(), 'manage'.$screen->id.'columnshidden', true );
+	}
+	public function options_enqueue_scripts() {
+		wp_register_script(
+			FML::SLUG.'-options',                             //handle
+			$this->_fml->static_url.'/js/admin-settings.js',  //src
+			array( 'jquery' ),                                //dependencies ajax
+			FML::VERSION,                                     //version
+			true                                              //in footer?
+		);
+		$templates = $this->_fml->settings['templates'];
+		$templates['__new__'] = '';
+		$data = array(
+			'confirm'   => __('Are you sure?',FML::SLUG),
+			'templates' => $templates,
+		);
+		wp_localize_script(
+			FML::SLUG.'-options', //handle
+			'FMLOptionsConst',
+			$data
+		);
+		wp_enqueue_script( FML::SLUG.'-options' );
 	}
 	/**
 	 * Form request to (start) Flickr oAuth.
@@ -515,8 +530,10 @@ class FMLAdmin
 					$_POST['template'] = $temp_name; // select newly created template
 				}
 			}
+		} elseif ( !empty( $_POST['submit_reset'] ) ) {
+			$templates = $this->_fml->settings_default( 'templates' );
+			$changed = true;
 		}
-		//var_dump($_POST,$changed,$templates);die;
 		if ( $changed ) {
 			$this->_options_update_settings( array( 'templates' => $templates ) );
 		}

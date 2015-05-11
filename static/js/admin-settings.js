@@ -1,6 +1,7 @@
-( function( window, $, undefined ) {
+( function( window, $, constants ) {
 	'use strict';
 
+	//console.log(constants);
 	//var $window = $( window ),
 	//	$document = $( document );
 
@@ -15,6 +16,7 @@
 			$this.attr('href', $this._href+'?TB_iframe=true&width='+($window.width()-100)+'&height='+($window.height()-100) ).addClass('thickbox');
 			// do not prevent default
 		});
+
 		// bind the checkboxes to hide/show display_<cbox_id> classes
 		$('.hide-column-tog', '#adv-settings').change( function() {
 			var $this = $(this), id = $this.val();
@@ -40,10 +42,17 @@
 
 		});
 
+		// add confirm to reset forms
+		$('#submit_reset').click( function(e) {
+			if ( !window.confirm( constants.confirm ) ) {
+				e.preventDefault();
+			}
+		});
+
 		// handle template editing select box
-		$('#flickr-media-library-template_options-template').change( function(ev) {
+		$('#flickr-media-library-template_options-template').change( function() {
 			var $this = $(this);
-			var content = $('#template_'+$this.val()).val();
+			var content = constants.templates[$this.val()];
 			$('#content').val( content );
 			if ( $this.val() == '__new__' ) {
 				$('#submit_update').addClass('hidden');
@@ -57,7 +66,8 @@
 				$('#new_template_name').addClass('hidden');
 			}
 
-		});
+		}).change(); //ping the change() in case the user hit the back button
+
 
 		// handle showing warnings
 		$('#flickr-media-library-cpt_options-post_date_map').change(function(ev) {
@@ -78,4 +88,4 @@
 		}).change();
 	});
 
-} )( window, window.jQuery );
+} )( window, window.jQuery, FMLOptionsConst );

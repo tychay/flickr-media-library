@@ -353,18 +353,13 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<input type="hidden" name="action" value="<?php echo $form_ids['template_options']; ?>" />
 		<h3 class="title"><?php _e('Edit Templates', FML::SLUG); ?></h3>
 		<div>
-			<strong><label for="<?php echo $form_id.'-template'; ?>"><?php _e('Select template to edit:'); ?> </label></strong>
+			<strong><label for="<?php echo $form_id.'-template'; ?>"><?php _e('Select template to edit:',FML::SLUG); ?> </label></strong>
 			<?php
 			_page_input_select( $form_id, 'template', $edit_templates, $template_selected );
-			foreach( $settings['templates'] as $template_id=>$template_content ) {
-				printf(
-					'<input class="hidden" id="template_%1$s" name="templates[%1$s]" value="%2$s" />',
-					esc_attr($template_id),
-					esc_attr($template_content)
-				);
-			}
+			submit_button(__('Reset all templates'), 'secondary', 'submit_reset', false );
 			?>
-			<input id="new_template_name" name="new_template_name" value="" class="code<?php echo $new_class; ?>"/>
+			<br />
+			<label for="new_template_name"><?php _e('New template name: ',FML::SLUG); ?></label><input id="new_template_name" name="new_template_name" value="" class="code<?php echo $new_class; ?>"/>
 		</div>
 		<div id="template">
 			<textarea cols="70" rows="30" name="content" id="content"><?php echo esc_textarea( $settings['templates'][$template_selected]); ?></textarea>

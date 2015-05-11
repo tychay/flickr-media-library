@@ -445,6 +445,14 @@ class FML implements FMLConstants
 			$this->settings_update();
 		}
 	}
+	public function settings_default( $option ) {
+		$defaults = $this->_settings_defaults( false );
+		$default = $defaults[$option];
+		if ( $default === false ) {
+			$default = $this->_settings_default_special( $option );
+		}
+		return $default;
+	}
 	/**
 	 * Get the settings array default
 	 * 
