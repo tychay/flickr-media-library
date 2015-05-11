@@ -560,14 +560,14 @@ class FML implements FMLConstants
 				return ( defined('PICTUREFILL_WP_VERSION') && '2' === substr(PICTUREFILL_WP_VERSION, 0, 1) );
 			case 'templates':
 				return apply_filters( 'fml_templates_default', array(
-					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}} on <span class="trademark flickr">flickr</span></a>',
-					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE,photo}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}</a>',
+					'yahoo_weather' => '<a href="{{attr:FLICKR_PHOTO_URL}}">© by {{html:FLICKR_OWNER_REALNAME}}{{?!FLICKR_OWNER_REALNAME}}{{html:FLICKR_OWNER_USERNAME}}{{/?FLICKR_OWNER_REALNAME}} on <span class="trademark flickr">flickr</span></a>',
+					'attribution'   => '<a href="{{attr:FLICKR_PHOTO_URL}}">{{html:POST_TITLE,photo}}</a> by <a href="{{attr:FLICKR_OWNER_PEOPLE_URL}}">{{html:FLICKR_OWNER_REALNAME}}{{?!FLICKR_OWNER_REALNAME}}{{html:FLICKR_OWNER_USERNAME}}{{/?FLICKR_OWNER_REALNAME}}</a>',
 					'terry_photo_format' => '<b>{{html:POST_TITLE,Untitled}}</b><br />
 {{?COUNTRY}}{{?_venue}}{{_venue}}, {{/?_venue}}{{?REGION}}{{REGION}}, {{/?REGION}}{{COUNTRY}}<br />{{/?COUNTRY}}
 <br />
 {{?CAMERA_CLEAN}}<i>{{CAMERA_CLEAN}}{{?LENS}}, {{LENS}}{{/?LENS}}<br />
 {{?EXPOSURE_CLEAN}}{{EXPOSURE_CLEAN}} @ {{/?EXPOSURE_CLEAN}}{{APERTURE_CLEAN}}{{?ISO}}, iso{{ISO}}{{/?ISO}}{{?FOCAL_LENGTH_CLEAN}}, {{FOCAL_LENGTH_CLEAN}}{{/?FOCAL_LENGTH_CLEAN}}{{?FOCAL_LENGTH_35}} ({{FOCAL_LENGTH_35}}){{/?FOCAL_LENGTH_35}}</i>{{/?CAMERA_CLEAN}}',
-					'google_static_map' => '<img src="http://maps.googleapis.com/maps/api/staticmap?zoom={{_geozoom,15}}&size={{_geo_width,400}}x{{_geo_height,240}}&maptype={{_geo_maptype,roadmap}}&markers=color:blue%7Clabel:P%7C{{LATITUDE_CLEAN}},{{LONGITUDE_CLEAN}}&sensor=false" width="{{_geo_width,400}}" height="{{_geo_height:240}}" />',
+					'google_static_map' => '{{?LATITUDE_CLEAN}}<img src="http://maps.googleapis.com/maps/api/staticmap?zoom={{_geozoom,15}}&size={{_geo_width,400}}x{{_geo_height,240}}&maptype={{_geo_maptype,roadmap}}&markers=color:blue%7Clabel:P%7C{{LATITUDE_CLEAN}},{{LONGITUDE_CLEAN}}&sensor=false" width="{{_geo_width,400}}" height="{{_geo_height:240}}{{/?LATITUDE_CLEAN}}" />',
 				) );
 		}
 		return false;
@@ -1487,10 +1487,10 @@ class FML implements FMLConstants
 		if ( $html === false ) { return false; }
 		do {
 			$html_old = $html;
-			$html = preg_replace_callback('!\{\{\?([a-zA-Z0-9_]+)\}\}(.+)\{\{\/\?\1\}\}!ms', array( $this, 'template_replace_condition' ), $html );
+			$html = preg_replace_callback('!\{\{\?(\!)?([a-zA-Z0-9_]+)\}\}(.+)\{\{\/\?\2\}\}!ms', array( $this, 'template_replace_condition' ), $html );
 			$html = preg_replace_callback('!\{\{([a-z]*):?([a-zA-Z0-9_]+),?(\w*)\}\}!ms', array($this,'template_replace_variable'), $html );
 		} while ( $html != $html_old );
-		//var_dump($html); die;
+		//var_dump($html, self::get_flickr_data($this->_template_post)); die;
 		return $html;
 	}
 	public function template_replace_variable( $matches ) {
@@ -1505,16 +1505,24 @@ class FML implements FMLConstants
 				case 'textarea': return esc_textarea( $return );
 				case 'url':      return esc_url( $return );
 				case 'var':      return str_replace( ' ', '_', $return );
+				case 'int':      return intval( $return );
 			}
 		}
 		if ( !$return  && $matches[3] ) {
-			$return = $matches[3];
+			//$return = $this->_template_variable( $matches[3] );
+			//if ( !$return ) {
+				$return = $matches[3];
+			//}
 		}
 		return $return;
 	}
 	public function template_replace_condition( $matches ) {
-		if ( $this->_template_variable( $matches[1] ) ) {
-			return $matches[2];
+		$condition = ( $this->_template_variable( $matches[2] ) );
+		if ( $matches[1] ) {
+			$condition = !$condition;
+		}
+		if ( $condition ) {
+			return $matches[3];
 		} else {
 			return '';
 		}
@@ -2928,7 +2936,7 @@ class FML implements FMLConstants
 		// generate post array (from data)
 		$post_data = array(
 			//ID
-			//'post_author'    => 0,//userid
+			'post_author'    => ( $data['owner']['nsid'] == $self->settings[Flickr::USER_NSID] ) ? get_current_user_id() : 0,
 			//'post_date'      => SEE BELOW
 			//'post_date_gmt'  => SEE BELOW
 			//'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
