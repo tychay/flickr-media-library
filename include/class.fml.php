@@ -210,6 +210,8 @@ class FML implements FMLConstants
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3 );
 		add_filter( 'get_image_tag_class', array($this,'filter_image_tag_class'), 10, 4 );
 
+		wp_embed_register_handler( self::SLUG.'-embed', self::REGEX_FLICKR_PHOTO_URL, array($this,'embed_handle_photo'), 3 );
+
 		if ( $this->settings['post_thumbnail_caption'] ) {
 			add_filter( 'post_thumbnail_html', array($this,'post_thumbnail_add_caption'), 10, 3 );
 		}
@@ -915,7 +917,7 @@ class FML implements FMLConstants
 		$alt   = $atts['alt'];
 		$title = $atts['title'];
 		$align = $atts['align'];
-		$size  = str_replace( ' ', '_', $atts['size'] );
+		$size  = ( is_string($atts['size']) ) ? str_replace( ' ', '_', $atts['size'] ) : $atts['size'];
 		$rel   = $atts['rel'];
 
 		$settings = $this->settings;
@@ -1692,6 +1694,29 @@ class FML implements FMLConstants
 			$caption = do_shortcode( $template );
 		}
 		return $caption;
+	}
+	//
+	// EMBED SUPPORT
+	//
+	public function embed_handle_photo( $matches, $atts, $url, $raw_atts=array() ) {
+		$size = array( $atts['width'], $atts['height'] );
+		$attr = array(
+			'size'      => $size,
+			'flickr_id' => $matches[1],
+		);
+		$return = $this->shortcode( $attr, '', 'embed' );
+		if ( $return ) {
+			return apply_filters( 'fml_embed_flickr_photo_url', $attr, $embed, $matches, $atts, $url, $raw_atts );
+		} else {
+			// fml didn't work (most likely, not allowing creation of flickr
+			// media), try to do default (taking into account recursion)
+			global $wp_embed;
+			wp_embed_unregister_handler( self::SLUG.'-embed', 3 );
+			$return = $wp_embed->shortcode( array(), $matches[0] );
+			wp_embed_register_handler( self::SLUG.'-embed', self::REGEX_FLICKR_PHOTO_URL, array($this,'embed_handle_photo'), 3 );
+			// not triggering filter because of fail
+			return $return;
+		}
 	}
 	//
 	// PICTUREFILL SUPPORT
