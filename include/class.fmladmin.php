@@ -447,8 +447,15 @@ class FMLAdmin
 						$options[$key] = $value;
 					}
 					break;
+				case 'post_thumbnail_caption_template':
+					if ( in_array( $value, array_keys( $this->_fml->settings['templates'] ) ) ) {
+						$options[$key] = $value;
+					}
+					break;
 				case 'shortcode_generate_custom_post':
 				case 'shortcode_extract_flickr_id':
+				case 'post_thumbnail_caption':
+				case 'post_thumbnail_post_only':
 				case 'image_use_css_crop':
 				case 'image_use_picturefill':
 					if ( $value == 'on' ) {
@@ -473,7 +480,7 @@ class FMLAdmin
 					break;
 			}
 		}
-		//var_dump($options);die;
+		//var_dump($options, $_POST);die;
 		$this->_options_update_settings($options);
 		//var_dump($this->_fml->settings);die;
 	}

@@ -303,6 +303,25 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<h3 class="title"><?php _e('Image Options',FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
+				<th scope="row"><?php _e('Featured Image',FML::SLUG); ?></th>
+				<td>
+					<?php
+			$description = __('Add captions to Featured Images',FML::SLUG);
+			_page_settings_cb( $form_id, 'post_thumbnail_caption', $settings['post_thumbnail_caption'], false, $description );
+			$hide_ptc = ( !$settings['post_thumbnail_caption'] );
+					?>
+					<br />
+					<label for="<?php echo $form_id.'-post_thumbnail_caption'; ?>"><?php _e('Caption template: ',FML::SLUG); ?></label>
+					<?php
+			$description = __('Only caption Featured Image in post',FML::SLUG);
+			// TODO do select box:
+			_page_input_select( $form_id, 'post_thumbnail_caption_template', $templates, $settings['post_thumbnail_caption_template'] );
+			echo '<br />';
+			_page_settings_cb( $form_id, 'post_thumbnail_post_only', $settings['post_thumbnail_post_only'], $hide_ptc, $description );
+					?>
+				</td>
+			</tr>
+			<tr>
 				<th scope="row"><?php _e('Javascript routines',FML::SLUG); ?></th>
 				<td>
 					<?php

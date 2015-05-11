@@ -209,6 +209,10 @@ class FML implements FMLConstants
 		// TODO make this optional depending on the style of handling shortcode injection
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3 );
 		add_filter( 'get_image_tag_class', array($this,'filter_image_tag_class'), 10, 4 );
+
+		if ( $this->settings['post_thumbnail_caption'] ) {
+			add_filter( 'post_thumbnail_html', array($this,'post_thumbnail_add_caption'), 10, 3 );
+		}
 	}
 	/**
 	 * Stuff to run on `init`
@@ -479,6 +483,9 @@ class FML implements FMLConstants
 			'shortcode_default_class_id'      => '',
 			'shortcode_extract_flickr_id'     => true,
 			'shortcode_generate_custom_post'  => true,
+			'post_thumbnail_caption'          => false,
+			'post_thumbnail_post_only'        => true,
+			'post_thumbnail_caption_template' => 'attribution',
 			'image_use_css_crop'              => true,
 			'image_use_picturefill'           => false,
 			'template_default'                => '',
@@ -1417,9 +1424,9 @@ class FML implements FMLConstants
 		} else {
 			$post = get_post( $atts['id'] );
 		}
-		return apply_filters( 'fml_template_shortcode', $this->template_process( $post, $atts['template'], $params, ( $content ) ? $content : false ), $atts, $content, $context );
+		return apply_filters( 'fml_template_shortcode', $this->_template_process( $post, $atts['template'], $params, ( $content ) ? $content : false ), $atts, $content, $context );
 	}
-	public function template_process( $post, $template_name='', $params=array(), $html=false ) {
+	private function _template_process( $post, $template_name='', $params=array(), $html=false ) {
 		//$this->settings_reset(); var_dump($this->settings);
 		if ( !is_object( $post ) ) {
 			$post = get_post( $post );
@@ -1548,6 +1555,43 @@ class FML implements FMLConstants
 
 		// Maybe it's a template??
 		return $this->template_parse( $variable ); //can be recursive :-(
+	}
+	//
+	// FEATURED IMAGE (POST THUMBNAIL) SUPPORT
+	//
+	public function post_thumbnail_add_caption( $html, $post_id, $post_thumbnail_id ) {
+		$settings = $this->settings;
+		// Handle case where we want to display post thumbnail caption on the
+		// post page only
+		if ( $settings['post_thumbnail_post_only'] ) {
+			// if it's not the post page don't display
+			//if ( !is_post( $post_id ) ) { return $html; } // can't use is_page() inside loop
+			if ( !is_single( $post_id ) ) { return $html; }
+			// if the post thumbnail that is being displayed is not the post
+			// thumbnail for this post (e.g. using post thumbnail for page
+			// navigation), don't display
+			if ( $post_thumbnail_id != get_post_thumbnail_id( $post_id ) ) {
+				return $html;
+			}
+		}
+		$caption_html = $this->_template_process( $post_thumbnail_id, $settings['post_thumbnail_caption_template'] );
+		$class = apply_filters( 'fml_post_thumbnail_caption_class', 'fml-post-thumbnail-caption', $post_id, $post_thumbnail_id );
+		if ( current_theme_supports( 'html5', 'caption' ) ) {
+			$return = sprintf(
+				'<figure class="%s">%s<figcaption class="wp-caption-text">%s</figccaption></figure>',
+				esc_attr( $class ),
+				$html,
+				$caption_html
+			);
+		} else {
+			$return = sprintf(
+				'%s<div class="%s">%s</div>',
+				$html,
+				esc_attr( $class ),
+				$caption_html
+			);
+		}
+		return apply_filters( 'fml_post_thumbnail_caption', $return, $html, $caption_html, $post_id, $post_thumbnail_id, $class );
 	}
 	//
 	// CAPTION TEMPLATE SUPPORT
