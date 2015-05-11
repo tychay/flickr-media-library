@@ -747,7 +747,7 @@ class Flickr
         //echo '<plaintext>';var_dump(array($url,$parameters,$responses,$_SESSION));
         if ( is_wp_error($responses) ) {
             // TODO: write this bad news! :-(
-            var_dump($responses);die;
+            trigger_error($responses->get_error_message().' for '.$url);
             return;
         }
 
