@@ -257,6 +257,12 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<h3 class="title"><?php _e('Shortcode Options',FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
+				<th scope="row"><?php _e('Embed',FML::SLUG); ?></th>
+				<td>
+					<?php _page_settings_cb( $form_id, 'shortcode_support_embed', $settings['shortcode_support_embed'], false, __('Support flickr embeds',FML::SLUG) );  ?>
+				</td>
+			</tr>
+			<tr>
 				<?php _page_settings_th( $form_id, 'shortcode_default_link', __('Default link',FML::SLUG) ); ?>
 				<td><?php _page_settings_input( $form_id, 'shortcode_default_link', $settings['shortcode_default_link'], false );  ?>
 					<p class="description"><?php printf( __('Set to <code>flickr</code> to force compliance with %s.', FML::SLUG), $flickr_tos ); ?></p>
