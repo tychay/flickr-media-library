@@ -334,7 +334,7 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<input type="hidden" name="action" value="<?php echo $form_ids['template_options']; ?>" />
 		<h3 class="title"><?php _e('Edit Templates', FML::SLUG); ?></h3>
 		<div>
-			<strong><label for="TODO"><?php _e('Select template to edit:'); ?> </label></strong>
+			<strong><label for="<?php echo $form_id.'-template'; ?>"><?php _e('Select template to edit:'); ?> </label></strong>
 			<?php
 			_page_input_select( $form_id, 'template', $edit_templates, $template_selected );
 			foreach( $settings['templates'] as $template_id=>$template_content ) {
