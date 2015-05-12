@@ -252,7 +252,6 @@ class FML implements FMLConstants
 			//    it on admin or login pages without having to add 3 actions
 			$this->register_picturefill_script();
 			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
-			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
 		}
 
 		if ( apply_filters( 'fml_image_use_css_crop', $settings['image_use_css_crop'] ) ) {
@@ -513,11 +512,13 @@ class FML implements FMLConstants
 			'attachment_prepend'              => true,
 			'attachment_prepend_remove'       => false,
 			'attachment_prepend_size'         => 'Medium',
+			'attachment_prepend_link'         => 'flickr',
 			'post_thumbnail_caption'          => false,
 			'post_thumbnail_post_only'        => true,
 			'post_thumbnail_caption_template' => 'attribution',
 			'image_use_css_crop'              => true,
 			'image_use_picturefill'           => false,
+			'image_prefer_http'               => false,
 			'template_default'                => '',
 			'templates'                       => false,
 		);
@@ -917,6 +918,7 @@ class FML implements FMLConstants
 			return $this->_shortcode_return( '', $content, '', $post_id, $atts );
 		}
 		if ( $context ) { $atts['_context'] = $context; }
+		//var_dump( array( $atts, $raw_atts ) );
 
 		$id    = $post->ID;
 		$alt   = $atts['alt'];
@@ -1312,7 +1314,7 @@ class FML implements FMLConstants
 				//$url = get_attached_file( $id );
 				//Flickr community guidelines: link the download page
 				$downsize = image_downsize( $post->ID, 'full' );
-				$atts['url'] = $downsize[0];
+				$atts['url'] = $this->maybe_http( $downsize[0] );
 				//$atts['rel'] = 'original';
 				//$atts['url'] = self::get_flickr_link( $post ).'sizes/';
 				//$atts['rel'] = 'flickr-download';
@@ -1343,6 +1345,8 @@ class FML implements FMLConstants
 				$atts['link'] = '';
 				*/
 				break;
+				case 'none':
+				$atts['url'] ='';
 				case '': // preserve URL default
 				break;
 				default: // unknown
@@ -1746,87 +1750,6 @@ class FML implements FMLConstants
       wp_register_script( 'picturefill', $picturefill_url, array(), $version, true );
 	}
 	/**
-	 * Inject the srcset and srcs for fmlmedia into shortcode
-	 *
-	 * This does it by hooking off of the img injection
-	 *
-	 * 1. Figure out if we're an icon or an image
-	 * 2. Generate srcset
-	 * 3. Replace src with small image
-	 * 4. Figure out sizes (maybe remove width and height)
-	 * 5. Return image
-	 * 
-	 * @param  array  $img     extract of image to be inserted
-	 * @param  int    $post_id post ID of fml media
-	 * @param  array  $atts    parsed attributes
-	 * @return array           extract of image with srcset added
-	 * @deprecated (this is handled by attachment_inject_srcset_srcs)
-	 */
-	public function shortcode_inject_srcset_srcs( $img, $post_id, $atts ) {
-		// 1. Figure out if we're an icon or an image
-		$icon_sizes = array( 'Square', 'Large Square' );
-		$desired_size = '';
-		$desired_width = '';
-		if ( !empty( $img['attributes']['width'] ) && !empty( $img['attributes']['height'] ) ) {
-			$is_icon = ( ( $img['attributes']['width'] == $img['attributes']['height'] ) && in_array( $img['attributes']['width'], array(75,150) ) );
-			$desired_width = $img['attributes']['width'];
-		} elseif ( !empty( $img['attributes']['class'] ) ) {
-			$desired_size = self::extract_flickr_sizes( $img['attributes']['class'], true );
-			$is_icon = ( $desired_size && in_array( $desired_size, $icon_sizes ) );
-		}
-		if ( !$desired_size && !$desired_width && !empty( $atts['size'] ) ) {
-			if ( is_array( $atts['size'] ) ) {
-				$is_icon = ( ( $atts['size']['width'] == $atts['size']['height'] ) && in_array( $atts['size']['width'], array(75,150) ) );
-				$desired_width = $atts['size']['width'];
-			} else {
-				$desired_size = self::extract_flickr_sizes( $atts['size'] );
-				$is_icon = ( $desired_size && in_array( $desired_size, $icon_sizes ) );
-			}
-		} else {
-			// assume it's not
-			$is_icon = false;
-		}
-
-		// 2. Generate srcset
-		$metadata = wp_get_attachment_metadata( $post_id );
-		$srcsets = array();
-		foreach ( $metadata['sizes'] as $size=>$size_data ) {
-			if ( in_array( $size, $icon_sizes ) ) {
-				if ( $is_icon ) {
-					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
-				}
-			} else {
-				if ( !$is_icon ) {
-					$srcsets[] = $size_data['src'] . ' ' . $size_data['width'].'w';
-				}
-			}
-		}
-		$img['attributes']['srcset'] = implode( ', ', $srcsets );
-
-		// 3. Replace src with small image
-		if ( $is_icon ) {
-			$img['attributes']['src'] = $metadata['sizes']['Square']['src'];
-		} else {
-			$img['attributes']['src'] = $metadata['sizes']['Thumbnail']['src'];
-		}
-
-		// 4. Figure out sizes (maybe remove width and height)
-		if ( $desired_size ) {
-			$desired_width = $metadata['sizes'][$desired_size]['width'];
-		}
-		if ( $desired_width ) {
-			$img['attributes']['sizes'] = sprintf( '(max-width: %1$dpx) 100vw, %1$dpx', $desired_width );
-			// remove width and height
-			unset($img['attributes']['width']);
-			unset($img['attributes']['height']);
-		} else {
-			//$img['attributes']['sizes'] = '100vw';
-		}
-
-		// 5. Return image
-		return $img;
-	}
-	/**
 	 * Inject the srcset and srcs for fmlmedia into attachment
 	 * 
 	 * 0. Only do this sort of work on Flickr Media
@@ -1856,6 +1779,7 @@ class FML implements FMLConstants
 
 		// 2. Generate srcset
 		$metadata = wp_get_attachment_metadata( $post->ID );
+		$metadata['sizes'] = $this->maybe_http( $metadata['sizes'] );
 		$srcsets = array();
 		foreach ( $metadata['sizes'] as $sizename=>$size_data ) {
 			if ( in_array( $sizename, $icon_sizes ) ) {
@@ -2040,7 +1964,7 @@ class FML implements FMLConstants
 		$shortcode_attrs = apply_filters('fml_attachment_prepend_media_shortcode_attrs', array(
 			'id'   => $post->ID,
 			'size' => $this->settings['attachment_prepend_size'],
-			'link' => 'flickr',
+			'link' => $this->settings['attachment_prepend_link'],
 		) );
 		$p = $this->shortcode( $shortcode_attrs, $shortcode_content, 'attachment_prepend_media' );
 		// append caption if available
@@ -2108,7 +2032,7 @@ class FML implements FMLConstants
 		$flickr_data = self::get_flickr_data( $id );
 		if ( $size == 'full' ) {
 			$img = self::_get_largest_image( $flickr_data );
-			return array( $img['source'], $img['width'], $img['height'], false );
+			return array( $this->maybe_http( $img['source'] ), $img['width'], $img['height'], false );
 		}
 
 		$img_sizes = $flickr_data['sizes']['size'];
@@ -2125,10 +2049,10 @@ class FML implements FMLConstants
 					if ( $min_ratio >= 1 ) {
 						if ( $max_ratio == 1 ) {
 							// perfect match
-							return array( $img['source'], $img['width'], $img['height'], false );
+							return array( $this->maybe_http( $img['source'] ), $img['width'], $img['height'], false );
 						}
 						// imperfect match
-						return array( $img['source'], intval($img['width']/$min_ratio), intval($img['height']/$min_ratio), true );
+						return array( $this->maybe_http( $img['source'] ), intval($img['width']/$min_ratio), intval($img['height']/$min_ratio), true );
 					}
 				}
 			} else {
@@ -2137,10 +2061,10 @@ class FML implements FMLConstants
 					$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 					if ( $max_ratio == 1 ) {
 						$is_intermediate = ( min( $img['width']/$size['width'], $img['height']/$size['height'] ) == 1 );
-						return array( $img['source'], $img['width'], $img['height'], $is_intermediate );
+						return array( $this->maybe_http( $img['source'] ), $img['width'], $img['height'], $is_intermediate );
 					}
 					if ( $max_ratio >= 1 ) {
-						return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+						return array( $this->maybe_http( $img['source'] ), intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
 					}
 				}
 
@@ -2152,10 +2076,10 @@ class FML implements FMLConstants
 			foreach ( $img_sizes as $img ) {
 				$max_ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 				if ( $max_ratio == 1 ) {
-					return array( $img['source'], $img['width'], $img['height'], false );
+					return array( $this->maybe_http( $img['source'] ), $img['width'], $img['height'], false );
 				}
 				if ( $max_ratio >= 1 ) {
-					return array( $img['source'], intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
+					return array( $this->maybe_http( $img['source'] ), intval($img['width']/$max_ratio), intval($img['height']/$max_ratio), true );
 				}
 			}
 		}
@@ -2166,7 +2090,7 @@ class FML implements FMLConstants
 		} else {
 			$ratio = max( $img['width']/$size['width'], $img['height']/$size['height'] );
 		}
-		return array( $img['source'], intval($img['width']/$ratio), intval($img['height']/$ratio), true );
+		return array( $this->maybe_http( $img['source'] ), intval($img['width']/$ratio), intval($img['height']/$ratio), true );
 	}
 	/**
 	 * This will strip the upload_dir() from the path by re-running the same
@@ -3069,6 +2993,9 @@ class FML implements FMLConstants
 	 * Return original image if possible, if not practical (rotated, a tiff),
 	 * return the largest one available. This takes advantage of the fact that
 	 * the flickr API orders its sizes.
+	 *
+	 * Because this can be used in different places, the https is not
+	 * transformed to http
 	 * 
 	 * @param  int|array $flickr_data if integer, its the post_id of flickr
 	 *         media, else it's the flickr_data
@@ -3104,74 +3031,28 @@ class FML implements FMLConstants
 		// original is invalid
 		return $sizes[ $count_img_sizes-2 ];
 	}
-	/**
-	 * @deprecated
-	 * @param  [type] $size_string [description]
-	 * @return [type]              [description]
-	 */
-	static private function _get_width_from_flickr_size( $size_string ) {
-		switch ( strtolower($size_string) ) {
-			case 'square': return 75;
-			case 'large square': return 150;
-			case 'thumbnail': return 100;
-			case 'small': return 240;
-			case 'small 320': return 320;
-			case 'medium': return 500;
-			case 'medium 640': return 640;
-			case 'medium 800': return 800;
-			case 'large': return 1024;
-			case 'large 1600': return 1600;
-			case 'large 2048': return 2048;
-			default: return 500;
-		}
-	}
-	/**
-	 * Turn a flickr photo into an image tag.
-	 *
-	 * This adds the responsive images in too.
-	 * 
-	 * @deprecated Getting rid of this function
-	 */
-	static private function _img_from_flickr_data( $data, $default_size='Medium', $include_original=false ) {
-		$sizes = $data['sizes']['size'];
-		$src = '';
-		$size_offset = 1000000;
-		if ( !is_numeric( $default_size ) ) {
-			$default_size = self::_get_width_from_flickr_size( $dwefault_size );
-		}
-		foreach ( $sizes as $size ) {
-			// handle original
-			if ( $size['label'] == 'Original' ) {
-				if ( $include_original ) {
-					// TODO code to include the original if no rotation
-				} else {
-					// don't include original
-					continue;
-				}
-			}
-			// TODO: better handling of squares
-			if ( ( $size['label'] == 'Square' ) || ( $size['label'] == 'Large Square' ) ) { continue; }
-			$srcset[] = sprintf( '%s %dw', $size['source'], $size['width'] );
-
-			$this_size = max( $size['width'], $size['height'] );
-			$this_size_offset = abs( $this_size - $default_size ) / $this_size;
-			if ( $this_size_offset < $size_offset ) {
-				$size_offset = $this_size_offset;
-				$src = $size['source'];
-			}
-		}
-		return sprintf(
-			'<img src="%s" srcset="%s" alt="%s" />',
-			$src,
-			implode( ', ', $srcset ),
-			esc_attr( $data['title']['_content'] )
-		);
-	}
 	//
 	// CLASS FUNCTIONS
 	// 
 	static function debug_filter_show_variables( $return )  {
 		var_dump( func_get_args() );
 		return $return;
+	}
+	static function https_to_http( $url ) {
+		if ( is_array( $url ) ) {
+			foreach ( $url as $key=>$value ) {
+				$url[$key] = self::https_to_http( $value );
+			}
+			return $url;
+		}
+		if ( strpos( $url, 'https' ) === 0 ) {
+			return 'http' . substr( $url, 5 );
+		}
+	}
+	public function maybe_http( $variable ) {
+		if ( is_ssl() || !$this->settings['image_prefer_http'] ) {
+			return $variable;
+		}
+		return self::https_to_http( $variable );
 	}
 }

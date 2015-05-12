@@ -371,6 +371,12 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 					?>
 				</td>
 			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_perf', $this )?>">
+				<th scope="row"><?php _e('Performance',FML::SLUG); ?></th>
+				<td>
+					<?php _page_settings_cb( $form_id, 'image_prefer_http', $settings['image_prefer_http'], $this->options_column_is_hidden( 'fml_show_perf' ), __('Prefer http over https when possible',FML::SLUG) );  ?>
+				</td>
+			</tr>
 			<tr>
 				<th scope="row"><?php _e('Javascript routines',FML::SLUG); ?></th>
 				<td>

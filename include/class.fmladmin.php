@@ -477,6 +477,7 @@ class FMLAdmin
 				case 'attachment_prepend_remove':
 				case 'post_thumbnail_caption':
 				case 'post_thumbnail_post_only':
+				case 'image_prefer_http':
 				case 'image_use_css_crop':
 				case 'image_use_picturefill':
 					if ( $value == 'on' ) {
