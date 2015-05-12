@@ -1348,7 +1348,7 @@ class FML implements FMLConstants
 	 *                       attributes as key/value pairs
 	 */
 	static public function extract_html_attributes($input) {
-	    if( ! preg_match('#^(<)([a-z0-9\-._:]+)((\s)+(.*?))?((>)([\s\S]*?)((<)\/\2(>))|(\s)*\/?(>))$#im', $input, $matches)) return false;
+	    if( ! preg_match('#^(<)([a-z0-9\-._:]+)((\s)+(.*?))?((>)([\s\S]*?)((<)\/\2(>))|(\s)*\/?(>))$#ims', $input, $matches)) return false;
 	    $matches[5] = preg_replace('#(^|(\s)+)([a-z0-9\-]+)(=)(")(")#i', '$1$2$3$4$5<attr:value>$6', $matches[5]);
 	    $results = array(
 	        'element' => $matches[2],
