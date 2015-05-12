@@ -477,6 +477,7 @@ class FML implements FMLConstants
 			'flickr_search_safe_search'       => true,
 			'flickr_search_license'           => '1,2,3,4,5,6,7,8', //everything but all rights reserved
 			'post_date_map'                   => 'taken',
+			'post_author_id_other'            => 0, //disabled
 			'post_excerpt_default'            => '[fmldata template="attribution"]',
 			'media_default_link'              => false,
 			'media_default_align'             => false,
@@ -2936,24 +2937,23 @@ class FML implements FMLConstants
 		// generate post array (from data)
 		$post_data = array(
 			//ID
-			'post_author'    => ( $data['owner']['nsid'] == $self->settings[Flickr::USER_NSID] ) ? get_current_user_id() : 0,
-			//'post_date'      => SEE BELOW
-			//'post_date_gmt'  => SEE BELOW
-			//'post_content'   => self::_img_from_flickr_data( $data ). '<br />' . $data['description']['_content'],
-			'post_content'   => $data['description']['_content'],
+			//'post_author'               // SEE BELOW
+			//'post_date'                 // SEE BELOW
+			//'post_date_gmt'             // SEE BELOW
+			'post_content'   => $data['description']['_content'], // image content will be prepended using the_content hook a la attachments
 			'post_title'     => $data['title']['_content'],
-			//'post_excerpt'   => // CAPTION
+			//'post_excerpt'              // CAPTION. Set separately due to caption templates + not on flickr
 			'post_status'    => ( $data['visibility']['ispublic'] ) ? 'publish' : 'private', 
-			'comment_status' => 'closed', //comments should be on flickr page only
-			'ping_status'    => 'closed', //no pingbacks
+			'comment_status' => 'closed', // comments should be on flickr page only
+			'ping_status'    => 'closed', // no pingbacks
 			//'post_password'
-			'post_name'      => self::_flickr_id_to_name( $data['id'] ), //post slug
+			'post_name'      => self::_flickr_id_to_name( $data['id'] ), // post slug used to do reverse lookups by flickr id
 			//'to_ping'
 			//'pinged'
 			//'post_modified'
 			'post_modified_gmt' => gmdate( 'Y m d H:i:s', $data['dates']['lastupdate'] ),
 			//'post_content_filtered' => let wordpress handle?
-			//'post_parent'    => 0, // TODO
+			//'post_parent'    => 0,    // TODO
 			//'guid' // Let wordpress handle
 			//'menu_order'     => (for page ordering)
 			'post_type'      => self::POST_TYPE,
@@ -2966,6 +2966,9 @@ class FML implements FMLConstants
 			//'page_template' (empty)
 			//'file' (from attachment) @see https://codex.wordpress.org/Function_Reference/wp_insert_attachment
 		);
+		if  ( $self->settings['post_author_id_other'] ) {
+			$post_data['post_author'] = ( $data['owner']['nsid'] == $self->settings[Flickr::USER_NSID] ) ? get_current_user_id() : $self->settings['post_author_id_other'];
+		}
 		// handle post_date
 		switch ( $self->settings['post_date_map'] ) {
 			case 'posted':

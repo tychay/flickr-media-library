@@ -437,6 +437,9 @@ class FMLAdmin
 				case 'post_excerpt_default':
 					$options[$key] = wp_unslash( $value );
 					break;
+				case 'post_author_id_other':
+					$options[$key] = intval( $value );
+					break;
 			}
 		}
 		$this->_options_update_settings($options);

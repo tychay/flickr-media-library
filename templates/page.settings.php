@@ -192,6 +192,13 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			<tr>
 				<?php _page_settings_th( $form_id, 'post_excerpt_default', __('Caption template',FML::SLUG) ); ?>
 				<td><?php _page_textarea( $form_id, 'post_excerpt_default', $settings['post_excerpt_default'] ); ?>
+			</td>
+			<tr>
+				<?php _page_settings_th( $form_id, 'post_author_id_other', __('Author ID for others',FML::SLUG) ); ?>
+				<td><?php _page_settings_input( $form_id, 'post_author_id_other', $settings['post_author_id_other'], false );  ?>
+					<p class="description"><?php _e('Use <code>0</code> to turn this feature off.',FML::SLUG); ?></p>
+				</td>
+			</tr>
 		</table>
 		<?php submit_button(__('Save Changes')); ?>
 	</form>
