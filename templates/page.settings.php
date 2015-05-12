@@ -260,6 +260,12 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 					<p class="description"><?php printf( __('Use <code>%s</code> to emulate attachments',FML::SLUG), 'wp-image-%d' ); ?></p>
 				</td>
 			</tr>
+			<tr class="<?php _page_settings_hidden_class( 'fml_show_perf', $this )?>">
+				<th scope="row"><?php _e('Performance',FML::SLUG); ?></th>
+				<td>
+					<?php _page_settings_cb( $form_id, 'media_shortcode_only', $settings['media_shortcode_only'], $this->options_column_is_hidden( 'fml_show_perf' ), __('Only insert shortcode',FML::SLUG) );  ?>
+				</td>
+			</tr>
 		</table>
 		<h3 class="title"><?php _e('Shortcode Options',FML::SLUG); ?></h3>
 		<table class="form-table">

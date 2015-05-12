@@ -498,6 +498,7 @@ class FML implements FMLConstants
 			'media_default_rel_flickr'        => 'flickr',
 			'media_default_class_size'        => 'size-%s',
 			'media_default_class_id'          => 'wp-image-%d',
+			'media_shortcode_only'            => false,
 			'shortcode_default_link'          => 'flickr',
 			'shortcode_default_keephw'        => true,
 			'shortcode_default_rel_post'      => 'attachment',
@@ -781,7 +782,18 @@ class FML implements FMLConstants
 				esc_attr( $value )
 			);
 		}
-		return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
+		if ( $this->settings['media_shortcode_only'] ) {
+			$shortcode = sprintf( '[%1$s%2$s][/%1$s]', self::SHORTCODE, $attr_string );
+			// prune out the <a><img> link from the html
+ 			if ( preg_match( '!(<a\s[^>]*>)?<img\s[^>]*>(</a>)?!im', $html, $matches ) ) {
+ 				$pos = strpos( $html, $matches[0] );
+ 				return substr( $html, 0, $pos) . $shortcode . substr( $html, $pos + strlen( $matches[0] ) );
+ 			}
+ 			// this should never happen, but let's play it safe
+ 			return $shortcode . $html;
+		} else {
+			return sprintf( '[%1$s%2$s]%3$s[/%1$s]', self::SHORTCODE, $attr_string, $html );
+		}
 	}
 	public function filter_image_tag_class($class, $id, $align, $size) {
 		$post = get_post($id);

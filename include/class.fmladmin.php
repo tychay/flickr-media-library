@@ -470,6 +470,7 @@ class FMLAdmin
 						$options[$key] = $value;
 					}
 					break;
+				case 'media_shortcode_only':
 				case 'shortcode_generate_custom_post':
 				case 'shortcode_extract_flickr_id':
 				case 'shortcode_support_embed':
