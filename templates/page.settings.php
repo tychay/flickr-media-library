@@ -316,6 +316,20 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<h3 class="title"><?php _e('Image Options',FML::SLUG); ?></h3>
 		<table class="form-table">
 			<tr>
+				<th scope="row"><?php _e('Attachment',FML::SLUG); ?></th>
+				<td>
+					<?php
+			$description = __('Emulate <code>prepend_attachment</code> by prepending media on attachment pages',FML::SLUG);
+			_page_settings_cb( $form_id, 'attachment_prepend', $settings['attachment_prepend'], false, $description );
+			$hide_ap = ( !$settings['attachment_prepend'] );
+			echo '<br />';
+			$description = __('Remove <code>prepend_attachment</code> on single pages',FML::SLUG);
+			// TODO hide/show select box:
+			_page_settings_cb( $form_id, 'attachment_prepend_remove', $settings['attachment_prepend_remove'], $hide_ap, $description );
+					?>
+				</td>
+			</tr>
+			<tr>
 				<th scope="row"><?php _e('Featured Image',FML::SLUG); ?></th>
 				<td>
 					<?php

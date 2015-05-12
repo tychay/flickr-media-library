@@ -179,7 +179,6 @@ class FML implements FMLConstants
 	 * Stuff to run on `plugins_loaded`
 	 *
 	 * - register `init` handler
-	 * - register attachment_prepend_media to the_content to trigger shortcode processing on attachment page
 	 * - add shortcode handler
 	 * - register filter_image_downsize to add fmlmedia image_downsize() support
 	 * - register filter_get_attached_file to make get_attached_file() return
@@ -187,17 +186,19 @@ class FML implements FMLConstants
 	 * - register filter_wp_get_attachment_metadata to inject metadata results
 	 *   without having to clutter up post_meta with more stuff
 	 * - register filter media_send_to_editor to wrap shortcode around fmlmedia
-	 * - register get_image_tag_class to override lasses in send_to_editor images
-	 * - initial "set" of picturefill compatibility
+	 * - register get_image_tag_class to override classes in send_to_editor images
+	 * - maybe register emulation of prepend_attachment on the_content (regular or full)
+	 * - maybe register flickr embed/oEmbed hijacking
+	 * - maybe register caption injection of post thumbnail html
 	 *
 	 * @return void
 	 */
 	public function run() {
+		$settings = $this->settings;
+
 		add_action( 'init', array( $this, 'init' ) );
 
 		// run [fmlmedia] shortcode before wpautop (and other shortcodes)
-		add_filter( 'the_content', array( $this, 'attachment_prepend_media') ); //can run anytime
-		add_filter( 'template_include', array( $this, 'attachment_maybe_remove_prepend') );
 		add_filter( 'the_content', array( $this, 'run_shortcode' ), 8);
 		// placeholder for strip_shortcodes() to work
 		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
@@ -211,11 +212,10 @@ class FML implements FMLConstants
 		add_filter( 'media_send_to_editor', array( $this, 'filter_media_send_to_editor'), 10, 3 );
 		add_filter( 'get_image_tag_class', array($this,'filter_image_tag_class'), 10, 4 );
 
-		if ( $this->settings['shortcode_support_embed'] ) {
+		if ( $settings['shortcode_support_embed'] ) {
 			wp_embed_register_handler( self::SLUG.'-embed', self::REGEX_FLICKR_PHOTO_URL, array($this,'shortcode_handle_embed'), 3 );
 		}
-
-		if ( $this->settings['post_thumbnail_caption'] ) {
+		if ( $settings['post_thumbnail_caption'] ) {
 			add_filter( 'post_thumbnail_html', array($this,'post_thumbnail_add_caption'), 10, 3 );
 		}
 	}
@@ -231,9 +231,17 @@ class FML implements FMLConstants
 	public function init() {
 		$this->register_post_type();
 
+		$settings = $this->settings;
 
-		// move the code later to give filters a chance to change it in plugins_loaded
-		//$this->_support_picturefill = false;
+		// move the code later to give themes a chance to filter it after plugins_loaded
+		
+		if ( apply_filters( 'fml_attachment_prepend', $settings['attachment_prepend'] ) ) {
+			add_filter( 'the_content', array( $this, 'attachment_prepend_media') ); //can run anytime
+			if ( apply_filters( 'fml_attachment_prepend_remove', $settings['attachment_prepend_remove'] ) ) {
+				add_filter( 'template_include', array( $this, 'attachment_maybe_remove_prepend') );
+			}
+		}
+
 		if ( $this->use_picturefill ) {
 			// Add Picturefill.WP 2 emulation specific code here.
 			// yes, you're "supposed" to call this in wp_enqueue_script but
@@ -246,7 +254,8 @@ class FML implements FMLConstants
 			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'attachment_inject_srcset_srcs' ), 10, 3 );
 			//add_filter( 'fml_shortcode_image_attributes', array( $this, 'shortcode_inject_srcset_srcs' ), 10, 3 );
 		}
-		if ( apply_filters( 'fml_image_use_css_crop', $this->settings['image_use_css_crop'] ) ) {
+
+		if ( apply_filters( 'fml_image_use_css_crop', $settings['image_use_css_crop'] ) ) {
 			wp_register_script(
 				'csscrop',
 				$this->static_url.'/js/csscrop.js',
@@ -499,6 +508,8 @@ class FML implements FMLConstants
 			'shortcode_extract_flickr_id'     => true,
 			'shortcode_generate_custom_post'  => true,
 			'shortcode_support_embed'         => true,
+			'attachment_prepend'              => true,
+			'attachment_prepend_remove'       => false,
 			'post_thumbnail_caption'          => false,
 			'post_thumbnail_post_only'        => true,
 			'post_thumbnail_caption_template' => 'attribution',

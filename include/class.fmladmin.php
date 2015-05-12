@@ -473,6 +473,8 @@ class FMLAdmin
 				case 'shortcode_generate_custom_post':
 				case 'shortcode_extract_flickr_id':
 				case 'shortcode_support_embed':
+				case 'attachment_prepend':
+				case 'attachment_prepend_remove':
 				case 'post_thumbnail_caption':
 				case 'post_thumbnail_post_only':
 				case 'image_use_css_crop':
