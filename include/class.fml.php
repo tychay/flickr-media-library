@@ -500,6 +500,7 @@ class FML implements FMLConstants
 			'media_default_class_id'          => 'wp-image-%d',
 			'media_shortcode_only'            => false,
 			'shortcode_default_link'          => 'flickr',
+			'shortcode_default_size'          => '',
 			'shortcode_default_keephw'        => true,
 			'shortcode_default_rel_post'      => 'attachment',
 			'shortcode_default_rel_post_id'   => 'wp-att-',
@@ -511,6 +512,7 @@ class FML implements FMLConstants
 			'shortcode_support_embed'         => true,
 			'attachment_prepend'              => true,
 			'attachment_prepend_remove'       => false,
+			'attachment_prepend_size'         => 'Medium',
 			'post_thumbnail_caption'          => false,
 			'post_thumbnail_post_only'        => true,
 			'post_thumbnail_caption_template' => 'attribution',
@@ -1170,16 +1172,26 @@ class FML implements FMLConstants
 			'flickr_id' => 0,
 			'alt'       => '',
 			'title'     => '',
-			'size'      => '',       // LEAVE BLANK: transformed from image-size
-			'sizes'     => '',       // allows injection of sizes (picturefill)
-			'align'     => '',       // editor default may be none, but ours is
-			                         // no attribute/class
-			'link'      => apply_filters( 'fml_shortcode_default_attr_link', $settings['shortcode_default_link'] ), // because of TOS
-			'url'       => apply_filters( 'fml_shortcode_default_attr_url', '' ),
-			'keephw'    => apply_filters(' fml_shortcode_default_attr_keephw', $settings['shortcode_default_keephw'] ),
+			'size'      => $settings['shortcode_default_size'],
+			                         // LEAVE BLANK: transformed from image-size in editor
+			'sizes'     => '',       // LEAVE BLANK: allows injection of sizes (picturefill)
+			'align'     => '',       // LEAVE BLANK: editor default may be none, but ours is no attribute/class
+			'link'      => $settings['shortcode_default_link'],
+			                         // Set to 'flickr' because of TOS
+			'url'       => '',
+			'keephw'    => $settings['shortcode_default_keephw'],
 			//'rel'                  // internally applied based on link and url
+			//'_context'             // internally applied based on how called
 			//'post_excerpt' => '',  // caption not used in a or img
 		);
+		/**
+		 * Filter shortcode attributes for shortcode processing in prepend_media()
+		 *
+		 * @since 1.0
+		 * @see FML\FML::_shortcode_attrs()
+		 * @param array $attrs shortcode attribute defaults
+		 */
+		$default_atts = apply_filters('fml_shortcode_default_attrs', $default_atts );
 
 		// 3. Modify defaults based on extracted content
 		if ( $a ) {
@@ -2017,7 +2029,7 @@ class FML implements FMLConstants
 		 * @see attachment_prepend_media()
 		 * @param string $content shortcode content
 		 */
-		$shortcode_content = apply_filters('fml_prepend_media_shortcode_content', '' );
+		$shortcode_content = apply_filters('fml_attachment_prepend_media_shortcode_content', '' );
 		/**
 		 * Filter shortcode attributes for shortcode processing in prepend_media()
 		 *
@@ -2025,9 +2037,9 @@ class FML implements FMLConstants
 		 * @see attachment_prepend_media()
 		 * @param array $attrs shortcode attributes
 		 */
-		$shortcode_attrs = apply_filters('fml_prepend_media_shortcode_attrs', array(
+		$shortcode_attrs = apply_filters('fml_attachment_prepend_media_shortcode_attrs', array(
 			'id'   => $post->ID,
-			'size' => 'Medium',
+			'size' => $this->settings['attachment_prepend_size'],
 			'link' => 'flickr',
 		) );
 		$p = $this->shortcode( $shortcode_attrs, $shortcode_content, 'attachment_prepend_media' );

@@ -451,7 +451,6 @@ class FMLAdmin
 	 */
 	public function options_handle_output_options() {
 		check_admin_referer( $this->_ids['forms']['output_options'] . '-verify' );
-		//var_dump($_POST);die;
 		$options = array();
 		foreach( $_POST as $key=>$value ) {
 			switch( $key ) {
@@ -492,11 +491,13 @@ class FMLAdmin
 				case 'media_default_rel_flickr':
 				case 'media_default_class_size':
 				case 'media_default_class_id':
+				case 'shortcode_default_size':
 				case 'shortcode_default_link':
 				case 'shortcode_default_rel_post':
 				case 'shortcode_default_rel_post_id':
 				case 'shortcode_default_class_size':
 				case 'shortcode_default_class_id':
+				case 'attachment_prepend_size':
 				//case 'image_default_class_size':
 					$options[$key] = $value;
 					break;
@@ -604,8 +605,17 @@ class FMLAdmin
 		$select_aligns       = $this->_aligns;
 		$select_sizes        = $this->_fml->flickr_sizes;
 		$cb_licenses         = $this->_fml->flickr_licenses;
+
 		// add "full" size
 		$select_sizes['full'] = __('Full',FML::SLUG);
+		// add a "blank" version
+		$select_sizes_blank  = array_merge(
+			array(
+				'' => __('(inherit from content)',FML::SLUG),
+			),
+			$select_sizes
+		);
+
 
 		$templates = array();
 		$edit_templates = array(

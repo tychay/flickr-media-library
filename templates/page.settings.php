@@ -25,10 +25,20 @@ function _page_settings_th( $form_id, $select_name, $label ) {
 		$label
 	);
 }
-function _page_input_select( $form_id, $select_name, $selects, $selected ) {
-	printf( '<select id="%1$s-%2$s" name="%2$s">', esc_attr($form_id), esc_attr($select_name) );
+function _page_input_select( $form_id, $select_name, $selects, $selected, $disabled=false ) {
+	printf(
+		'<select id="%1$s-%2$s" name="%2$s"%3$s>',
+		esc_attr($form_id),
+		esc_attr($select_name),
+		( $disabled ) ? 'disabled="disabled"' : ''
+	);
 	foreach ( $selects as $value=>$name ) {
-		printf( '<option value="%s"%s>%s</option>', esc_attr($value), ( $selected == $value ) ? ' selected="selected"' : '', esc_html($name) );
+		printf(
+			'<option value="%s"%s>%s</option>',
+			esc_attr($value),
+			( $selected == $value ) ? ' selected="selected"' : '',
+			esc_html($name)
+		);
 	}
 	echo '</select>';
 }
@@ -214,20 +224,17 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 		<table class="form-table">
 			<tr>
 				<?php _page_settings_th( $form_id, 'media_default_align', __('Default Alignment',FML::SLUG) ); ?>
-				<td><?php _page_input_select
-			( $form_id, 'media_default_align', $select_aligns, $settings['media_default_align'] ); ?></td>
+				<td><?php _page_input_select( $form_id, 'media_default_align', $select_aligns, $settings['media_default_align'] ); ?></td>
 			</tr>
 			<tr>
 				<?php _page_settings_th( $form_id, 'media_default_link', __('Default Link To',FML::SLUG) ); ?>
-				<td><?php _page_input_select
-			( $form_id, 'media_default_link', $select_links, $settings['media_default_link'] ); ?>
+				<td><?php _page_input_select( $form_id, 'media_default_link', $select_links, $settings['media_default_link'] ); ?>
 					<p class="description hidden" id="media_default_link_description"><?php printf( __('Remember %s state that you link back to Flickr when you post Flickr content elsewhere.', FML::SLUG), $flickr_tos ); ?></p>
 				</td>
 			</tr>
 			<tr>
 				<?php _page_settings_th( $form_id, 'media_default_size', __('Default Size',FML::SLUG) ); ?>
-				<td><?php _page_input_select
-			( $form_id, 'media_default_size', $select_sizes, $settings['media_default_size'] ); ?>
+				<td><?php _page_input_select( $form_id, 'media_default_size', $select_sizes, $settings['media_default_size'] ); ?>
 					<p class="description" id="media_default_size_description"><?php _e('Some sizes will be unavailable for photos that are too small or too old.',FML::SLUG); ?></p>
 				</td>
 			</tr>
@@ -273,6 +280,12 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 				<th scope="row"><?php _e('Embed',FML::SLUG); ?></th>
 				<td>
 					<?php _page_settings_cb( $form_id, 'shortcode_support_embed', $settings['shortcode_support_embed'], false, __('Support flickr embeds',FML::SLUG) );  ?>
+				</td>
+			</tr>
+			<tr>
+				<?php _page_settings_th( $form_id, 'shortcode_default_size', __('Default Size',FML::SLUG) ); ?>
+				<td><?php _page_input_select( $form_id, 'shortcode_default_size', $select_sizes_blank, $settings['shortcode_default_size'] ); ?>
+					<p class="description" id="shortcode_default_size_description"><?php _e('It is recommended you let the size inherit from the content. ',FML::SLUG) ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -333,7 +346,11 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 			// TODO hide/show select box:
 			_page_settings_cb( $form_id, 'attachment_prepend_remove', $settings['attachment_prepend_remove'], $hide_ap, $description );
 					?>
+					<br />
+					<label for="<?php echo $form_id.'-attachment_prepend_size'; ?>"><?php _e('Image Size: ',FML::SLUG); ?></label>
+					<?php _page_input_select( $form_id, 'attachment_prepend_size', $select_sizes, $settings['attachment_prepend_size'], $hide_ap ); ?>
 				</td>
+			</tr>
 			</tr>
 			<tr>
 				<th scope="row"><?php _e('Featured Image',FML::SLUG); ?></th>
