@@ -179,7 +179,7 @@ class FML implements FMLConstants
 	 * Stuff to run on `plugins_loaded`
 	 *
 	 * - register `init` handler
-	 * - register prepend_media to the_content to trigger shortcode processing on attachment page
+	 * - register attachment_prepend_media to the_content to trigger shortcode processing on attachment page
 	 * - add shortcode handler
 	 * - register filter_image_downsize to add fmlmedia image_downsize() support
 	 * - register filter_get_attached_file to make get_attached_file() return
@@ -196,7 +196,8 @@ class FML implements FMLConstants
 		add_action( 'init', array( $this, 'init' ) );
 
 		// run [fmlmedia] shortcode before wpautop (and other shortcodes)
-		add_filter( 'the_content', array( $this, 'prepend_media') ); //can run anytime
+		add_filter( 'the_content', array( $this, 'attachment_prepend_media') ); //can run anytime
+		add_filter( 'template_include', array( $this, 'attachment_maybe_remove_prepend') );
 		add_filter( 'the_content', array( $this, 'run_shortcode' ), 8);
 		// placeholder for strip_shortcodes() to work
 		//add_shortcode( self::SHORTCODE, array( $this, 'shortcode') );
@@ -229,6 +230,7 @@ class FML implements FMLConstants
 	 */
 	public function init() {
 		$this->register_post_type();
+
 
 		// move the code later to give filters a chance to change it in plugins_loaded
 		//$this->_support_picturefill = false;
@@ -718,60 +720,6 @@ class FML implements FMLConstants
 	//
 	// FMLMEDIA SHORTCODE HANDLING
 	//
-	/**
-	 * Filter to duplicate behavior of prepend_attachment but for flickr media.
-	 *
-	 * prepend_attachment is a filter run to inject the attachment image to the
-	 * attachment page. This emulates that behavior but for flickr media.
-	 * 
-	 * This can run anytime as it directly calls the shortcode.
-	 * 
-	 * @param  string $content the_content
-	 * @return string          the_content with fml shortcode prepend (if get_post() is flickr media)
-	 */
-	public function prepend_media( $content ) {
-		$post = get_post();
-		if ( empty($post->post_type) || $post->post_type != self::POST_TYPE ) { return $content; }
-
-		// show the medium sized image representation of the attachment if available, and link to the raw file
-		//$p .= wp_get_attachment_link(0, 'medium', false);
-		/**
-		 * Filter shortcode content for processing in prepend_media()
-		 *
-		 * Use this to inject parameters not handled by fml_prepend_media_shortcode_attrs.
-		 * @since 1.0
-		 * @see prepend_media()
-		 * @param string $content shortcode content
-		 */
-		$shortcode_content = apply_filters('fml_prepend_media_shortcode_content', '' );
-		/**
-		 * Filter shortcode attributes for shortcode processing in prepend_media()
-		 *
-		 * @since 1.0
-		 * @see prepend_media()
-		 * @param array $attrs shortcode attributes
-		 */
-		$shortcode_attrs = apply_filters('fml_prepend_media_shortcode_attrs', array(
-			'id'   => $post->ID,
-			'size' => 'Medium',
-			'link' => 'flickr',
-		) );
-		$p = $this->shortcode( $shortcode_attrs, $shortcode_content, 'prepend_media' );
-		// append caption if available
-		if ( $caption_text = $post->post_excerpt ) {
-			list( $img_src, $width, $height ) = image_downsize( $post->ID, $shortcode_attrs['size'] );
-			$attr = array(
-				'id'      => self::SLUG.'-attachment',
-				'width'   => $width,
-				'caption' => $caption_text,
-				'align'   => 'aligncenter',
-			);
-			$p = img_caption_shortcode( $attr, $p );
-		}
-		$p = apply_filters( 'prepend_attachment', $p );
-
-		return "$p\n$content";
-	}
 	/**
 	 * Modify HTML attachment to add shortcode for flickr media when inserting
 	 * from editor
@@ -2021,6 +1969,84 @@ class FML implements FMLConstants
 	//
 	// ATTACHMENT EMULATIONS
 	//
+	/**
+	 * Filter to duplicate behavior of prepend_attachment but for flickr media.
+	 *
+	 * prepend_attachment is a filter run to inject the attachment image to the
+	 * attachment page. This emulates that behavior but for flickr media.
+	 * 
+	 * This can run anytime as it directly calls the shortcode.
+	 * 
+	 * @param  string $content the_content
+	 * @return string          the_content with fml shortcode prepend (if get_post() is flickr media)
+	 */
+	public function attachment_prepend_media( $content ) {
+		$post = get_post();
+		if ( empty($post->post_type) || $post->post_type != self::POST_TYPE ) { return $content; }
+
+		// show the medium sized image representation of the attachment if available, and link to the raw file
+		//$p .= wp_get_attachment_link(0, 'medium', false);
+		/**
+		 * Filter shortcode content for processing in prepend_media()
+		 *
+		 * Use this to inject parameters not handled by fml_prepend_media_shortcode_attrs.
+		 * @since 1.0
+		 * @see attachment_prepend_media()
+		 * @param string $content shortcode content
+		 */
+		$shortcode_content = apply_filters('fml_prepend_media_shortcode_content', '' );
+		/**
+		 * Filter shortcode attributes for shortcode processing in prepend_media()
+		 *
+		 * @since 1.0
+		 * @see attachment_prepend_media()
+		 * @param array $attrs shortcode attributes
+		 */
+		$shortcode_attrs = apply_filters('fml_prepend_media_shortcode_attrs', array(
+			'id'   => $post->ID,
+			'size' => 'Medium',
+			'link' => 'flickr',
+		) );
+		$p = $this->shortcode( $shortcode_attrs, $shortcode_content, 'attachment_prepend_media' );
+		// append caption if available
+		if ( $caption_text = $post->post_excerpt ) {
+			list( $img_src, $width, $height ) = image_downsize( $post->ID, $shortcode_attrs['size'] );
+			$attr = array(
+				'id'      => self::SLUG.'-attachment',
+				'width'   => $width,
+				'caption' => $caption_text,
+				'align'   => 'aligncenter',
+			);
+			$p = img_caption_shortcode( $attr, $p );
+		}
+		$p = apply_filters( 'prepend_attachment', $p );
+
+		return "$p\n$content";
+	}
+	/**
+	 * Emulates the behavior of core template-loader.php
+	 *
+	 * Core will remove the attachment content prepend if the WP_USE_THEMES
+	 * is set and displaying the post page itself. The assumption is that
+	 * the theme will handle it.
+	 *
+	 * Note that the only obvious hook to use (reliably) is actually a filter,
+	 * not an action. Don't worry the variable would have been set correctly
+	 * inside core, we just need to take advantage of a side-effect of the
+	 * filter used in it.
+	 * 
+	 * @param  string $template pass-thru template
+	 * @return string
+	 */
+	public function attachment_maybe_remove_prepend( $template ) {
+		//// This is already true since the filter has been called
+		//if ( defined('WP_USE_THEMES') && WP_USE_THEMES ) {}
+		// CPT equivalent to is_attachment()
+		if ( is_singular( self::POST_TYPE ) ) {
+			remove_filter( 'the_content', array($this,'attachment_prepend_media') );
+		}
+		return $template;
+	}
 	/**
 	 * Inject Flickr image downsize code if image is Flickr Media
 	 * 
