@@ -39,8 +39,22 @@
 			} else {
 				$target.val('off');
 			}
+			// bind some checkboxes to others
+			if ( $this.hasClass('ctrl') ) {
+				var key = $this.prop('name').substring(3);
+				var $ctrl_div = $('.ctrl-'+key);
+				if ( $this.prop('checked') ) {
+					$ctrl_div.removeClass('hidden');
+					$('input', $ctrl_div).prop('disabled',false);
+					$('select', $ctrl_div).prop('disabled',false);
+				} else {
+					$ctrl_div.addClass('hidden');
+					$('input', $ctrl_div).prop('disabled','disabled');
+					$('select', $ctrl_div).prop('disabled','disabled');
+				}
+			}
 
-		});
+		}).change();
 
 		// add confirm to reset forms
 		$('#submit_reset').click( function(e) {

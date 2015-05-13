@@ -60,15 +60,16 @@ function _page_textarea( $form_id, $input_name, $input_value, $disabled=false ) 
 		( $disabled) ? ' disabled="disabled"' : ''
 	);
 }
-function _page_settings_cb( $form_id, $input_name, $input_value, $disabled, $label ) {
+function _page_settings_cb( $form_id, $input_name, $input_value, $disabled, $label, $add_ctrl=false ) {
 	printf(
-		'<input type="hidden" id="hidden-%1$s-%2$s" name="%2$s" value="%3$s"%4$s /> <label for="%1$s-%2$s"><input type="checkbox" id="%1$s-%2$s" name="cb-%2$s" class="bound_checkbox"%5$s /> %6$s</label>',
+		'<input type="hidden" id="hidden-%1$s-%2$s" name="%2$s" value="%3$s"%4$s /><label for="%1$s-%2$s"><input type="checkbox" id="%1$s-%2$s" name="cb-%2$s" class="bound_checkbox%7$s"%5$s%4$s /> %6$s</label>',
 		esc_attr($form_id),
 		esc_attr($input_name),
 		( $input_value ) ? 'on'                   : 'off',
 		( $disabled )    ? ' disabled="disabled"' : '',
 		( $input_value ) ? ' checked="checked"'   : '',
-		$label
+		$label,
+		( $add_ctrl ) ? ' ctrl' : ''
 	);
 }
 function _page_settings_hidden_class( $screen_option_id, $that ) {
@@ -339,16 +340,20 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 				<td>
 					<?php
 			$description = __('Emulate <code>prepend_attachment</code> by prepending media on attachment pages',FML::SLUG);
-			_page_settings_cb( $form_id, 'attachment_prepend', $settings['attachment_prepend'], false, $description );
+			_page_settings_cb( $form_id, 'attachment_prepend', $settings['attachment_prepend'], false, $description, true );
 			$hide_ap = ( !$settings['attachment_prepend'] );
-			echo '<br />';
+					?>
+					<br />
+					<div class="ctrl-attachment_prepend<?php if ( $hide_ap ) echo ' hidden'; ?>">
+						<?php
 			$description = __('Remove <code>prepend_attachment</code> on single pages',FML::SLUG);
 			// TODO hide/show select box:
 			_page_settings_cb( $form_id, 'attachment_prepend_remove', $settings['attachment_prepend_remove'], $hide_ap, $description );
 					?>
-					<br />
-					<label for="<?php echo $form_id.'-attachment_prepend_size'; ?>"><?php _e('Image Size: ',FML::SLUG); ?></label>
+						<br />
+						<label for="<?php echo $form_id.'-attachment_prepend_size'; ?>"><?php _e('Image Size: ',FML::SLUG); ?></label>
 					<?php _page_input_select( $form_id, 'attachment_prepend_size', $select_sizes, $settings['attachment_prepend_size'], $hide_ap ); ?>
+					</div>
 				</td>
 			</tr>
 			</tr>
@@ -357,18 +362,20 @@ function _page_settings_get_info_link( $url, $use_thickbox=true ) {
 				<td>
 					<?php
 			$description = __('Add captions to Featured Images',FML::SLUG);
-			_page_settings_cb( $form_id, 'post_thumbnail_caption', $settings['post_thumbnail_caption'], false, $description );
+			_page_settings_cb( $form_id, 'post_thumbnail_caption', $settings['post_thumbnail_caption'], false, $description, true );
 			$hide_ptc = ( !$settings['post_thumbnail_caption'] );
 					?>
 					<br />
-					<label for="<?php echo $form_id.'-post_thumbnail_caption'; ?>"><?php _e('Caption template: ',FML::SLUG); ?></label>
-					<?php
+					<div class="ctrl-post_thumbnail_caption<?php if ( $hide_ptc ) echo ' hidden'; ?>">
+						<label for="<?php echo $form_id.'-post_thumbnail_caption'; ?>"><?php _e('Caption template: ',FML::SLUG); ?></label>
+						<?php
 			$description = __('Only caption Featured Image in post',FML::SLUG);
 			// TODO do select box:
-			_page_input_select( $form_id, 'post_thumbnail_caption_template', $templates, $settings['post_thumbnail_caption_template'] );
+			_page_input_select( $form_id, 'post_thumbnail_caption_template', $templates, $settings['post_thumbnail_caption_template'], $hide_ptc );
 			echo '<br />';
 			_page_settings_cb( $form_id, 'post_thumbnail_post_only', $settings['post_thumbnail_post_only'], $hide_ptc, $description );
-					?>
+						?>
+					</div>
 				</td>
 			</tr>
 			<tr class="<?php _page_settings_hidden_class( 'fml_show_perf', $this )?>">
