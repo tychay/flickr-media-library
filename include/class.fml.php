@@ -585,7 +585,7 @@ class FML implements FMLConstants
 <br />
 {{?CAMERA_CLEAN}}<i>{{CAMERA_CLEAN}}{{?LENS}}, {{LENS}}{{/?LENS}}<br />
 {{?EXPOSURE_CLEAN}}{{EXPOSURE_CLEAN}} @ {{/?EXPOSURE_CLEAN}}{{APERTURE_CLEAN}}{{?ISO}}, iso{{ISO}}{{/?ISO}}{{?FOCAL_LENGTH_CLEAN}}, {{FOCAL_LENGTH_CLEAN}}{{/?FOCAL_LENGTH_CLEAN}}{{?FOCAL_LENGTH_35}} ({{FOCAL_LENGTH_35}}){{/?FOCAL_LENGTH_35}}</i>{{/?CAMERA_CLEAN}}',
-					'google_static_map' => '{{?LATITUDE_CLEAN}}<img src="http://maps.googleapis.com/maps/api/staticmap?zoom={{_geozoom,15}}&size={{_geo_width,400}}x{{_geo_height,240}}&maptype={{_geo_maptype,roadmap}}&markers=color:blue%7Clabel:P%7C{{LATITUDE_CLEAN}},{{LONGITUDE_CLEAN}}&sensor=false" width="{{_geo_width,400}}" height="{{_geo_height:240}}{{/?LATITUDE_CLEAN}}" />',
+					'google_static_map' => '{{?LATITUDE_CLEAN}}<img src="http://maps.googleapis.com/maps/api/staticmap?zoom={{_geo_zoom,15}}&size={{_geo_width,400}}x{{_geo_height,240}}&maptype={{_geo_maptype,roadmap}}&markers=color:{{_gmap_color,blue}}%7Clabel:{{_gmap_label,P}}%7C{{LATITUDE_CLEAN}},{{LONGITUDE_CLEAN}}&sensor=false" width="{{_geo_width,400}}" height="{{_geo_height:240}}{{/?LATITUDE_CLEAN}}" />',
 				) );
 		}
 		return false;
